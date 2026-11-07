@@ -4,7 +4,7 @@ description = "Dead Man's Wallet: probe contract proving NEAR Chain Signatures f
 version = "0.1.0"
 edition = "2021"
 license = "MIT"
-repository = "https://github.com/agarretson/deadmans-wallet"
+repository = "https://github.com/bigbenny1231/will-wallet"
 
 [lib]
 crate-type = ["cdylib", "rlib"]

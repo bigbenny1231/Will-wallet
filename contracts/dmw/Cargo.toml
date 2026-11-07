@@ -5,7 +5,7 @@ version = "0.1.0"
 edition = "2021"
 license = "MIT"
 # NEP-330: exposed by the `contract_source_metadata` view as `link`
-repository = "https://github.com/agarretson/deadmans-wallet"
+repository = "https://github.com/bigbenny1231/will-wallet"
 
 [lib]
 crate-type = ["cdylib", "rlib"]

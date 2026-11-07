@@ -2,10 +2,10 @@
 // No backend: every value here is a plain link. app.js only fills [data-link] anchors.
 const CONFIG = {
   DASHBOARD_URL: 'https://app.deadmanswallet.dev',   // the dashboard is deployed separately; see dashboard/README.md
-  DOCS_URL: 'https://github.com/agarretson/deadmans-wallet#readme',
+  DOCS_URL: 'https://github.com/bigbenny1231/will-wallet#readme',
   ONE_PAGER_URL: 'assets/attorney-one-pager.pdf',
-  GITHUB_URL: 'https://github.com/agarretson/deadmans-wallet',
-  CONTACT: 'https://github.com/agarretson/deadmans-wallet/issues'  // no mailbox exists yet; issues are the contact channel
+  GITHUB_URL: 'https://github.com/bigbenny1231/will-wallet',
+  CONTACT: 'https://github.com/bigbenny1231/will-wallet/issues'  // no mailbox exists yet; issues are the contact channel
 };
 
 

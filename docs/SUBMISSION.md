@@ -30,7 +30,7 @@ on Nov 7 2026 this checkout had no git remote and the GitHub URL was not reachab
     "open"
   ],
   "nearAddress": "{{NEAR_MAINNET_PAYOUT_ACCOUNT}}",
-  "projectUrl": "https://github.com/agarretson/deadmans-wallet",
+  "projectUrl": "https://github.com/bigbenny1231/will-wallet",
   "demoUrl": "{{DEMO_URL}}",
   "idea": "Agents hold wallets, API budgets and treasuries. When their operator dies, loses access or is incapacitated, the agent keeps spending until it runs dry, and anything it held on other chains is gone. The dead-man's switches we found move one key or one file on one chain; none disarms an agent or settles an estate across chains.\n\nDead Man's Wallet is a NEAR contract that does both. While you are alive, a phone key that can only call heartbeat says so. When the heartbeats stop, anyone can poke the contract, and it settles in five steps: heirs are paid on NEAR, with nothing for them to sign; the pulse and agent keys are deleted; NEAR's MPC network signs payouts on Base, Monad and Solana; a proposal is filed in the estate DAO; the Will NFT, which draws itself from state and can claim what is left, goes to the primary heir.\n\nWhat NEAR enables: function-call access keys scoped to one method, so a stolen phone can only say alive and a compromised agent can only spend inside its policy; Chain Signatures, so no single party holds a key for the foreign addresses and the contract requests signatures only after the trigger; NEP-171 with an on-chain SVG seal; permissionless keepers.\n\nShown on testnet: an agent scripted to obey a planted prompt injection, refused by its wallet, then by the contract itself; a guardian pause that moves the deadline once; two review rounds by a separate AI agent, with every Critical and High finding fixed. Foreign payouts are signed on chain but none has been relayed: the derived addresses are unfunded.\n\nTestnet only. Not a will, not a custodian, not audited. Built at NEAR Hackathon, mostly AI-generated with Claude under the direction of the author. MIT.",
   "consent": true
@@ -48,7 +48,7 @@ Your AI agent keeps spending after you die.
 
 Dead Man's Wallet: miss the heartbeats and a NEAR contract kills the agent's key and pays heirs. Built at NEAR Hackathon @NEARProtocol #NEARHackathon
 {{SITE_URL}}
-github.com/agarretson/deadmans-wallet
+github.com/bigbenny1231/will-wallet
 Who holds your agent's keys?
 ```
 
@@ -59,7 +59,7 @@ If you died tonight, could your family reach your crypto?
 
 Dead Man's Wallet: when your pulse stops, a NEAR contract pays them. They sign nothing to receive it. Built at NEAR Hackathon @NEARProtocol #NEARHackathon
 {{SITE_URL}}
-github.com/agarretson/deadmans-wallet
+github.com/bigbenny1231/will-wallet
 Who is yours?
 ```
 
@@ -70,7 +70,7 @@ Our scripted agent obeyed a prompt injection: send everything to a stranger. The
 
 Dead Man's Wallet, built at NEAR Hackathon @NEARProtocol #NEARHackathon
 {{SITE_URL}}
-github.com/agarretson/deadmans-wallet
+github.com/bigbenny1231/will-wallet
 What would you test next?
 ```
 
@@ -106,7 +106,7 @@ tweet 2 (use `docs/diagrams/settlement-sequence.png`) and tweet 5 (a crop of `do
 ```
 
 ```text
-6/6 Reproduce it: git clone, make check, make build, make test, make deploy, make demo. make build matches the live code hash with the same toolchain (rustc 1.97, cargo-near 0.23). Foreign payouts are signed; relay waits for funded addresses. github.com/agarretson/deadmans-wallet
+6/6 Reproduce it: git clone, make check, make build, make test, make deploy, make demo. make build matches the live code hash with the same toolchain (rustc 1.97, cargo-near 0.23). Foreign payouts are signed; relay waits for funded addresses. github.com/bigbenny1231/will-wallet
 ```
 
 Lengths: 250, 263, 258, 266, 260, 266.
@@ -134,7 +134,7 @@ git push origin master hackathon-submission
 git ls-remote --tags origin hackathon-submission    # one line
 
 # 2. fresh clone of the tag
-rm -rf /tmp/dmw-fresh && git clone --branch hackathon-submission https://github.com/agarretson/deadmans-wallet /tmp/dmw-fresh
+rm -rf /tmp/dmw-fresh && git clone --branch hackathon-submission https://github.com/bigbenny1231/will-wallet /tmp/dmw-fresh
 cd /tmp/dmw-fresh && make check                      # "All good."
 make build && make test                              # contract 104, keeper 51, dashboard 70, agent 41 passed (about 3 min)
 cd -
@@ -155,8 +155,8 @@ curl -s https://rpc.testnet.fastnear.com -H 'content-type: application/json' -d 
   | python3 -c 'import sys,json;print(bytes(json.load(sys.stdin)["result"]["result"]).decode())'
 #   -> "link" must be the repo URL. On Nov 7 2026 "build_info" is null: the live code (hash 13ug5kLS…fsqU, commit
 #      f0178de) came from `cargo near build non-reproducible-wasm`, so only a same-toolchain `make build` matches it
-curl -sI https://github.com/agarretson/deadmans-wallet | head -1            # 200 (repo is public)
-curl -sI https://github.com/agarretson/deadmans-wallet/tree/hackathon-submission | head -1           # 200
+curl -sI https://github.com/bigbenny1231/will-wallet | head -1            # 200 (repo is public)
+curl -sI https://github.com/bigbenny1231/will-wallet/tree/hackathon-submission | head -1           # 200
 # compare: `make build` (rustc 1.97.0, cargo-near 0.23.0) prints the code hash; `view_account dmw-x8cx.testnet` code_hash
 # must be the same. If the contract is redeployed, update the README row "The live contract is this source".
 

@@ -60,7 +60,7 @@ Prerequisites (`make check` verifies them and prints the fix for anything missin
 No `.env`, keys or near-cli credentials are needed beforehand. `make deploy` creates them.
 
 ```bash
-git clone https://github.com/agarretson/deadmans-wallet deadmans-wallet && cd deadmans-wallet
+git clone https://github.com/bigbenny1231/will-wallet deadmans-wallet && cd deadmans-wallet
 make check     # verify toolchain   -> "All good." (optional tools only warn)
 make build     # build the contract -> contracts/dmw/target/near/dmw.wasm and its code hash (about 1 min)
 make test      # unit tests         -> contract "104 passed", keeper "51 passed", dashboard "70 passed", agent "41 passed" (runs npm ci first)
