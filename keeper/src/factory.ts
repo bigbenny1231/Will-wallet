@@ -1,3 +1,4 @@
+import { KeyPair } from 'near-api-js';
 import { type Backend, NearBackend, makeAccount, makeProvider } from './backend.js';
 import { type Chains, loadRealChains } from './chainsApi.js';
 import { type Config, need } from './config.js';
@@ -23,12 +24,12 @@ export function keeperBackend(cfg: Config): Backend {
   );
 }
 
-/** Read-only backend (views only); uses a throwaway signer. */
+/** Read-only backend (views only); uses a throwaway random signer (never signs anything). */
 export function viewBackend(cfg: Config): Backend {
   if (cfg.mock) return new MockBackend();
   const provider = makeProvider(cfg.rpcUrl);
   const acct = cfg.keeperAccountId || 'view.testnet';
-  const key = cfg.keeperPrivateKey || 'ed25519:3D4YudUQRE39Lc4JHghuB5WM8kbgDDa34mnrEP5DdTApVH81af7e2dWgNPEaiQfdJnZq1CNPp5im4Rg5b733oiMP';
+  const key = cfg.keeperPrivateKey || KeyPair.fromRandom('ed25519').toString();
   return new NearBackend(provider, need(cfg.contract, 'DMW_CONTRACT'), makeAccount(provider, acct, key));
 }
 

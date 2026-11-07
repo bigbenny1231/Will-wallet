@@ -49,6 +49,18 @@ export const api = {
       return String(BigInt(n) + 1n);
     }
   },
+  /** The contract's per-chain max_fee_per_gas (get_config().chains[]); Base 100 gwei, Monad 1000 gwei. */
+  async getChainFeeCap(chain: string): Promise<bigint> {
+    const fallback = chain === "monad" ? 1_000_000_000_000n : 100_000_000_000n;
+    if (MOCK) return fallback;
+    try {
+      const c = await view<{ chains: { chain: string; max_fee_per_gas?: string }[] }>("get_config");
+      const e = c.chains.find((x) => x.chain === chain);
+      return e?.max_fee_per_gas ? BigInt(e.max_fee_per_gas) : fallback;
+    } catch {
+      return fallback;
+    }
+  },
   async getHeirVaults(account: string): Promise<VaultView[]> {
     const all = await this.getAllVaults();
     return all.filter((v) => v.heirs.some((h) => h.account_id === account));

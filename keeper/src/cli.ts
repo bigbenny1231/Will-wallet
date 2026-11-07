@@ -22,7 +22,7 @@ const run = (fn: () => Promise<void>) =>
 
 program
   .command('derive')
-  .description('print the derived Base and Solana source addresses for a vault')
+  .description('print the derived Base, Monad and Solana source addresses for a vault')
   .requiredOption('--token <id>', 'vault token id')
   .option('--json', 'machine-readable output')
   .action((o) =>

@@ -20,11 +20,15 @@ describe("NEAR Auth identity -> account", () => {
 });
 
 describe("EVM fee caps (Base and Monad)", () => {
-  it("keeps max_fee within the contract's 100 gwei cap and priority <= max", () => {
+  it("keeps max_fee within the per-chain cap and priority <= max", () => {
     const gwei = 1_000_000_000n;
     expect(capFees(1n * gwei, 2n * gwei)).toEqual({ max_fee_per_gas: (4n * gwei).toString(), max_priority_fee_per_gas: (2n * gwei).toString() });
-    const monad = capFees(100n * gwei, 2n * gwei);
-    expect(BigInt(monad.max_fee_per_gas)).toBe(MAX_EVM_FEE);
+    const base = capFees(100n * gwei, 2n * gwei);
+    expect(BigInt(base.max_fee_per_gas)).toBe(MAX_EVM_FEE);
+    // Monad: the per-chain cap from get_config (1000 gwei) applies, not the 100 gwei Base default.
+    const monad = capFees(300n * gwei, 2n * gwei, 1000n * gwei);
+    expect(BigInt(monad.max_fee_per_gas)).toBe(602n * gwei);
+    expect(BigInt(capFees(900n * gwei, 2n * gwei, 1000n * gwei).max_fee_per_gas)).toBe(1000n * gwei);
     const silly = capFees(10n * gwei, 500n * gwei);
     expect(BigInt(silly.max_priority_fee_per_gas)).toBeLessThanOrEqual(BigInt(silly.max_fee_per_gas));
   });

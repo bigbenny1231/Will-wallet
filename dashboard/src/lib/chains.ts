@@ -2,9 +2,14 @@
 // Mirrors keeper/src/chains/{evm,solana}.ts. Public RPCs, called straight from the browser.
 import { BASE_RPC, MONAD_RPC, SOLANA_RPC } from "../config";
 import type { EvmStepArgs, ForeignChain, ForeignPayout, StepArgs, VaultView } from "../types";
+import { deriveFor } from "./derive";
+import { api } from "./near";
 
 const EVM_RPC: Partial<Record<ForeignChain, string>> = { base: BASE_RPC, monad: MONAD_RPC };
-/** The contract rejects max_fee_per_gas above 100 gwei (foreign.rs MAX_EVM_FEE_PER_GAS). */
+/**
+ * Fallback only: the contract's Base cap (foreign.rs MAX_EVM_FEE_PER_GAS, 100 gwei). The real cap is per chain
+ * (Monad testnet allows 1000 gwei) and is read from get_config().chains[].max_fee_per_gas at run time.
+ */
 export const MAX_EVM_FEE = 100_000_000_000n;
 
 async function rpc<T>(url: string, method: string, params: unknown[]): Promise<T> {
@@ -18,23 +23,27 @@ async function rpc<T>(url: string, method: string, params: unknown[]): Promise<T
   return j.result as T;
 }
 
-/** EIP-1559 fees within the contract's cap: max_fee = min(2 * baseFee + priority, 100 gwei), priority <= max_fee. */
-export function capFees(baseFee: bigint, prio: bigint): { max_fee_per_gas: string; max_priority_fee_per_gas: string } {
+/** EIP-1559 fees within the chain's cap: max_fee = min(2 * baseFee + priority, cap), priority <= max_fee. */
+export function capFees(baseFee: bigint, prio: bigint, cap: bigint = MAX_EVM_FEE): { max_fee_per_gas: string; max_priority_fee_per_gas: string } {
   const p = prio > 0n ? prio : 1_000_000n;
   let max = baseFee * 2n + p;
-  if (max > MAX_EVM_FEE) max = MAX_EVM_FEE;
+  if (max > cap) max = cap;
   return { max_fee_per_gas: max.toString(), max_priority_fee_per_gas: (p > max ? max : p).toString() };
 }
 
-/** Pending nonce and capped EIP-1559 fees, 21000 gas for a native transfer. The contract pins the nonce itself. */
+/**
+ * Pending nonce and capped EIP-1559 fees, 21000 gas for a native transfer (the contract raises the EVM gas to
+ * its 50,000 floor, final audit H-5). The contract pins the nonce itself.
+ */
 export async function getEvmStepArgs(from: string, chain: ForeignChain = "base"): Promise<EvmStepArgs> {
   const url = EVM_RPC[chain] ?? BASE_RPC;
-  const [nonceHex, block, prioHex] = await Promise.all([
+  const [nonceHex, block, prioHex, cap] = await Promise.all([
     rpc<string>(url, "eth_getTransactionCount", [from, "pending"]),
     rpc<{ baseFeePerGas: string }>(url, "eth_getBlockByNumber", ["latest", false]),
     rpc<string>(url, "eth_maxPriorityFeePerGas", []).catch(() => "0xf4240"),
+    api.getChainFeeCap(chain),
   ]);
-  return { nonce: Number(BigInt(nonceHex)), ...capFees(BigInt(block.baseFeePerGas), BigInt(prioHex)), gas_limit: "21000" };
+  return { nonce: Number(BigInt(nonceHex)), ...capFees(BigInt(block.baseFeePerGas), BigInt(prioHex), cap), gas_limit: "21000" };
 }
 
 export async function getSolanaBlockhash(): Promise<string> {
@@ -52,7 +61,9 @@ export async function stepArgsFor(v: VaultView, fromAddressFallback?: string): P
   const p = currentForeign(v);
   if (!p) return undefined;
   if (p.chain === "base" || p.chain === "monad") {
-    const from = p.from_address || fromAddressFallback;
+    // Some stored payouts have an empty from_address (e.g. created without the derived addresses): derive it
+    // in the browser from the contract id and token id, exactly as the MPC path does.
+    const from = p.from_address || fromAddressFallback || deriveFor(v.token_id)[p.chain];
     if (!from) throw new Error(`No source address recorded for this ${p.chain === "base" ? "Base" : "Monad"} payout`);
     return { evm: await getEvmStepArgs(from, p.chain) };
   }
