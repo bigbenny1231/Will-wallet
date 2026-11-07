@@ -1,0 +1,54 @@
+@import "tailwindcss";
+
+@theme {
+  --color-bg: #0b0f14;
+  --color-panel: #121821;
+  --color-panel2: #18202b;
+  --color-line: #232d3a;
+  --color-ink: #e6edf3;
+  --color-mute: #8b98a5;
+  --color-accent: #7c9cff;
+  --color-alive: #2ecc71;
+  --color-warn: #f39c12;
+  --color-dead: #e74c3c;
+  --color-settled: #7f8c8d;
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+html {
+  font-size: 18px;
+}
+body {
+  background: var(--color-bg);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+@layer components {
+  .panel {
+    @apply rounded-2xl border border-line bg-panel p-6;
+  }
+  .h-section {
+    @apply mb-4 text-sm font-semibold uppercase tracking-widest text-mute;
+  }
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl border border-line bg-panel2 px-5 py-3 text-base font-semibold text-ink transition hover:border-accent disabled:cursor-not-allowed disabled:opacity-40;
+  }
+  .btn-primary {
+    @apply border-accent bg-accent text-bg hover:brightness-110;
+  }
+  .input {
+    @apply w-full rounded-xl border border-line bg-bg px-4 py-3 text-base text-ink outline-none focus:border-accent;
+  }
+  .label {
+    @apply mb-1 block text-sm text-mute;
+  }
+  .mono {
+    @apply font-mono text-sm break-all;
+  }
+  a.link {
+    @apply text-accent underline-offset-4 hover:underline;
+  }
+}
