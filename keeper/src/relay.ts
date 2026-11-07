@@ -4,7 +4,7 @@ import type { ChainName } from './types.js';
 
 export type RelayErrorKind = 'unfunded' | 'stale' | 'other';
 
-const UNFUNDED = /insufficient funds|insufficient lamports|AccountNotFound|no record of a prior credit|InsufficientFundsForFee|InsufficientFundsForRent/i;
+const UNFUNDED = /insufficient funds|insufficient lamports|AccountNotFound|no record of a prior credit|InsufficientFundsForFee|InsufficientFundsForRent|insufficient balance/i;
 const EVM_STALE = /nonce too low|nonce is too low|replacement transaction underpriced|max fee per gas less than block base fee/i;
 
 export function classifyRelayError(chain: ChainName, e: unknown): RelayErrorKind {
