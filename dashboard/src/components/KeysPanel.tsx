@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { KeyPair } from "near-api-js";
 import { useWallet } from "../lib/wallet";
 import { shortKey } from "../lib/format";
+import { addAgentKeyCall, addPulseKeyCall, removeKeyCall, KEY_ALLOWANCE_YOCTO } from "../lib/calls";
+import { yoctoToNear } from "../lib/format";
 import type { VaultView } from "../types";
 import { CopyBox, ErrorNote } from "./ui";
 
@@ -39,6 +41,7 @@ export default function KeysPanel({ v, isOwner }: { v: VaultView; isOwner: boole
   useEffect(() => setFresh(load(v.token_id)), [v.token_id]);
 
   const locked = v.state === "Triggered" || v.state === "Settled";
+  const lowBalance = BigInt(v.balance) < KEY_ALLOWANCE_YOCTO;
   const registered = fresh ? (fresh.kind === "pulse" ? v.pulse_keys : v.agent_keys).includes(fresh.pub) : false;
 
   const add = async (kind: Kind) => {
@@ -50,11 +53,7 @@ export default function KeysPanel({ v, isOwner }: { v: VaultView; isOwner: boole
     sessionStorage.setItem(STORE, JSON.stringify(f));
     setFresh(f);
     try {
-      await call({
-        method: kind === "pulse" ? "add_pulse_key" : "add_agent_key",
-        args: { token_id: v.token_id, public_key: f.pub },
-        gas: "60000000000000",
-      });
+      await call(kind === "pulse" ? addPulseKeyCall(v.token_id, f.pub) : addAgentKeyCall(v.token_id, f.pub));
     } catch (e) {
       sessionStorage.removeItem(STORE);
       setFresh(null);
@@ -72,7 +71,7 @@ export default function KeysPanel({ v, isOwner }: { v: VaultView; isOwner: boole
   const remove = async (public_key: string) => {
     setErr(null);
     try {
-      await call({ method: "remove_key", args: { token_id: v.token_id, public_key }, gas: "60000000000000" });
+      await call(removeKeyCall(v.token_id, public_key));
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
     }
@@ -81,13 +80,16 @@ export default function KeysPanel({ v, isOwner }: { v: VaultView; isOwner: boole
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap gap-3">
-        <button className="btn btn-primary" disabled={!isOwner || locked || busy} onClick={() => add("pulse")}>
+        <button className="btn btn-primary" disabled={!isOwner || locked || busy || lowBalance} title={lowBalance ? "The vault balance must cover the 1 NEAR key gas allowance" : undefined} onClick={() => add("pulse")}>
           Add pulse key
         </button>
-        <button className="btn" disabled={!isOwner || locked || busy} onClick={() => add("agent")}>
+        <button className="btn" disabled={!isOwner || locked || busy || lowBalance} title={lowBalance ? "The vault balance must cover the 1 NEAR key gas allowance" : undefined} onClick={() => add("agent")}>
           Add agent key
         </button>
         {!isOwner && <span className="self-center text-mute">Connect as the vault owner to add keys.</span>}
+        {isOwner && !locked && lowBalance && (
+          <span className="self-center text-mute">Each key reserves 1 NEAR of gas allowance from the vault balance ({yoctoToNear(v.balance)} NEAR now). Deposit more first.</span>
+        )}
         {isOwner && locked && <span className="self-center text-mute">Keys are locked once the vault is triggered.</span>}
       </div>
 

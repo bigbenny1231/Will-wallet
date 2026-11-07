@@ -75,14 +75,14 @@ function cycleVault(now = Date.now()): VaultView {
   });
   const log: LogEntry[] = [
     { ms: last, event: "heartbeat", detail: "owner" },
-    { ms: last + 4000, event: "agent_pay_allowed", detail: "api.provider.testnet 0.2 NEAR" },
-    { ms: last + 9000, event: "agent_pay_denied", detail: "reason=over_per_tx_max receiver=api.provider.testnet amount=3 NEAR" },
-    { ms: last + 12000, event: "agent_pay_denied", detail: "reason=receiver_not_allowlisted receiver=unknown.testnet amount=0.1 NEAR" },
+    { ms: last + 4000, event: "agent_pay_allowed", detail: `api.provider.testnet ${(NEAR / 5n).toString()}` },
+    { ms: last + 9000, event: "agent_pay_denied", detail: `over_per_tx_max api.provider.testnet ${(3n * NEAR).toString()}` },
+    { ms: last + 12000, event: "agent_pay_denied", detail: `receiver_not_allowlisted unknown.testnet ${(NEAR / 10n).toString()}` },
     ...extraLog.filter((e) => e.ms >= last),
   ];
   if (state === "Triggered" || settled) {
     log.push({ ms: trigger, event: "triggered", detail: "bounty paid to keeper.testnet" });
-    for (let s = 1; s <= Math.min(5, step - 1 + (settled ? 1 : 0)); s++) log.push({ ms: trigger + s * 3500, event: `step_${s}`, detail: s === 1 ? "sarah.testnet 5.7 NEAR; ben.testnet 3.8 NEAR" : "ok" });
+    for (let s = 1; s <= Math.min(5, step - 1 + (settled ? 1 : 0)); s++) log.push({ ms: trigger + s * 3500, event: `step_${s}`, detail: s === 1 ? "sarah.testnet 5.7 NEAR, ben.testnet 3.8 NEAR" : "ok" });
   }
   if (settled) log.push({ ms: trigger + 20000, event: "settled", detail: "nft -> sarah.testnet" });
   log.sort((a, b) => a.ms - b.ms);
@@ -134,7 +134,7 @@ function staticVault(id: string, owner: string, state: VaultState, heirs: { acco
     log: settled
       ? [
           { ms: now - 90000, event: "triggered", detail: "" },
-          { ms: now - 80000, event: "step_1", detail: heirs.map((h) => `${h.account_id} ${(25 * h.bps) / 10000} NEAR`).join("; ") },
+          { ms: now - 80000, event: "step_1", detail: heirs.map((h) => `${h.account_id} ${(25 * h.bps) / 10000} NEAR`).join(", ") },
           { ms: now - 60000, event: "settled", detail: "" },
         ]
       : [],
@@ -189,6 +189,8 @@ export const mockApi = {
     if (c.method === "heartbeat" && id === "1") {
       cycleStart = now;
       extraLog.push({ ms: now, event: "heartbeat", detail: "owner" });
+    } else if (c.method === "poke" || c.method === "execute_step" || c.method === "deposit" || c.method === "claim" || c.method === "nft_transfer") {
+      // Mock mode follows the fixed cycle; these calls are accepted but change nothing.
     } else if (c.method === "add_pulse_key") {
       extraPulse.push(String(c.args.public_key));
     } else if (c.method === "add_agent_key") {

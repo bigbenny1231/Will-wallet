@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { MOCK, POLL_MS } from "../config";
+import { CONTRACT, MOCK, POLL_MS } from "../config";
 import { api } from "../lib/near";
 import { useWallet } from "../lib/wallet";
 import { usePoll } from "../lib/usePoll";
@@ -13,6 +13,9 @@ export default function Home() {
   const nav = useNavigate();
   const [open, setOpen] = useState("");
   const mine = usePoll(() => (accountId ? api.getVaultsForOwner(accountId) : Promise.resolve([])), POLL_MS * 2, [accountId]);
+  // Without a wallet, list every vault on the contract so the app is browsable read-only.
+  const everyone = usePoll(() => (accountId ? Promise.resolve([]) : api.getAllVaults()), POLL_MS * 2, [accountId]);
+  const list = accountId ? mine.data : everyone.data;
 
   return (
     <div className="space-y-8">
@@ -24,7 +27,7 @@ export default function Home() {
 
       {!accountId && (
         <div className="panel flex flex-col items-start gap-4">
-          <p className="text-lg text-mute">Connect a NEAR wallet to see your vaults.</p>
+          <p className="text-lg text-mute">Connect a NEAR wallet to see your vaults. All vaults on {CONTRACT} are listed below.</p>
           <button className="btn btn-primary" onClick={connect} disabled={!ready}>Connect wallet</button>
         </div>
       )}
@@ -35,7 +38,7 @@ export default function Home() {
       )}
 
       <div className="grid gap-5 md:grid-cols-2">
-        {mine.data?.map((v) => (
+        {list?.map((v) => (
           <Link key={v.token_id} to={`/vault/${v.token_id}`} className="panel block transition hover:border-accent">
             <div className="flex items-start justify-between">
               <div className="text-3xl font-semibold">#{v.token_id}</div>

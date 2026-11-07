@@ -2,7 +2,7 @@ const env = import.meta.env;
 
 export const MOCK = env.VITE_DMW_MOCK === "1" || env.VITE_DMW_MOCK === "true";
 export const NETWORK: "testnet" | "mainnet" = env.VITE_NEAR_NETWORK === "mainnet" ? "mainnet" : "testnet";
-export const CONTRACT: string = env.VITE_DMW_CONTRACT || "dmw-1.testnet";
+export const CONTRACT: string = env.VITE_DMW_CONTRACT || "dmw-x8cx.testnet";
 export const RPC: string =
   env.VITE_NEAR_RPC || (NETWORK === "mainnet" ? "https://rpc.mainnet.near.org" : "https://rpc.testnet.near.org");
 export const SIGNER_CONTRACT = NETWORK === "mainnet" ? "v1.signer" : "v1.signer-prod.testnet";
@@ -23,3 +23,6 @@ export const links = {
   baseFaucet: "https://www.alchemy.com/faucets/base-sepolia",
   solFaucet: "https://faucet.solana.com",
 };
+
+export const BASE_RPC: string = env.VITE_BASE_RPC || "https://sepolia.base.org";
+export const SOLANA_RPC: string = env.VITE_SOLANA_RPC || "https://api.devnet.solana.com";

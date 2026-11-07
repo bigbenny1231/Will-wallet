@@ -3,8 +3,9 @@ import { POLL_MS, links, CONTRACT } from "../config";
 import { api } from "../lib/near";
 import { useWallet } from "../lib/wallet";
 import { usePoll } from "../lib/usePoll";
-import { bpsToPct, shareOf, unitsFor, yoctoToNear } from "../lib/format";
+import { bpsToPct, expectedShare, unitsFor, yoctoToNear } from "../lib/format";
 import { ErrorNote, ExtLink, Ribbon } from "../components/ui";
+import { parseStep1Detail, step1AmountFor } from "../lib/logparse";
 import type { VaultView } from "../types";
 
 export default function Heir() {
@@ -38,8 +39,11 @@ function HeirCard({ v, me }: { v: VaultView; me: string }) {
   const settled = v.state === "Settled";
   const step1 = v.log.find((l) => l.event === "step_1");
   const paid = v.step > 1 || settled; // step 1 (NEAR to heirs) is done once the cursor has moved on
-  // After step 1 the vault balance only holds the reserve, so the paid amount comes from the step_1 log line when it names this account.
-  const paidMatch = step1?.detail?.match(new RegExp(`${me.replace(/\./g, "\\.")}[ :=]+([0-9.]+)`));
+  // After step 1 the vault balance only holds the reserve, so the paid amount comes from the step_1 log line
+  // ("<account> <amount> NEAR, <account> <amount> NEAR").
+  const paidAmount = step1AmountFor(step1?.detail, me);
+  const paidMatch = paidAmount ? [paidAmount, paidAmount] : null;
+  const allPaid = parseStep1Detail(step1?.detail);
   return (
     <div className="panel space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -57,8 +61,8 @@ function HeirCard({ v, me }: { v: VaultView; me: string }) {
         <Box label="Your share" value={bpsToPct(mine.bps)} />
         <Box
           label={paid ? "Sent to you" : "Will arrive (NEAR)"}
-          value={paid ? (paidMatch ? `${paidMatch[1]} NEAR` : "Sent") : `${yoctoToNear(shareOf(v.balance, mine.bps))} NEAR`}
-          sub={paid ? (paidMatch ? "from the settlement log" : "see the settlement log") : "at current balance"}
+          value={paid ? (paidMatch ? `${paidMatch[1]} NEAR` : "Sent") : `${yoctoToNear(expectedShare(v.balance, mine.bps, !!v.dao_id))} NEAR`}
+          sub={paid ? (paidMatch ? "from the settlement log" : "see the settlement log") : "at current balance, after the settlement reserve"}
         />
         <Box label="Status" value={v.state === "Settled" ? "Arrived" : v.state === "Triggered" ? `Settling, step ${Math.min(v.step, 5)} of 5` : "Waiting"} />
       </div>
@@ -80,7 +84,11 @@ function HeirCard({ v, me }: { v: VaultView; me: string }) {
         </div>
       )}
 
-      {step1?.detail && <p className="text-mute">Settlement log: <span className="mono">{step1.detail}</span></p>}
+      {allPaid.length > 0 && (
+        <p className="text-mute">
+          Settlement paid {allPaid.map((p) => `${p.account} ${p.amount} NEAR`).join(", ")}
+        </p>
+      )}
       <ExtLink href={links.nearAddress(me)}>Your account on nearblocks</ExtLink>
       <span className="ml-4 text-sm text-mute">contract {CONTRACT}</span>
     </div>

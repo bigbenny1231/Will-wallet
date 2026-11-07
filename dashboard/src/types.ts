@@ -51,6 +51,8 @@ export interface VaultView {
   dao_proposal_id: number | null;
   step: number;
   foreign_index: number;
+  foreign_inflight?: boolean;
+  created_ms?: number;
   log: LogEntry[];
 }
 
@@ -58,6 +60,18 @@ export interface NftToken {
   token_id: string;
   owner_id: string;
   metadata?: { title?: string; description?: string; media?: string; extra?: string | null } | null;
+}
+
+export interface EvmStepArgs {
+  nonce: number;
+  max_fee_per_gas: string;
+  max_priority_fee_per_gas: string;
+  gas_limit: string;
+}
+
+export interface StepArgs {
+  evm?: EvmStepArgs;
+  solana?: { recent_blockhash: string };
 }
 
 export interface CallArgs {

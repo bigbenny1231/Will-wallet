@@ -38,11 +38,16 @@ export const api = {
     }
     return out;
   },
-  /** Best guess at the id the next create_vault will mint (assumes sequential ids from nft_total_supply). */
+  /** The id the next create_vault will mint: get_config().next_id (falls back to nft_total_supply + 1). */
   async nextTokenId(): Promise<string> {
     if (MOCK) return String((await mockApi.getAllVaults()).length + 1);
-    const n = await view<string | number>("nft_total_supply");
-    return String(BigInt(n) + 1n);
+    try {
+      const c = await view<{ next_id: number | string }>("get_config");
+      return String(BigInt(c.next_id));
+    } catch {
+      const n = await view<string | number>("nft_total_supply");
+      return String(BigInt(n) + 1n);
+    }
   },
   async getHeirVaults(account: string): Promise<VaultView[]> {
     const all = await this.getAllVaults();

@@ -9,6 +9,8 @@ import { CONTRACT, MOCK, NETWORK } from "../config";
 import type { CallArgs } from "../types";
 import { MOCK_ACCOUNT, mockApi } from "./mock";
 
+// Display-only override for screenshots/tests (VITE_DEBUG_ACCOUNT=<account>); no wallet is attached, so calls still fail.
+const DEBUG_ACCOUNT: string = import.meta.env.VITE_DEBUG_ACCOUNT || "";
 const GAS_DEFAULT = "100000000000000"; // 100 TGas
 
 interface WalletCtx {
@@ -37,12 +39,12 @@ function toTx(c: CallArgs) {
 
 export function WalletProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
-  const [accountId, setAccountId] = useState<string | null>(MOCK ? MOCK_ACCOUNT : null);
+  const [accountId, setAccountId] = useState<string | null>(MOCK ? MOCK_ACCOUNT : DEBUG_ACCOUNT || null);
   const selectorRef = useRef<WalletSelector | null>(null);
   const modalRef = useRef<WalletSelectorModal | null>(null);
 
   useEffect(() => {
-    if (MOCK) {
+    if (MOCK || DEBUG_ACCOUNT) {
       setReady(true);
       return;
     }

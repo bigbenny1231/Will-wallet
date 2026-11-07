@@ -81,3 +81,16 @@ export function toSmallest(chain: "base" | "solana", human: string): string {
   const [w, f = ""] = s.split(".");
   return (BigInt(w) * 10n ** BigInt(digits) + BigInt(f.padEnd(digits, "0"))).toString();
 }
+
+/** Step 1 keeps a reserve in the vault: 1.5 NEAR with a DAO (bond + gas), 0.1 NEAR without. */
+export function step1Reserve(hasDao: boolean): bigint {
+  return hasDao ? 15n * 10n ** 23n : 10n ** 23n;
+}
+
+/** What an heir with `bps` would receive in step 1 at the current balance. */
+export function expectedShare(balance: string, bps: number, hasDao: boolean): string {
+  const b = BigInt(balance);
+  const r = step1Reserve(hasDao);
+  const d = b > r ? b - r : 0n;
+  return ((d * BigInt(bps)) / 10000n).toString();
+}

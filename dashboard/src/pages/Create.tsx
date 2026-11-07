@@ -30,7 +30,7 @@ export default function Create() {
   // heirs
   const [heirs, setHeirs] = useState<HeirRow[]>([{ account_id: "", pct: "100" }]);
   // policy
-  const [perTx, setPerTx] = useState("1");
+  const [perTx, setPerTx] = useState("5");
   const [daily, setDaily] = useState("5");
   const [allow, setAllow] = useState("");
   // foreign
@@ -41,7 +41,7 @@ export default function Create() {
   // dao + deposit
   const [dao, setDao] = useState("");
   const [bounty, setBounty] = useState("0.05");
-  const [deposit, setDeposit] = useState("1");
+  const [deposit, setDeposit] = useState("5");
 
   useEffect(() => {
     api.nextTokenId().then(setExpectedId).catch(() => setExpectedId(null));
@@ -255,7 +255,7 @@ export default function Create() {
         {step === 5 && (
           <>
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Initial deposit (NEAR)" hint="At least 0.1 NEAR is kept for storage; the rest is the vault balance.">
+              <Field label="Initial deposit (NEAR)" hint="0.1 NEAR is kept for storage; the rest is the vault balance. Each pulse or agent key later reserves 1 NEAR of it as gas allowance.">
                 <input className="input" value={deposit} onChange={(e) => setDeposit(e.target.value)} />
               </Field>
               <Field label="Keeper bounty (NEAR)" hint="Paid to whoever pokes the vault.">
