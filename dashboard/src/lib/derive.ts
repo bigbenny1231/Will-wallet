@@ -7,6 +7,7 @@ import { CONTRACT, NETWORK } from "../config";
 
 export interface DerivedAddresses {
   base: string;
+  monad: string;
   solana: string;
 }
 
@@ -23,13 +24,14 @@ export function deriveFor(tokenId: string, contractId = CONTRACT): DerivedAddres
   const roots = chainsig.constants.ROOT_PUBLIC_KEYS[NETWORK === "mainnet" ? "MAINNET" : "TESTNET"];
   const { cryptography: c } = chainsig.utils;
 
-  const sec = c.deriveChildPublicKey(c.najToUncompressedPubKeySEC1(roots.secp256k1), contractId, `base-${tokenId}`);
-  const addr = hex(keccak_256(unhex(sec.slice(2))).slice(12));
+  const rootSec = c.najToUncompressedPubKeySEC1(roots.secp256k1);
+  // Each EVM chain has its own path (base-<id>, monad-<id>), so its own address.
+  const evm = (path: string) => eip55(hex(keccak_256(unhex(c.deriveChildPublicKey(rootSec, contractId, path).slice(2))).slice(12)));
 
   const ed = c.deriveChildPublicKeyEd25519(roots.ed25519, contractId, `sol-${tokenId}`);
   const sol = ed.replace(/^ed25519:/, "");
   // validate it is a 32-byte key
   if (bs58.decode(sol).length !== 32) throw new Error("bad ed25519 derived key");
 
-  return { base: eip55(addr), solana: sol };
+  return { base: evm(`base-${tokenId}`), monad: evm(`monad-${tokenId}`), solana: sol };
 }

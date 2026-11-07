@@ -75,7 +75,10 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   const connect = useCallback(() => modalRef.current?.show(), []);
 
   const disconnect = useCallback(async () => {
-    if (MOCK) return;
+    if (MOCK) {
+      setAccountId(null); // mock: lets the heir page show the Google sign-in
+      return;
+    }
     const sel = selectorRef.current;
     if (!sel) return;
     const w = await sel.wallet();

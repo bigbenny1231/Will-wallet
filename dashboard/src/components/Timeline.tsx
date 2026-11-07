@@ -1,3 +1,4 @@
+import { chainMeta } from "../lib/chainmeta";
 import { links } from "../config";
 import { fmtTime, humanizeYocto, shortAddr, unitsFor } from "../lib/format";
 import { lastEvent, parseStep1Detail } from "../lib/logparse";
@@ -23,7 +24,7 @@ const WORD: Record<StepStatus, string> = { pending: "", active: "now", done: "do
 
 function payoutLink(p: ForeignPayout) {
   if (!p.tx_hash) return null;
-  return p.chain === "base" ? links.baseTx(p.tx_hash) : links.solTx(p.tx_hash);
+  return chainMeta(p.chain).tx(p.tx_hash);
 }
 
 const PAYOUT_TONE: Record<ForeignPayout["status"], string> = {
@@ -92,7 +93,7 @@ export default function Timeline({ v, contract, onRelay, relayBusy }: Props) {
               const href = payoutLink(p);
               return (
                 <li key={i} className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
-                  <span className="sc w-16 !text-text-2">{p.chain === "base" ? "Base" : "Solana"}</span>
+                  <span className="sc w-16 !text-text-2">{chainMeta(p.chain).short}</span>
                   <span className="num">{unitsFor(p.chain, p.amount)}</span>
                   <span className="mono !text-[13px] text-text-2">to {shortAddr(p.to)}</span>
                   <span className={`display text-[17px] italic ${PAYOUT_TONE[p.status]}`}>{p.status}</span>

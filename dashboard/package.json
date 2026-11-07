@@ -8,9 +8,11 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "dev:auth": "vite --port 3000 --strictPort"
   },
   "dependencies": {
+    "@auth0/auth0-spa-js": "^2.30.0",
     "@fontsource/instrument-serif": "^5.3.0",
     "@fontsource/inter-tight": "^5.3.0",
     "@fontsource/jetbrains-mono": "^5.3.0",
@@ -23,12 +25,14 @@
     "buffer": "^6.0.3",
     "chainsig.js": "^1.1.16",
     "near-api-js": "^6.5.1",
+    "qrcode": "^1.5.4",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^7.18.5"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.3.5",
+    "@types/qrcode": "^1.5.6",
     "@types/react": "^18.3.31",
     "@types/react-dom": "^18.3.7",
     "@vitejs/plugin-react": "^6.2.1",

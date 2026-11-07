@@ -1,3 +1,5 @@
+import { CHAINS, CHAIN_ORDER, chainMeta } from "../lib/chainmeta";
+import type { ForeignChain } from "../types";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../lib/near";
@@ -6,7 +8,7 @@ import { deriveFor, type DerivedAddresses } from "../lib/derive";
 import { createVaultCall, type CreateDraft, type ForeignDraft } from "../lib/calls";
 import { PENDING_KEY, type Pending } from "../components/PendingCreate";
 import { bpsToPct, fmtInterval, nearToYocto, toSmallest, unitsFor } from "../lib/format";
-import { CONTRACT, MOCK, links } from "../config";
+import { CONTRACT, MOCK } from "../config";
 import { ErrorNote, ExtLink, Field, Label, ROMAN } from "../components/ui";
 
 const STEPS = ["Timing", "Heirs", "Agent policy", "Foreign payouts", "DAO", "Deposit"] as const;
@@ -14,7 +16,7 @@ const INTRO = [
   "How often you check in, and how much silence is allowed before the vault settles.",
   "Who receives what. Shares must add up to 100%.",
   "What an AI agent may spend from this vault while you are alive. In Warning it is disarmed.",
-  "Payouts on Base Sepolia and Solana devnet, signed by NEAR Chain Signatures at settlement.",
+  "Payouts on Base Sepolia, Monad testnet and Solana devnet, signed by NEAR Chain Signatures at settlement.",
   "An optional Sputnik DAO that receives a proposal at step four of settlement.",
   "Fund the vault and read it through once before you sign.",
 ];
@@ -22,7 +24,7 @@ const UNITS = { seconds: 1, minutes: 60, hours: 3600, days: 86400 } as const;
 type Unit = keyof typeof UNITS;
 
 interface HeirRow { account_id: string; pct: string }
-interface ForeignRow { chain: "base" | "solana"; to: string; amount: string }
+interface ForeignRow { chain: ForeignChain; to: string; amount: string }
 
 export default function Create() {
   const { accountId, connect, call } = useWallet();
@@ -81,7 +83,7 @@ export default function Create() {
     });
     try { nearToYocto(perTx); nearToYocto(daily); } catch { p[2].push("Caps must be NEAR amounts."); }
     foreign.forEach((f, i) => {
-      if (f.chain === "base" && !/^0x[0-9a-fA-F]{40}$/.test(f.to.trim())) p[3].push(`Payout ${i + 1}: Base address must be 0x plus 40 hex characters.`);
+      if (chainMeta(f.chain).evm && !/^0x[0-9a-fA-F]{40}$/.test(f.to.trim())) p[3].push(`Payout ${i + 1}: ${chainMeta(f.chain).short} address must be 0x plus 40 hex characters.`);
       if (f.chain === "solana" && !/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(f.to.trim())) p[3].push(`Payout ${i + 1}: enter a Solana base58 address.`);
       try { if (BigInt(toSmallest(f.chain, f.amount)) <= 0n) throw new Error(); } catch { p[3].push(`Payout ${i + 1}: enter an amount.`); }
     });
@@ -106,7 +108,7 @@ export default function Create() {
         chain: f.chain,
         to: f.to.trim(),
         amount: toSmallest(f.chain, f.amount),
-        from_address: (f.chain === "base" ? derived?.base : derived?.solana) ?? "",
+        from_address: derived?.[f.chain] ?? "",
       }));
       const draft: CreateDraft = {
         heartbeat_interval_s: intervalS,
@@ -248,28 +250,30 @@ export default function Create() {
 
         {step === 3 && (
           <>
-            {foreign.length === 0 && <p className="text-[15px] text-text-2">No foreign payouts. Add one to send Base Sepolia ETH or Solana devnet SOL at settlement.</p>}
+            {foreign.length === 0 && <p className="text-[15px] text-text-2">No foreign payouts. Add one to send Base Sepolia ETH, Monad testnet MON or Solana devnet SOL at settlement.</p>}
             {foreign.map((f, i) => {
-              const src = f.chain === "base" ? derived?.base : derived?.solana;
+              const src = derived?.[f.chain];
+              const m = chainMeta(f.chain);
               return (
                 <div key={i} className="space-y-4 border-t border-rule pt-5">
                   <div className="grid gap-6 sm:grid-cols-[10rem_1fr_9rem]">
-                    <select className="field" value={f.chain} onChange={(e) => setForeign(foreign.map((x, j) => (j === i ? { ...x, chain: e.target.value as "base" | "solana", to: "" } : x)))}>
-                      <option value="base">Base Sepolia</option>
-                      <option value="solana">Solana devnet</option>
+                    <select className="field" aria-label={`Payout ${i + 1} chain`} value={f.chain} onChange={(e) => setForeign(foreign.map((x, j) => (j === i ? { ...x, chain: e.target.value as ForeignChain, to: "" } : x)))}>
+                      {CHAIN_ORDER.map((c) => <option key={c} value={c}>{CHAINS[c].name}</option>)}
                     </select>
-                    <input className="field mono" placeholder={f.chain === "base" ? "0x…" : "base58 address"} value={f.to} onChange={(e) => setForeign(foreign.map((x, j) => (j === i ? { ...x, to: e.target.value } : x)))} />
+                    <input className="field mono" placeholder={m.evm ? "0x…" : "base58 address"} value={f.to} onChange={(e) => setForeign(foreign.map((x, j) => (j === i ? { ...x, to: e.target.value } : x)))} />
                     <div className="relative">
                       <input className="field num pr-12" inputMode="decimal" placeholder="0.01" value={f.amount} onChange={(e) => setForeign(foreign.map((x, j) => (j === i ? { ...x, amount: e.target.value } : x)))} />
-                      <span className="absolute bottom-2.5 right-0 text-[14px] text-text-2">{f.chain === "base" ? "ETH" : "SOL"}</span>
+                      <span className="absolute bottom-2.5 right-0 text-[14px] text-text-2">{m.unit}</span>
                     </div>
                   </div>
                   <div className="text-[14px] text-text-2">
-                    Funded from the derived address{expectedId ? ` for vault ${expectedId}` : ""}:{" "}
+                    Funded from the {m.name} address derived for{" "}
+                    <span className="mono !text-[13px] text-text">{expectedId ? m.path(expectedId) : m.path("<id>")}</span>:{" "}
                     {src ? <span className="mono !text-[13px] text-text">{src}</span> : <span>{deriveErr ? "derivation failed, run `npm run derive`" : "computing…"}</span>}
                     {src && (
                       <span className="ml-3">
-                        <ExtLink href={f.chain === "base" ? links.baseFaucet : links.solFaucet}>faucet</ExtLink>
+                        <ExtLink href={m.address(src)}>{m.explorer}</ExtLink>
+                        <span className="ml-3"><ExtLink href={m.faucet}>faucet</ExtLink></span>
                       </span>
                     )}
                   </div>
@@ -306,7 +310,7 @@ export default function Create() {
                 ["Heartbeat", `${fmtInterval(intervalS || 0)}, ${graceN} missed allowed`],
                 ["Heirs", heirs.map((h, i) => `${h.account_id || "?"} ${bpsToPct(bpsRows[i] || 0)}`).join(", ")],
                 ["Agent caps", `${perTx} NEAR per tx, ${daily} NEAR per day`],
-                ["Foreign", foreign.length ? foreign.map((f) => `${unitsFor(f.chain, safeSmallest(f))} ${f.chain}`).join(", ") : "none"],
+                ["Foreign", foreign.length ? foreign.map((f) => `${unitsFor(f.chain, safeSmallest(f))} on ${chainMeta(f.chain).short}`).join(", ") : "none"],
                 ["DAO", dao.trim() || "none"],
               ]}
             />

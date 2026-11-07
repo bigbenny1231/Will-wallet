@@ -225,3 +225,26 @@ describe("step 3 current payout", () => {
     expect(currentForeign({ ...base, foreign_index: 2 })).toBeNull();
   });
 });
+
+describe("guardian calls (SPEC 2.8)", () => {
+  it("set_guardian names a guardian with a pause length", () => {
+    const c = C.setGuardianCall("4", "ana.testnet", 3600);
+    expect(c).toEqual({ method: "set_guardian", args: { token_id: "4", guardian_id: "ana.testnet", max_pause_s: 3600 }, gas: gas(30) });
+    expectMatchesContract(c);
+  });
+  it("set_guardian with null clears it and sends no pause length", () => {
+    const c = C.setGuardianCall("4", null);
+    expect(c.args).toEqual({ token_id: "4", guardian_id: null });
+    expectMatchesContract(c);
+  });
+  it("pause takes only the token", () => {
+    const c = C.pauseCall("4");
+    expect(c).toEqual({ method: "pause", args: { token_id: "4" }, gas: gas(30) });
+    expectMatchesContract(c);
+  });
+  it("pause range matches the contract constants", () => {
+    expect(LIB).toMatch(new RegExp(`MIN_PAUSE_S: u64 = ${C.PAUSE_RANGE_S.min};`));
+    expect(LIB).toMatch(/MAX_PAUSE_S: u64 = 90 \* 24 \* 3600;/);
+    expect(C.PAUSE_RANGE_S.max).toBe(90 * 24 * 3600);
+  });
+});

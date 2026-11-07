@@ -7,8 +7,11 @@ export interface Heir {
 
 export type PayoutStatus = "pending" | "signed" | "broadcast" | "failed";
 
+export type ForeignChain = "base" | "solana" | "monad";
+export const EVM_CHAINS: ForeignChain[] = ["base", "monad"];
+
 export interface ForeignPayout {
-  chain: "base" | "solana";
+  chain: ForeignChain;
   to: string;
   amount: string;
   from_address?: string | null;
@@ -48,6 +51,11 @@ export interface VaultView {
   daily_spent: string;
   daily_window_start_ms: number;
   dao_id: string | null;
+  /** Guardian who may pause the trigger once per heartbeat cycle (SPEC 2.8). Absent on older deployments. */
+  guardian_id?: string | null;
+  max_pause_s?: number;
+  /** 0 when no pause is running. While now < paused_until_ms the vault reads Warning. */
+  paused_until_ms?: number;
   dao_proposal_id: number | null;
   step: number;
   foreign_index: number;

@@ -1,3 +1,4 @@
+import { chainMeta } from "../lib/chainmeta";
 import { links } from "../config";
 import { fmtTime } from "../lib/format";
 import { lastEvent } from "../lib/logparse";
@@ -21,8 +22,9 @@ function stepLinks(v: VaultView, n: number, contract: string): [string, string][
   if (n === 2) return [["keys", links.nearAddress(contract)]];
   if (n === 3)
     return v.foreign.map((p) => {
-      const href = p.tx_hash ? (p.chain === "base" ? links.baseTx(p.tx_hash) : links.solTx(p.tx_hash)) : p.from_address ? (p.chain === "base" ? links.baseAddress(p.from_address) : links.solAddress(p.from_address)) : "";
-      return [p.chain === "base" ? "basescan" : "solana", href] as [string, string];
+      const m = chainMeta(p.chain);
+      const href = p.tx_hash ? m.tx(p.tx_hash) : p.from_address ? m.address(p.from_address) : "";
+      return [m.explorer, href] as [string, string];
     }).filter(([, h]) => h);
   if (n === 4) return v.dao_id ? [["sputnik", links.dao(v.dao_id)]] : [];
   return [["nearblocks", links.nearAddress(contract)]];

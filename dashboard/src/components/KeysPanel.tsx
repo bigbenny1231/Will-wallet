@@ -1,13 +1,15 @@
 import { useEffect, useState } from "react";
 import { KeyPair } from "near-api-js";
 import { useWallet } from "../lib/wallet";
+import { CONTRACT } from "../config";
 import { shortKey } from "../lib/format";
 import { addAgentKeyCall, addPulseKeyCall, removeKeyCall, KEY_ALLOWANCE_YOCTO } from "../lib/calls";
 import { yoctoToNear } from "../lib/format";
 import type { VaultView } from "../types";
 import { CopyBox, ErrorNote } from "./ui";
+import PhonePairing from "./PhonePairing";
 
-type Kind = "pulse" | "agent";
+type Kind = "pulse" | "agent" | "phone";
 interface Fresh {
   token: string;
   kind: Kind;
@@ -42,7 +44,7 @@ export default function KeysPanel({ v, isOwner }: { v: VaultView; isOwner: boole
 
   const locked = v.state === "Triggered" || v.state === "Settled";
   const lowBalance = BigInt(v.balance) < KEY_ALLOWANCE_YOCTO;
-  const registered = fresh ? (fresh.kind === "pulse" ? v.pulse_keys : v.agent_keys).includes(fresh.pub) : false;
+  const registered = fresh ? (fresh.kind === "agent" ? v.agent_keys : v.pulse_keys).includes(fresh.pub) : false;
 
   const add = async (kind: Kind) => {
     setErr(null);
@@ -53,7 +55,7 @@ export default function KeysPanel({ v, isOwner }: { v: VaultView; isOwner: boole
     sessionStorage.setItem(STORE, JSON.stringify(f));
     setFresh(f);
     try {
-      await call(kind === "pulse" ? addPulseKeyCall(v.token_id, f.pub) : addAgentKeyCall(v.token_id, f.pub));
+      await call(kind === "agent" ? addAgentKeyCall(v.token_id, f.pub) : addPulseKeyCall(v.token_id, f.pub));
     } catch (e) {
       sessionStorage.removeItem(STORE);
       setFresh(null);
@@ -84,6 +86,9 @@ export default function KeysPanel({ v, isOwner }: { v: VaultView; isOwner: boole
       <KeyList n="II" title="Agent keys" what="May only call agent_pay, within the policy above." keys={v.agent_keys} canRemove={isOwner && !locked} onRemove={remove} />
 
       <div className="flex flex-wrap items-baseline gap-x-8 gap-y-3">
+        <button className={isOwner && !locked && !lowBalance && v.pulse_keys.length === 0 ? "pill" : "tl"} disabled={!isOwner || locked || busy || lowBalance} title={lowWhy} onClick={() => add("phone")}>
+          Pair a phone
+        </button>
         <button className="tl" disabled={!isOwner || locked || busy || lowBalance} title={lowWhy} onClick={() => add("pulse")}>
           Add pulse key
         </button>
@@ -101,12 +106,16 @@ export default function KeysPanel({ v, isOwner }: { v: VaultView; isOwner: boole
 
       {fresh && !registered && (
         <div className="flex flex-wrap items-baseline gap-x-6 gap-y-2 border-l border-rule pl-4 text-[15px] text-text-2">
-          Waiting for the {fresh.kind} key transaction to land. The private key will appear here once it has.
+          {fresh.kind === "phone"
+            ? "Waiting for the pulse key transaction to land. The pairing code will appear here once it has."
+            : `Waiting for the ${fresh.kind} key transaction to land. The private key will appear here once it has.`}
           <button className="tl" onClick={dismiss}>Discard</button>
         </div>
       )}
 
-      {fresh && registered && (
+      {fresh && registered && fresh.kind === "phone" && <PhonePairing contract={CONTRACT} token={v.token_id} secret={fresh.priv} publicKey={fresh.pub} onDone={dismiss} />}
+
+      {fresh && registered && fresh.kind !== "phone" && (
         <div className="space-y-6 border-l-2 border-warn pl-6">
           <div>
             <div className="display text-[32px]">Private key, shown once.</div>

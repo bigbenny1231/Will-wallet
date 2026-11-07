@@ -64,7 +64,7 @@ export default function PendingCreate() {
         if (pending.foreign.length) {
           try {
             const d = deriveFor(id);
-            payouts = toPayouts(pending.foreign, pending.foreign.map((f) => (f.chain === "base" ? d.base : d.solana)));
+            payouts = toPayouts(pending.foreign, pending.foreign.map((f) => d[f.chain]));
           } catch {
             /* keep the previewed addresses */
           }

@@ -7,6 +7,7 @@ import Vault from "./pages/Vault";
 import Create from "./pages/Create";
 import Heir from "./pages/Heir";
 import PendingCreate from "./components/PendingCreate";
+import Pulse from "./pages/Pulse";
 
 function Mark() {
   return (
@@ -67,6 +68,14 @@ export default function App() {
   useEffect(() => {
     document.documentElement.classList.toggle("inverted", inverted);
   }, [inverted]);
+  // The phone page stands alone: no header, no footer, nothing to tap by accident.
+  if (pathname.startsWith("/pulse"))
+    return (
+      <>
+        <div className="grain" aria-hidden />
+        <Pulse />
+      </>
+    );
   return (
     <div className="flex min-h-screen flex-col">
       <div className="grain" aria-hidden />

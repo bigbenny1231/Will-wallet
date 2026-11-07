@@ -1,3 +1,4 @@
+import { chainMeta } from "../lib/chainmeta";
 import { useState, type ReactNode } from "react";
 import { Link, useParams } from "react-router-dom";
 import { CONTRACT, MOCK, POLL_MS, links } from "../config";
@@ -11,6 +12,7 @@ import { lastEvent, step1AmountFor } from "../lib/logparse";
 import type { CallArgs, VaultView } from "../types";
 import AgentPanel from "../components/AgentPanel";
 import KeysPanel from "../components/KeysPanel";
+import GuardianPanel, { isPaused } from "../components/GuardianPanel";
 import Timeline from "../components/Timeline";
 import TxBanner from "../components/TxBanner";
 import Seal from "../components/Seal";
@@ -108,6 +110,7 @@ export default function Vault() {
   const triggered = lastEvent(v.log, "triggered");
   const settled = lastEvent(v.log, "settled");
   const lastBeat = lastEvent(v.log, "heartbeat");
+  const paused = isPaused(v, now);
 
   return (
     <div className="wrap pb-24">
@@ -129,13 +132,26 @@ export default function Vault() {
           <Label>
             Vault {v.token_id} on <ExtLink href={links.nearAddress(CONTRACT)}>{CONTRACT}</ExtLink>
           </Label>
-          <h1 className="display mt-4 text-[48px] md:text-[64px]">{headline(v)}</h1>
+          <h1 className="display mt-4 text-[48px] md:text-[64px]">{paused ? "Paused." : headline(v)}</h1>
           <p className="mt-5 max-w-[56ch] text-[19px] leading-relaxed text-text-2">
-            <Sentence v={v} silence={silence} isOwner={isOwner} />
+            {paused ? (
+              <>
+                {lastEvent(v.log, "paused")?.detail?.startsWith("owner") ? (isOwner ? "You" : "The owner") : (v.guardian_id ?? "The guardian")} paused this vault until {fmtTime(v.paused_until_ms!)}. Settlement cannot start before then and the agent is disarmed. One heartbeat from {isOwner ? "you" : "the owner"} ends the pause.
+              </>
+            ) : (
+              <Sentence v={v} silence={silence} isOwner={isOwner} />
+            )}
           </p>
 
           <div className="mt-10">
             <PulseStrip v={v} contract={CONTRACT} />
+            {paused && (
+              <p className="mt-3 flex flex-wrap items-baseline gap-x-3 border-l-2 border-warn pl-3 text-[15px] text-warn" role="status">
+                <span className="sc !text-warn">Paused until</span>
+                <span className="num text-[17px]">{fmtTime(v.paused_until_ms!)}</span>
+                <span className="text-text-2">{fmtDuration(v.paused_until_ms! - now)} left</span>
+              </p>
+            )}
             {live && (
               <p className="mt-2 text-[13px] text-text-2">
                 {lastBeat ? <>Last heartbeat at <span className="num">{fmtTime(lastBeat.ms)}</span>{lastBeat.detail ? `, by ${lastBeat.detail === "pulse_key" ? "a pulse key" : "the owner"}` : ""}.</> : <>Counting from <span className="num">{fmtTime(v.last_beat_ms)}</span>.</>} Each new beat on chain pulses the seal.
@@ -144,7 +160,7 @@ export default function Vault() {
           </div>
 
           <dl className="mt-10 grid grid-cols-1 gap-8 border-t border-rule pt-8 sm:grid-cols-3 sm:gap-0 sm:[&>div+div]:border-l sm:[&>div+div]:border-rule sm:[&>div+div]:pl-8 sm:[&>div]:pr-6">
-            {figures(v, now, nftOwner, triggered?.ms, settled?.ms)}
+            {figures(v, now, nftOwner, triggered?.ms, settled?.ms, paused)}
           </dl>
 
           <div className="mt-10 flex flex-wrap items-center gap-x-8 gap-y-4">
@@ -217,7 +233,7 @@ export default function Vault() {
             {v.foreign.map((f, i) =>
               f.from_address ? (
                 <span key={i} className="mr-3">
-                  <ExtLink href={f.chain === "base" ? links.baseAddress(f.from_address) : links.solAddress(f.from_address)}>{f.chain}</ExtLink>
+                  <ExtLink href={chainMeta(f.chain).address(f.from_address)}>{chainMeta(f.chain).short}</ExtLink>
                 </span>
               ) : null,
             )}
@@ -233,8 +249,12 @@ export default function Vault() {
         <AgentPanel v={v} />
       </Section>
 
-      <Section label="Keys" note="Pulse keys can only send heartbeats. Agent keys can only pay within policy.">
+      <Section label="Keys" note="Pulse keys can only send heartbeats. Pair a phone to carry one. Agent keys can only pay within policy.">
         <KeysPanel v={v} isOwner={isOwner} />
+      </Section>
+
+      <Section label="Guardian" note="Someone you trust who can pause the vault once per heartbeat cycle.">
+        <GuardianPanel v={v} now={now} accountId={accountId} isOwner={isOwner} busy={busy} send={send} />
       </Section>
 
       <Section label="Fund and transfer">
@@ -243,7 +263,7 @@ export default function Vault() {
 
       <Section label="Stop the heartbeat" note="For the demo: this is how absence is simulated.">
         <p className="max-w-[62ch] text-[17px] leading-relaxed">
-          Press <kbd className="mono rounded-sm border border-rule px-1.5 py-0.5 !text-[13px]">Ctrl-C</kbd> in the terminal running{" "}
+          On a paired phone, press and hold <span className="text-text">Hold to stop</span> for two seconds. Or press <kbd className="mono rounded-sm border border-rule px-1.5 py-0.5 !text-[13px]">Ctrl-C</kbd> in the terminal running{" "}
           <code className="mono text-brass">npm run pulse</code>, or run <code className="mono text-brass">make kill</code> from the repo root.
         </p>
         <p className="mt-3 max-w-[62ch] text-[15px] text-text-2">
@@ -282,7 +302,7 @@ function Who({ isOwner, id }: { isOwner: boolean; id: string }) {
   return isOwner ? <>you</> : <span className="mono !text-[16px] text-text">{id}</span>;
 }
 
-function figures(v: VaultView, now: number, nftOwner: string | null, trigMs?: number, settledMs?: number): ReactNode {
+function figures(v: VaultView, now: number, nftOwner: string | null, trigMs?: number, settledMs?: number, paused = false): ReactNode {
   const bal = <Figure key="b" label={v.state === "Settled" ? "Remaining balance" : "Balance"} value={`${yoctoToNear(v.balance)} NEAR`} />;
   if (v.state === "Settled")
     return [
@@ -292,6 +312,8 @@ function figures(v: VaultView, now: number, nftOwner: string | null, trigMs?: nu
     ];
   if (v.state === "Triggered")
     return [<Figure key="s" label="Step" value={`${Math.min(v.step, 5)} of 5`} tone="text-dead" />, <Figure key="t" label="Triggered at" value={trigMs ? fmtTime(trigMs) : "…"} />, bal];
+  if (paused)
+    return [<Figure key="p" label="Paused until" value={fmtTime(v.paused_until_ms!)} tone="text-warn" />, <Figure key="l" label="Silent since" value={fmtTime(v.last_beat_ms)} />, bal];
   if (now >= v.trigger_at_ms)
     return [<Figure key="d" label="Deadline passed" value="Awaiting poke" tone="text-dead" />, <Figure key="l" label="Silent since" value={fmtTime(v.last_beat_ms)} />, bal];
   if (v.state === "Warning" || now >= v.warning_at_ms)

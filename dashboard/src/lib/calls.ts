@@ -1,9 +1,9 @@
 // Call builders for every write method of the dmw contract (contracts/dmw/src/lib.rs).
 // Each builder returns the exact method, JSON args, gas and attached deposit. calls.test.ts pins them.
-import type { CallArgs, ForeignPayout, Heir, Policy, StepArgs } from "../types";
+import type { CallArgs, ForeignChain, ForeignPayout, Heir, Policy, StepArgs } from "../types";
 
 export interface ForeignDraft {
-  chain: "base" | "solana";
+  chain: ForeignChain;
   to: string;
   amount: string; // smallest unit
   from_address: string;
@@ -110,6 +110,19 @@ export const setTimingCall = (tokenId: string, heartbeatIntervalS: number, grace
   args: { token_id: tokenId, heartbeat_interval_s: heartbeatIntervalS, grace_missed: graceMissed },
   gas: GAS.other,
 });
+
+/** Appoint a guardian who may pause the trigger once per heartbeat cycle; guardian_id null clears it. */
+export const setGuardianCall = (tokenId: string, guardianId: string | null, maxPauseS?: number): CallArgs => ({
+  method: "set_guardian",
+  args: guardianId ? { token_id: tokenId, guardian_id: guardianId, max_pause_s: maxPauseS } : { token_id: tokenId, guardian_id: null },
+  gas: GAS.other,
+});
+
+/** Guardian or owner: hold off the trigger until now + max_pause_s. */
+export const pauseCall = (tokenId: string): CallArgs => ({ method: "pause", args: { token_id: tokenId }, gas: GAS.other });
+
+/** Contract range for max_pause_s (lib.rs MIN_PAUSE_S..MAX_PAUSE_S). */
+export const PAUSE_RANGE_S = { min: 10, max: 90 * 24 * 3600 } as const;
 
 export const pokeCall = (tokenId: string): CallArgs => ({ method: "poke", args: { token_id: tokenId }, gas: GAS.other });
 

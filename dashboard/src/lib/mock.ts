@@ -11,6 +11,13 @@ const GRACE = 1; //       one missed interval of grace -> Warning lasts 20 s
 const NEAR = 10n ** 24n;
 
 let cycleStart = Date.now();
+/** Guardian pause on vault 1 (mock): while now < pausedUntil the vault holds at Warning. */
+let pausedUntil = 0;
+let pauseUsed = false;
+let pausedLast = 0;
+let guardian: { id: string | null; max: number } = { id: "ana.testnet", max: 120 };
+/** Heir named by a NEAR Auth implicit account (filled in when the mock Google sign-in runs). */
+let implicitHeir: string | null = null;
 let ownerExtras: VaultView[] = [];
 const extraLog: LogEntry[] = [];
 let nextId = 10;
@@ -24,6 +31,7 @@ const HEIRS = [
 
 const STATIC_FOREIGN: Omit<ForeignPayout, "status" | "tx_hash" | "signed_tx">[] = [
   { chain: "base", to: "0x7a3f1c9d5e2b48a6f0c1d3e5b7a9c2d4e6f80123", amount: "20000000000000000", from_address: "0x3b5C0d41e2A9F6c7d8E1b2A3c4D5e6F708192a3b" },
+  { chain: "monad", to: "0x5c1e8b7A90d2f3C4e5B6a7D8c9E0f1A2b3C4d5E6", amount: "250000000000000000", from_address: "0x9D2e4F6a8B0c1D3e5F7a9B1c3D5e7F9a0B2c4D6e" },
   { chain: "solana", to: "9xQeWvG816bUx9EPjHmaT23yvVM2ZWbrrpZb9PusVFin", amount: "50000000", from_address: "F7Zk3xq2nWb8PpVd1sA9mYtRu6HcLe4JgNvQoXiK2BaT" },
 ];
 
@@ -41,11 +49,14 @@ function phaseOf(now: number): { state: VaultState; t: number } {
 }
 
 function cycleVault(now = Date.now()): VaultView {
-  const { state, t } = phaseOf(now);
-  const cycleBase = now - t; // start of this cycle
+  const paused = now < pausedUntil;
+  const ph = phaseOf(now);
+  const state: VaultState = paused ? "Warning" : ph.state;
+  const t = paused ? PHASE_MS + 2000 : ph.t;
+  const cycleBase = paused ? pausedLast : now - t; // start of this cycle
   const last = cycleBase;
   const warning = last + INTERVAL_S * 1000;
-  const trigger = last + INTERVAL_S * 1000 * (GRACE + 1);
+  const trigger = Math.max(last + INTERVAL_S * 1000 * (GRACE + 1), pausedUntil);
   const inTrig = t - 2 * PHASE_MS; // ms into Triggered phase
   let step = 0;
   if (state === "Triggered") step = 1 + Math.min(4, Math.floor(inTrig / 4000)); // 5 steps across 20 s
@@ -56,8 +67,9 @@ function cycleVault(now = Date.now()): VaultView {
     let tx: string | null = null;
     if (step > 3 || settled) {
       status = "broadcast";
-      tx = i === 0 ? "0x" + "ab12".repeat(16) : "5Zr".padEnd(88, "k9x");
-    } else if (step === 3) status = i === 0 ? "signed" : "pending";
+      tx = f.chain === "solana" ? "5Zr".padEnd(88, "k9x") : "0x" + (i === 0 ? "ab12" : "c0de").repeat(16);
+    } else if (step === 3) status = i === 0 ? "broadcast" : i === 1 ? "signed" : "pending";
+    if (step === 3 && i === 0) tx = "0x" + "ab12".repeat(16);
     return { ...f, status, signed_tx: status === "pending" ? null : "0xdeadbeef", tx_hash: tx };
   });
   const log: LogEntry[] = [
@@ -65,7 +77,7 @@ function cycleVault(now = Date.now()): VaultView {
     { ms: last + 4000, event: "agent_pay_allowed", detail: `api.provider.testnet ${(NEAR / 5n).toString()}` },
     { ms: last + 9000, event: "agent_pay_denied", detail: `over_per_tx_max api.provider.testnet ${(3n * NEAR).toString()}` },
     { ms: last + 12000, event: "agent_pay_denied", detail: `receiver_not_allowlisted unknown.testnet ${(NEAR / 10n).toString()}` },
-    ...extraLog.filter((e) => e.ms >= last),
+    ...extraLog.filter((e) => e.ms >= last || (paused && e.event === "paused")),
   ];
   if (state === "Triggered" || settled) {
     log.push({ ms: trigger, event: "triggered", detail: "bounty paid to keeper.testnet" });
@@ -92,6 +104,9 @@ function cycleVault(now = Date.now()): VaultView {
     daily_spent: (NEAR / 5n).toString(),
     daily_window_start_ms: last,
     dao_id: "estate-1.sputnik-v2.testnet",
+    guardian_id: guardian.id,
+    max_pause_s: guardian.max,
+    paused_until_ms: paused ? pausedUntil : 0,
     dao_proposal_id: step >= 5 || settled ? 7 : null,
     step,
     foreign_index: step > 3 ? foreign.length : step === 3 ? 1 : 0,
@@ -116,6 +131,9 @@ function staticVault(id: string, owner: string, state: VaultState, heirs: { acco
     foreign: settled ? cycleVault(now + CYCLE_MS).foreign : [],
     dao_id: null,
     dao_proposal_id: null,
+    guardian_id: null,
+    max_pause_s: 0,
+    paused_until_ms: 0,
     pulse_keys: [],
     agent_keys: [],
     log: settled
@@ -139,6 +157,13 @@ function all(): VaultView[] {
       { account_id: MOCK_ACCOUNT, bps: 5000 },
       { account_id: "ben.testnet", bps: 5000 },
     ]),
+    ...(implicitHeir
+      ? [
+          staticVault("4", "grandma.testnet", "Alive", [
+            { account_id: implicitHeir, bps: 10000 },
+          ]),
+        ]
+      : []),
     ...ownerExtras,
   ];
 }
@@ -175,7 +200,21 @@ export const mockApi = {
     console.info("[mock] call", c.method, c.args);
     if (c.method === "heartbeat" && id === "1") {
       cycleStart = now;
-      extraLog.push({ ms: now, event: "heartbeat", detail: "owner" });
+      pausedUntil = 0;
+      pauseUsed = false;
+      extraLog.push({ ms: now, event: "heartbeat", detail: account === MOCK_ACCOUNT ? "owner" : "pulse_key" });
+    } else if (c.method === "pause" && id === "1") {
+      if (!guardian.id) throw new Error("no guardian set");
+      if (account !== guardian.id && account !== MOCK_ACCOUNT) throw new Error("unauthorized: not guardian or owner");
+      if (pauseUsed) throw new Error("already_paused: a heartbeat must land before the next pause");
+      pauseUsed = true;
+      pausedUntil = now + guardian.max * 1000;
+      pausedLast = now - phaseOf(now).t;
+      extraLog.push({ ms: now, event: "paused", detail: `${account === guardian.id ? "guardian" : "owner"} ${account} until ${pausedUntil}` });
+    } else if (c.method === "set_guardian" && id === "1") {
+      const g = c.args.guardian_id as string | null;
+      guardian = { id: g, max: g ? Number(c.args.max_pause_s) : 0 };
+      extraLog.push({ ms: now, event: "guardian_set", detail: g ? `${g} ${guardian.max}s` : "cleared" });
     } else if (c.method === "poke" || c.method === "execute_step" || c.method === "deposit" || c.method === "claim" || c.method === "nft_transfer") {
       // Mock mode follows the fixed cycle; these calls are accepted but change nothing.
     } else if (c.method === "add_pulse_key") {
@@ -206,8 +245,14 @@ export const mockApi = {
       });
     }
   },
+  /** Mock NEAR Auth: name `account` as heir of a new vault 4. */
+  nameImplicitHeir(account: string) {
+    implicitHeir = account;
+  },
   reset() {
     cycleStart = Date.now();
+    pausedUntil = 0;
+    pauseUsed = false;
     ownerExtras = [];
   },
   /** Jump the demo cycle to a given phase (used for screenshots). */

@@ -1,3 +1,5 @@
+import type { ForeignChain } from "../types";
+import { chainMeta } from "./chainmeta";
 const YOCTO = 10n ** 24n;
 
 export function yoctoToNear(y: string | bigint | undefined | null, maxFrac = 4): string {
@@ -75,13 +77,10 @@ export function fmtTime(ms: number): string {
   return new Date(ms).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 }
 
-export function unitsFor(chain: "base" | "solana", amount: string): string {
+export function unitsFor(chain: ForeignChain, amount: string): string {
   const a = BigInt(amount || "0");
-  if (chain === "base") {
-    const d = 10n ** 18n;
-    return `${trim(a, d, 18)} ETH`;
-  }
-  return `${trim(a, 10n ** 9n, 9)} SOL`;
+  const { decimals, unit } = chainMeta(chain);
+  return `${trim(a, 10n ** BigInt(decimals), decimals)} ${unit}`;
 }
 
 function trim(a: bigint, d: bigint, digits: number): string {
@@ -90,8 +89,8 @@ function trim(a: bigint, d: bigint, digits: number): string {
   return f ? `${w}.${f}` : w.toString();
 }
 
-export function toSmallest(chain: "base" | "solana", human: string): string {
-  const digits = chain === "base" ? 18 : 9;
+export function toSmallest(chain: ForeignChain, human: string): string {
+  const digits = chainMeta(chain).decimals;
   const s = human.trim();
   if (!new RegExp(`^\\d+(\\.\\d{0,${digits}})?$`).test(s)) throw new Error("Invalid amount");
   const [w, f = ""] = s.split(".");
