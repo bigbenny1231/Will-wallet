@@ -1,0 +1,4 @@
+node_modules/
+.mock-state.json
+.env
+*.log

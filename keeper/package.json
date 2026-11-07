@@ -1,0 +1,36 @@
+{
+  "name": "dmw-keeper",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Off-chain keeper, pulse daemon and demo CLI for Dead Man's Wallet",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "bin": {
+    "dmw": "./bin/dmw.mjs"
+  },
+  "scripts": {
+    "dmw": "tsx src/cli.ts",
+    "derive": "tsx src/cli.ts derive",
+    "pulse": "tsx src/cli.ts pulse",
+    "keeper": "tsx src/cli.ts keeper",
+    "agent-demo": "tsx src/cli.ts agent-demo",
+    "dao": "tsx src/cli.ts dao",
+    "mock": "tsx src/cli.ts mock",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "commander": "^15.1.0",
+    "dotenv": "^18.0.9",
+    "near-api-js": "^6.5.1",
+    "picocolors": "^1.1.1"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vitest": "^5.1.0"
+  }
+}
