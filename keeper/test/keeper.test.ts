@@ -310,7 +310,7 @@ describe('retry and helpers', () => {
 });
 
 describe('commands', () => {
-  it('pulse prints a countdown, beats immediately, and announces the owner disappearing on stop', async () => {
+  it('pulse beats immediately, logs once per beat without a TTY, and announces the owner disappearing on stop', async () => {
     vi.useFakeTimers();
     const clock = { t: 1_000_000 };
     const backend = fresh(clock);
@@ -323,8 +323,9 @@ describe('commands', () => {
     await p.done;
     vi.useRealTimers();
     const text = lines.join('');
-    expect(text).toMatch(/alive · next beat in \ds/);
-    expect(text).toMatch(/heartbeat sent/);
+    // not a TTY: one line per beat (carrying the next-beat time), no per-second countdown lines
+    expect(text).toMatch(/heartbeat sent .*alive · next beat in \ds/);
+    expect(lines.filter((l) => l.includes('next beat in')).length).toBe(1);
     expect(text).toContain('pulse stopped — this is the moment the owner disappears');
   });
   it('agent-demo shows one allowed and one denied call with parsed events', async () => {
