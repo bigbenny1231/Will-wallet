@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url';
 const here = dirname(fileURLToPath(import.meta.url));
 const require = createRequire(join(here, '../../keeper/package.json'));
 const { KeyPair, KeyPairSigner, Account, providers } = require('near-api-js');
-const provider = new providers.JsonRpcProvider({ url: process.env.NEAR_RPC || 'https://rpc.testnet.near.org' });
+const provider = new providers.JsonRpcProvider({ url: process.env.NEAR_RPC || 'https://rpc.testnet.fastnear.com' });
 const NEAR = 10n ** 24n;
 const toYocto = (n) => BigInt(Math.round(Number(n) * 1e6)) * (NEAR / 1_000_000n);
 // Deposit: NEAR as a decimal ("0.5") or yoctoNEAR with a `y` suffix ("1y": the 1 yocto that owner

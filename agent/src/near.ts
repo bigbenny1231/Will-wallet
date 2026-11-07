@@ -48,7 +48,7 @@ export class NearChain implements VaultChain {
   constructor(
     readonly contractId: string,
     agentKey: string,
-    rpcUrl = 'https://rpc.testnet.near.org',
+    rpcUrl = 'https://rpc.testnet.fastnear.com',
   ) {
     const kp = KeyPair.fromString(agentKey as `ed25519:${string}`);
     this.publicKey = kp.getPublicKey().toString();

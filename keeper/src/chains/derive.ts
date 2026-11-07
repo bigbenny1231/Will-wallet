@@ -5,7 +5,7 @@ import { base58Decode, evmAddressFromPubkey64 } from './codec.js';
 import { chainConfig, type EvmChainName } from './evm.js';
 
 export const MPC_SIGNER_TESTNET = 'v1.signer-prod.testnet';
-const DEFAULT_NEAR_RPC = 'https://rpc.testnet.near.org';
+const DEFAULT_NEAR_RPC = 'https://rpc.testnet.fastnear.com';
 
 export interface DeriveOptions {
   rpcUrl?: string; // NEAR RPC

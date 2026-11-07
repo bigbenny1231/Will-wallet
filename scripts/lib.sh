@@ -35,7 +35,7 @@ rand_hex() { openssl rand -hex "$1"; }
 key_of() { node -e "console.log(JSON.parse(require('fs').readFileSync(process.argv[1],'utf8')).private_key)" "keys/$1.json"; }
 
 account_exists() {
-  curl -s "${NEAR_RPC:-https://rpc.testnet.near.org}" -H 'content-type: application/json' \
+  curl -s "${NEAR_RPC:-https://rpc.testnet.fastnear.com}" -H 'content-type: application/json' \
     -d "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"query\",\"params\":{\"request_type\":\"view_account\",\"finality\":\"final\",\"account_id\":\"$1\"}}" | grep -q '"amount"'
 }
 

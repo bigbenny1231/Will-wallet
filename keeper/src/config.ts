@@ -33,7 +33,7 @@ export interface Config {
 }
 
 const RPC_BY_NETWORK: Record<string, string> = {
-  testnet: 'https://rpc.testnet.near.org',
+  testnet: 'https://rpc.testnet.fastnear.com',
   mainnet: 'https://rpc.mainnet.near.org',
 };
 

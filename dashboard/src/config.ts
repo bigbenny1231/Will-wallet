@@ -4,7 +4,7 @@ export const MOCK = env.VITE_DMW_MOCK === "1" || env.VITE_DMW_MOCK === "true";
 export const NETWORK: "testnet" | "mainnet" = env.VITE_NEAR_NETWORK === "mainnet" ? "mainnet" : "testnet";
 export const CONTRACT: string = env.VITE_DMW_CONTRACT || "dmw-x8cx.testnet";
 export const RPC: string =
-  env.VITE_NEAR_RPC || (NETWORK === "mainnet" ? "https://rpc.mainnet.near.org" : "https://rpc.testnet.near.org");
+  env.VITE_NEAR_RPC || (NETWORK === "mainnet" ? "https://rpc.mainnet.near.org" : "https://rpc.testnet.fastnear.com");
 export const SIGNER_CONTRACT = NETWORK === "mainnet" ? "v1.signer" : "v1.signer-prod.testnet";
 export const SPUTNIK_UI: string = env.VITE_SPUTNIK_UI || "";
 

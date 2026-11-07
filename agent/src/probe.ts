@@ -10,7 +10,7 @@ const { values: a } = parseArgs({ options: { key: { type: 'string' }, contract: 
 const key = a.key ?? process.env.DMW_AGENT_KEY;
 const contract = a.contract ?? process.env.DMW_CONTRACT;
 if (!key || !contract) throw new Error('need --key (or DMW_AGENT_KEY) and --contract (or DMW_CONTRACT)');
-const provider = new providers.JsonRpcProvider({ url: process.env.NEAR_RPC || 'https://rpc.testnet.near.org' });
+const provider = new providers.JsonRpcProvider({ url: process.env.NEAR_RPC || 'https://rpc.testnet.fastnear.com' });
 const acct = new Account(contract, provider, new KeyPairSigner(KeyPair.fromString(key as `ed25519:${string}`)));
 
 async function attempt(label: string, fn: () => Promise<unknown>) {

@@ -15,7 +15,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const require = createRequire(join(here, '../keeper/package.json'));
 const near = require('near-api-js');
 const { KeyPair, KeyPairSigner, Account } = near; const { JsonRpcProvider } = near.providers;
-const RPC = process.env.NEAR_RPC || 'https://rpc.testnet.near.org';
+const RPC = process.env.NEAR_RPC || 'https://rpc.testnet.fastnear.com';
 const KEYS = join(here, '..', 'keys');
 const provider = new JsonRpcProvider({ url: RPC });
 const NEAR = 10n ** 24n;
