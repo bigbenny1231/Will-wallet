@@ -45,10 +45,10 @@ The vault has no keys yet. For the video either add them from the dashboard, or 
 
 ```bash
 node scripts/near-admin.mjs genkey                      # pulse key; make a second one for the agent key
-node contracts/tools/tx.mjs call dmw-andrew-8d2e.testnet dmw-x8cx.testnet add_pulse_key '{"token_id":"6","public_key":"ed25519:..."}' 50
-node contracts/tools/tx.mjs call dmw-andrew-8d2e.testnet dmw-x8cx.testnet add_agent_key '{"token_id":"6","public_key":"ed25519:..."}' 50
+node contracts/tools/tx.mjs call dmw-andrew-8d2e.testnet dmw-x8cx.testnet add_pulse_key '{"token_id":"6","public_key":"ed25519:..."}' 50 1y
+node contracts/tools/tx.mjs call dmw-andrew-8d2e.testnet dmw-x8cx.testnet add_agent_key '{"token_id":"6","public_key":"ed25519:..."}' 50 1y
 # shorten the clock right before recording; trigger = 2 x interval after the last beat with grace 1
-node contracts/tools/tx.mjs call dmw-andrew-8d2e.testnet dmw-x8cx.testnet set_timing '{"token_id":"6","heartbeat_interval_s":60,"grace_missed":1}' 30
+node contracts/tools/tx.mjs call dmw-andrew-8d2e.testnet dmw-x8cx.testnet set_timing '{"token_id":"6","heartbeat_interval_s":60,"grace_missed":1}' 30 1y
 cd keeper && npm run keeper -- --poll 5 --token 6       # --token keeps the keeper off the other test vaults
 ```
 

@@ -7,7 +7,7 @@ run this after editing anything in design/ and commit the result.
 - copies design/tokens.css and design/pulse.js to site/assets/
 - inlines design/seal.svg into site/index.html between <!-- seal --> and <!-- /seal -->
 - pre-renders the pulse strip (via design/pulse.js, using node) between <!-- strip --> and <!-- /strip -->
-- copies docs/video/dead-mans-wallet-demo-720p.mp4 to site/assets/demo-720p.mp4 if it exists (gitignored)
+- copies docs/video/dmw-demo-v3-720p.mp4 to site/assets/demo-720p.mp4 if it exists (gitignored)
 """
 import pathlib
 import re
@@ -48,7 +48,7 @@ def main() -> None:
         shutil.copyfile(video, SITE / "assets" / "demo-720p.mp4")
         print("copied demo video to site/assets/demo-720p.mp4 (gitignored)")
     else:
-        print("note: docs/video/dead-mans-wallet-demo-720p.mp4 not found; the player will show the poster only")
+        print("note: docs/video/dmw-demo-v3-720p.mp4 not found; the player will show the poster only")
     print("site synced")
 
 
