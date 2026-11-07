@@ -13,9 +13,9 @@ Dashboard route: `/vault/6`. Created 2026-11-07.
 | Balance | 5 NEAR (+0.1 storage). Adding a pulse key and an agent key takes 1 NEAR each from the vault balance |
 | Policy | per_tx_max 0.5 NEAR, daily_max 1 NEAR, allowlist `[dmw-api-8d2e.testnet]` |
 | Bounty | 0.05 NEAR |
-| Payout 0 (Base Sepolia) | 0.0005 ETH (`500000000000000` wei) to `0xcA024adC7cac111339Fe077C739F8085aE705F2F` |
-| Payout 1 (Monad testnet) | 0.01 MON (`10000000000000000` wei) to `0x360d02320ebff8439fe0d804e68dfc6976230e13` (one Monad payout per vault) |
-| Payout 2 (Solana devnet) | 0.01 SOL (`10000000` lamports) to `CFdWXa1ean7bBoewSv2SZESrDpWSxeoN1hfLrqaqZQUr` |
+| Payout 0 (Base Sepolia) | 0.0005 ETH (`500000000000000` wei) to `0xfd151ad02f573689f235f56059ce6e2f3b64dd89` |
+| Payout 1 (Monad testnet) | 0.01 MON (`10000000000000000` wei) to `0xfd151ad02f573689f235f56059ce6e2f3b64dd89` (one Monad payout per vault) |
+| Payout 2 (Solana devnet) | 0.01 SOL (`10000000` lamports) to `HpEHvLpa9pMNiDCQDnVMSomCx4bmJuXX8sKqtKGg2uWr` |
 
 Setup transactions: [create_vault](https://testnet.nearblocks.io/txns/9tQ5JnJyjXZqohxyS2E1BKNxN1SYvp7uVhFc5sajTSGL),
 [set_foreign_payouts](https://testnet.nearblocks.io/txns/Gd5TcHycMhUnszvrxDoKq319i8jyfbVGkicXHsXgFPmd),
@@ -53,3 +53,10 @@ cd keeper && npm run keeper -- --poll 5 --token 6       # --token keeps the keep
 ```
 
 `make demo` creates its own throwaway vault and does not touch vault 6.
+
+## Heir-controlled recipient addresses (set 2026-11-07)
+
+The Base and Monad payouts go to `0xfd151ad02f573689f235f56059ce6e2f3b64dd89` and the Solana payout to
+`HpEHvLpa9pMNiDCQDnVMSomCx4bmJuXX8sKqtKGg2uWr`. Both are fresh keypairs held by the demo heir ("Sarah");
+the secrets are in the gitignored `keys/sarah-evm.json` and `keys/sarah-solana.json`. Earlier recipients were
+MPC-derived addresses nobody holds a key for (on-chain audit F-3), which would have burned the test funds.
