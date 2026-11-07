@@ -108,7 +108,7 @@
  <g class="m">
   <rect x="776" y="382" width="188" height="28" rx="2" class="panel2"/><circle cx="790" cy="396" r="4" class="c-life"/><text x="802" y="400">Base Sepolia</text><text x="954" y="400" text-anchor="end" class="mg">signed</text>
   <rect x="776" y="418" width="188" height="28" rx="2" class="panel2"/><circle cx="790" cy="432" r="4" class="c-life"/><text x="802" y="436">Solana devnet</text><text x="954" y="436" text-anchor="end" class="mg">signed</text>
-  <rect x="776" y="454" width="188" height="28" rx="2" fill="#0B0C0F" stroke="#C8A96A" stroke-dasharray="4 3"/><circle cx="790" cy="468" r="4" fill="none" stroke="#C8A96A"/><text x="802" y="472" class="mb">Monad</text><text x="954" y="472" text-anchor="end" class="mb">adding now</text>
+  <rect x="776" y="454" width="188" height="28" rx="2" class="panel2"/><circle cx="790" cy="468" r="4" class="c-life"/><text x="802" y="472">Monad testnet</text><text x="954" y="472" text-anchor="end" class="mg">signed</text>
  </g>
 
  <rect x="760" y="508" width="220" height="70" class="panel" rx="4"/>
@@ -145,7 +145,6 @@
 <text x="170" y="740" class="b"><tspan class="m mb">mark_broadcast(hash)</tspan>. The contract accepts only the id of the transaction it stored.</text>
 <g>
  <line x1="690" y1="760" x2="720" y2="760" class="arrow"/><text x="728" y="764" class="sm">live on testnet</text>
- <line x1="830" y1="760" x2="860" y2="760" stroke="#C8A96A" stroke-width="1.5" stroke-dasharray="4 3"/><text x="868" y="764" class="sm">in progress</text>
 </g>
 <text x="30" y="764" class="sm">Testnet only. Not a will. Not audited. dmw: near-sdk 5, v1.signer-prod.testnet.</text>
 </svg>

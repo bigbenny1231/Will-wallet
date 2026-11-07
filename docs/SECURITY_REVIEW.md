@@ -19,7 +19,7 @@ against SPEC.md (including §2.7) and every file in `contracts/dmw/src` (`lib.rs
 | H-1 | High | `mark_broadcast` accepts any hash: a front-run fake hash stops the keeper relay and permanently bricks Solana payouts | Fixed |
 | H-2 | High | Caller-chosen EVM fees and gas let anyone burn the derived address's ETH | Fixed |
 | H-3 | High | Transferring the Will NFT leaves the seller's pulse/agent keys active on the buyer's vault | Fixed |
-| M-1 | Medium | Pulse-key gas allowance runs out after about 90 beats, and the vault then triggers even though the owner is alive | Documented |
+| M-1 | Medium | Pulse-key gas allowance runs out after about 90 beats, and the vault then triggers even though the owner is alive | Mitigated: guardian pause (`set_guardian`/`pause`), see SPEC §2.8 |
 | M-2 | Medium | Permissionless step 3 can be front-run with useless chain params (bad blockhash, low fees) | Mitigated |
 | M-3 | Medium | Residual trust: re-signing a signed Solana payout needs the contract owner or keeper | By design, documented |
 | M-4 | Medium | Unused key allowances and refunded DAO bonds go to the contract's free balance, not back to the vault | Documented |
@@ -196,6 +196,11 @@ intervals while the owner is alive. Settlement cannot be undone.
 
 There is no on-chain top-up. Rotating a key means `remove_key` plus `add_pulse_key`, and costs
 another 1 NEAR (see M-4).
+
+**Status: Mitigated: guardian pause (`set_guardian`/`pause`), see SPEC §2.8.** A guardian (or the owner) can
+pause once per heartbeat cycle, moving the deadline to `pause time + max_pause_s`, so a dead pulse key no longer
+triggers a live owner's vault straight away. The allowance itself still runs out; the recommendation below stands
+for the keeper and for a future `rotate_key`.
 
 **Recommendation:** the keeper `pulse` command should read the remaining allowance with RPC
 `view_access_key` and warn or rotate below about 10%. Recommend intervals of hours or days, not

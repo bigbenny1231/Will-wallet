@@ -129,7 +129,7 @@
       <figcaption>
         <dl class="vault-meta">
           <div><dt>Heirs</dt><dd>Sarah 60%, Ben 40%</dd></div>
-          <div><dt>Chains</dt><dd>NEAR, Base, Solana</dd></div>
+          <div><dt>Chains</dt><dd>NEAR, Base, Monad and Solana</dd></div>
           <div><dt>Last heartbeat</dt><dd>today, 9:14 am</dd></div>
         </dl>
         <p class="meta-note">An example vault.</p>
@@ -157,7 +157,7 @@
         <li class="step" style="--n:1">
           <span class="step-n" aria-hidden="true">II</span>
           <h3>Stay alive.</h3>
-          <p>A pulse key sends a heartbeat. Today that is a small daemon you run. A phone app, reminders, and a guardian who can pause the vault are <span class="soon">coming soon</span>.</p>
+          <p>A pulse key sends a heartbeat: from a small daemon, or from the phone app you pair with a QR code. A guardian you name can pause the vault once per heartbeat cycle. Reminders are <span class="soon">coming soon</span>.</p>
         </li>
         <li class="step" style="--n:2">
           <span class="step-n" aria-hidden="true">III</span>
@@ -271,13 +271,13 @@
     <h2 id="faq-h">Questions</h2>
     <div class="faq-list">
       <details><summary>What if I am in the hospital?</summary>
-        <p>Choose an interval and a grace period that suit your life: up to ten years between heartbeats, plus missed beats of grace. Reminders after a missed heartbeat, and a guardian you name who can pause the vault, are <span class="soon">coming soon</span>. Neither is in the hackathon build.</p></details>
+        <p>Choose an interval and a grace period that suit your life: up to ten years between heartbeats, plus missed beats of grace. A guardian you name can pause the vault: one pause per heartbeat cycle, capped at a length you set, and the owner can name no guardian at all. Reminders after a missed heartbeat are <span class="soon">coming soon</span>; they are not in the hackathon build.</p></details>
       <details><summary>Is this a will?</summary>
         <p>No. It is not a will or a trust. It executes the distribution your will or trust specifies, so configure it with your estate attorney and keep the two consistent.</p></details>
       <details><summary>What is a heartbeat?</summary>
         <p>A small signed message from your pulse key saying you are still here. It is the proof of life. Nothing happens while heartbeats keep arriving.</p></details>
       <details><summary>Which chains?</summary>
-        <p>NEAR, plus Base and Solana through NEAR Chain Signatures. The demo uses Base Sepolia and Solana devnet. Assets must be held at the vault&#8217;s derived addresses to be included.</p></details>
+        <p>NEAR, Base, Monad and Solana, the last three through NEAR Chain Signatures. The demo uses Base Sepolia, Monad testnet and Solana devnet. Assets must be held at the vault&#8217;s derived addresses to be included.</p></details>
       <details><summary>Can my heirs see my balance?</summary>
         <p>Not through the app. They see nothing until settlement. NEAR is a public ledger, though, so the plan and balances in the contract are visible to anyone who looks up the vault on-chain.</p></details>
       <details><summary>What does it cost?</summary>

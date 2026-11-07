@@ -3,9 +3,26 @@
 **A NEAR contract that executes your estate plan — for humans and for AI agents.**
 While you're alive, a pulse key sends a heartbeat. If the heartbeats stop, the contract
 pays your heirs on NEAR, deletes your AI agent's spending key, has NEAR's MPC network sign payouts
-on Base and Solana (signed; relay pending funding of the derived addresses), files a proposal in your
+on Base, Monad and Solana (signed; relay pending funding of the derived addresses), files a proposal in your
 estate DAO, and hands the Will NFT (which holds the funds) to your primary heir. Heirs never touch a
 seed phrase.
+
+What is in the build:
+
+- **Phone pulse PWA.** The dashboard's `/pulse` page is the owner's phone: pair it with a QR code from the vault
+  page, and it sends heartbeats with a pulse key that can only call `heartbeat`.
+- **Autonomous agent.** `agent/` runs an agent loop whose wallet wrapper holds only the scoped agent key. The
+  [live attack transcript](agent/LIVE_TRANSCRIPT.md) shows a prompt-injected agent being refused by the wrapper,
+  and then, with the wrapper's pre-checks off, by the contract itself.
+- **Guardian pause.** The owner can name a guardian who can pause the vault once per heartbeat cycle, for at most
+  a length the owner sets (SPEC §2.8). It closes the "dead pulse key triggers a live owner" finding (M-1).
+- **Four chains.** NEAR, plus Base Sepolia, Monad testnet and Solana devnet through Chain Signatures. The
+  keeper relays Monad payouts like Base ones.
+- **Heir sign-in with Google (partial).** Heirs can sign in with Google through NEAR Auth on testnet (shared
+  credentials, `localhost:3000` only). The Google identity resolves to the NEAR implicit account its MPC key
+  controls, and the page lists what was left to it. On the public site the button reads "NEAR Auth (coming)"
+  until we have production credentials ([`dashboard/docs/near-auth.md`](dashboard/docs/near-auth.md)).
+- **Attorney one-pager.** [One page for estate attorneys](docs/one-pager/attorney-one-pager.pdf).
 
 Built at NEAR Hackathon, Nov 1–14 2026. Tracks: `security` (06 AI Security & Defense), `nfts` (10), `open` (13).
 Testnet only. Not a will, not a custodian, not audited. MIT license.
@@ -40,7 +57,7 @@ No `.env`, keys or near-cli credentials are needed beforehand. `make deploy` cre
 git clone https://github.com/agarretson/deadmans-wallet deadmans-wallet && cd deadmans-wallet
 make check     # verify toolchain   -> "All good." (optional tools only warn)
 make build     # build the contract -> contracts/dmw/target/near/dmw.wasm and its code hash (about 1 min)
-make test      # unit tests         -> contract "76 passed", keeper "44 passed", dashboard "32 passed" (runs npm ci first)
+make test      # unit tests         -> contract "95 passed", keeper "46 passed", dashboard "67 passed", agent "37 passed" (runs npm ci first)
 make deploy    # faucet accounts    -> creates dmw-<rand>.testnet + dmw-keeper-<rand>.testnet, deploys, inits,
                #                       calls set_keeper, writes .env, ends with "deployed dmw-xxxxxx.testnet"
 make demo      # live demo          -> see below (about 1.5 min)
@@ -147,6 +164,9 @@ source addresses; the faucets need a human login), and step 4 is skipped because
 | Claim | Where to look |
 | --- | --- |
 | The pulse key can only call `heartbeat`, the agent key only `agent_pay` | your own `make demo` contract: `node scripts/near-admin.mjs keys <contract>` shows `FunctionCall` keys with `method_names` `["heartbeat"]` / `["agent_pay"]`. On `dmw-x8cx.testnet` every vault is settled or keyless now, so it holds only the deployer's FullAccess key |
+| An autonomous agent is refused when a prompt injection tells it to drain the vault | [`agent/LIVE_TRANSCRIPT.md`](agent/LIVE_TRANSCRIPT.md): three real runs against vault 13 on `dmw-x8cx.testnet` (wrapper refuses; contract denies when the wrapper's checks are off; a vigilant brain refuses on its own), with the setup transactions |
+| A guardian can pause once and the deadline moves | [TESTNET_SMOKE.md](contracts/TESTNET_SMOKE.md) vault 14: [`set_guardian`](https://testnet.nearblocks.io/txns/HqomRLAzzUd6KYTuz2bsNU1qYEsuC9RyBQUtuToFShcG), [`pause`](https://testnet.nearblocks.io/txns/FNZntghrMV7pj2S5qLvqqu4zrpLKJZ933mNQSyMm163o) (deadline +153 s, state Warning), a second [`pause`](https://testnet.nearblocks.io/txns/Chnrufz6tF2Z6qrSijL9xPgRuoukz8oNDfKMxqddY7Ub) rejected `already_paused`, an early [`poke`](https://testnet.nearblocks.io/txns/31xYgVNdcpY2sqaT369SVVFDf5oohmry8ifjzN23qEDn) rejected `not_due` |
+| The contract signs a Monad transaction | TESTNET_SMOKE.md vault 14, [step 3](https://testnet.nearblocks.io/txns/DFmmyrRWNTUdsn3KLXuoHfjuaAcMoY7c71i2EUN3p976): `v1.signer-prod.testnet` signs path `monad-14`; the stored tx decodes to chain id 10143 from the derived address `0x360D0232…0e13`. Relay is pending funding (the RPC answers `insufficient balance`) |
 | Denied agent payments are logged, not reverted | `agent_pay` returns `{allowed:false, reason}`; the tx succeeds; see TESTNET_SMOKE.md item 5 |
 | Settlement deletes the keys | TESTNET_SMOKE.md item 8, key list before/after |
 | The contract itself requests MPC signatures | `docs/chainsig-notes.md`: NEAR txs where `dmw` calls `v1.signer-prod.testnet.sign`. The probe contract `ecrecover`s the Base signature on-chain to the derived address; for `dmw` the signed Base tx recovers off-chain (viem) to the derived address |
@@ -175,7 +195,7 @@ source addresses; the faucets need a human login), and step 4 is skipped because
 ## Diagrams
 
 Source SVGs (fonts embedded) and PNG exports live in [`docs/diagrams/`](docs/diagrams/); `node docs/diagrams/build.mjs` regenerates them.
-Monad is being added as a third signing target and is drawn dashed.
+Monad testnet is a live signing target; the state machine includes the guardian pause.
 
 ![Architecture: keys, contract and settlement outputs](docs/diagrams/architecture.png)
 
@@ -214,11 +234,11 @@ items are documented with their mitigations. Full findings: [`docs/SECURITY_REVI
 | `contracts/dmw` | the contract (Rust, near-sdk 5), unit tests, `build.sh` |
 | `contracts/chainsig-probe` | minimal contract used to prove the MPC round trip first |
 | `agent/` | TypeScript: autonomous agent loop (pluggable brain) + wallet wrapper that holds only the agent key; `make agent` |
-| `keeper/` | TypeScript CLI: `pulse`, `keeper`, `agent-demo`, `derive`, `dao create`; `src/chains/` for Base/Solana |
-| `dashboard/` | Vite + React app: create vault, live Will NFT, agent log, keys, settlement timeline, heir view |
+| `keeper/` | TypeScript CLI: `pulse`, `keeper` (`--token` limits it to some vaults), `agent-demo`, `derive`, `dao create`; `src/chains/` for Base, Monad and Solana |
+| `dashboard/` | Vite + React app: create vault, live Will NFT, agent log, keys, guardian, settlement timeline, heir view, phone pulse (`/pulse`) |
 | `site/` | public landing page |
 | `scripts/` | `near-admin.mjs` (faucet/deploy/call without near-cli), `deploy.sh`, `demo.sh`, `kill.sh`, `check.sh` |
-| `docs/` | Chain Signatures notes, security review, judge dry runs (`JUDGE_DRY_RUN.md`, `JUDGE_DRY_RUN_2.md`) |
+| `docs/` | Chain Signatures notes, security review, diagrams, attorney one-pager, judge dry runs (`JUDGE_DRY_RUN*.md`) |
 | `SPEC.md` | the interface every component was built against |
 
 ## Libraries, templates and AI-generated code
@@ -234,11 +254,11 @@ The author leads no other hackathon project.
 
 ## Limits and what's next
 
-- Testnet only; two foreign chains. Foreign payouts are signed by the MPC network, but none has been relayed yet:
+- Testnet only; three foreign chains (Base, Monad, Solana). Foreign payouts are signed by the MPC network, but none has been relayed yet:
   relaying needs the derived source addresses funded, and the faucets require a human login.
 - Not a legal instrument. The product configures alongside a will or trust; see the FAQ on the site.
-- Next: guardian pause, owner notifications at `Warning`, trust-owned vaults, heir sign-in with NEAR Auth
-  (Google), Shade Agent attestation for the heartbeat, audit, mainnet.
+- Next: owner notifications at `Warning`, trust-owned vaults, production NEAR Auth credentials for heir sign-in
+  with Google, Shade Agent attestation for the heartbeat, audit, mainnet.
 
 ## License
 

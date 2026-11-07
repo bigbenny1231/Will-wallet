@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 720" width="1000" height="720" role="img" aria-labelledby="t d">
 <title id="t">Vault state machine</title>
-<desc id="d">Alive moves to Warning when a heartbeat is missed, back to Alive on a heartbeat, to Triggered when anyone pokes after the grace period, then five settlement steps lead to Settled. A guardian pause is planned.</desc>
+<desc id="d">Alive moves to Warning when a heartbeat is missed, back to Alive on a heartbeat, to Triggered when anyone pokes after the grace period, then five settlement steps lead to Settled. A guardian or the owner can pause once per heartbeat cycle, which moves the deadline.</desc>
 <style>/*STYLE*/</style>
 <defs>
 <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 1 L9 5 L0 9" fill="none" stroke="#C8A96A" stroke-width="1.5"/></marker>
@@ -62,13 +62,15 @@
 <text x="755" y="316" text-anchor="middle" class="sm">NFT to heir</text>
 
 <!-- guardian pause -->
-<rect x="60" y="452" width="380" height="50" rx="4" fill="none" stroke="#C8A96A" stroke-dasharray="5 4"/>
+<rect x="60" y="452" width="380" height="50" rx="4" fill="#121419" stroke="#C8A96A" stroke-width="1.5"/>
 <text x="250" y="474" text-anchor="middle" class="hs">Paused by a guardian</text>
-<text x="250" y="492" text-anchor="middle" class="sm">planned, not in the hackathon build</text>
-<path d="M92 342 V450" stroke="#A9A399" stroke-width="1.5" stroke-dasharray="4 3" fill="none" marker-end="url(#ahs)" marker-start="url(#ahs)"/>
-<path d="M400 342 V450" stroke="#A9A399" stroke-width="1.5" stroke-dasharray="4 3" fill="none" marker-end="url(#ahs)" marker-start="url(#ahs)"/>
-<text x="104" y="400" class="m mg">pause</text>
-<text x="104" y="418" class="m mg">resume</text>
+<text x="250" y="492" text-anchor="middle" class="sm">deadline moves once, to pause time + max_pause_s</text>
+<path d="M92 342 V450" class="arrow" marker-end="url(#ah)"/>
+<path d="M400 450 V342" class="arrow" marker-end="url(#ah)"/>
+<text x="104" y="400" class="m mb">pause()</text>
+<text x="104" y="418" class="sm">guardian or owner</text>
+<text x="412" y="400" class="m mg">reads as Warning</text>
+<text x="412" y="418" class="sm">only a heartbeat re-arms</text>
 
 <!-- rules -->
 <g>
