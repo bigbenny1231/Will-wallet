@@ -459,8 +459,8 @@ fn step_ordering_1_to_6_with_stub() {
     assert!(v(&c).pulse_keys.is_empty() && v(&c).agent_keys.is_empty());
     assert!(!c.key_index.contains_key(&pk(1)) && !c.key_index.contains_key(&pk(2)));
 
-    // step 3: one payout -> promise (stub), guard set
-    match c.execute_step(1.into(), None) {
+    // step 3: one payout -> promise (MPC sign), guard set
+    match c.execute_step(1.into(), Some(base_args())) {
         PromiseOrValue::Promise(_) => {}
         PromiseOrValue::Value(_) => panic!("expected promise"),
     }
@@ -468,15 +468,16 @@ fn step_ordering_1_to_6_with_stub() {
     // re-entry while in flight does nothing
     assert_eq!(step_value(c.execute_step(1.into(), None)), 3);
     assert_eq!(v(&c).foreign_index, 0);
-    // stub callback
+    // MPC callback (live response shape) -> raw signed EIP-1559 tx stored
     Ctx::new().by("dmw.testnet").at(T0 + 42_000).set();
-    let s = c.on_foreign_signed(1, 0, Ok(serde_json::json!({"stub": true})));
+    let s = c.on_foreign_signed(1, 0, Ok(mpc_secp_response()));
     assert_eq!(s, 4);
     let vault = v(&c);
-    assert_eq!(vault.foreign[0].status, ForeignStatus::Failed);
+    assert_eq!(vault.foreign[0].status, ForeignStatus::Signed);
+    assert!(vault.foreign[0].signed_tx.as_deref().unwrap().starts_with("0x02f8"));
     assert_eq!(vault.foreign_index, 1);
     assert!(vault.foreign_inflight_since_ms.is_none());
-    assert!(vault.log.iter().any(|l| l.detail.contains("chainsig not wired yet")));
+    assert!(vault.log.iter().any(|l| l.detail.starts_with("#0 signed 0x")));
 
     // step 4: no DAO -> skipped
     Ctx::new().by("keeper.testnet").at(T0 + 43_000).set();
@@ -535,7 +536,7 @@ fn step3_inflight_timeout_fails_payout_and_ignores_late_callback() {
     Ctx::new().by("keeper.testnet").at(T0 + 41_000).set();
     let _ = c.execute_step(1.into(), None);
     let _ = c.execute_step(1.into(), None);
-    let _ = c.execute_step(1.into(), None); // in flight
+    let _ = c.execute_step(1.into(), Some(sol_args())); // in flight
     Ctx::new().by("keeper.testnet").at(T0 + 41_000 + FOREIGN_INFLIGHT_TIMEOUT_MS).set();
     assert_eq!(step_value(c.execute_step(1.into(), None)), 4);
     assert_eq!(v(&c).foreign[0].status, ForeignStatus::Failed);
@@ -803,4 +804,140 @@ fn log_is_bounded() {
         c.heartbeat(1.into());
     }
     assert_eq!(v(&c).log.len(), MAX_LOG);
+}
+
+// ---------------------------------------------------------------- chain signatures (step 3)
+
+const SOL_FROM: &str = "GmaDrppBC7P5ARKV8g3djiwP89vz1jLK23V2GBjuAEGB";
+const SOL_TO: &str = "8opHzTAnfzRpPEx21XtnrVTX28YQuCpAjcn1PczScKh";
+const SOL_BH: &str = "EkSnNWid2cvwEVnVx9aBqawnmiCNiDgp3gUdkDPTKN1N";
+const SOL_SIG: &str = "378a35a6527e8c1288d9695546a6fed45b7cc89a92b5c8c5978c3c69a4cf2b21d90e6a9fffb2f0aa07124e9df0e337f8e67415067bec9c307c9c680f5a51dc00";
+const SOL_RAW_B64: &str = "ATeKNaZSfowSiNlpVUam/tRbfMiakrXIxZeMPGmkzysh2Q5qn/+y8KoHEk6d8OM3+OZ0FQZ77JwwfJxoD1pR3AABAAED6kpsY+KcUgq+9VB7Ey7F+ZVHdq6+vnuSQh7qaRRG0iwCAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAzEkOkozS44c7s0P8ldozF5ymD02/RsLDbpEpnVXU5rkBAgIAAQwCAAAAQEIPAAAAAAA=";
+
+fn base_args() -> StepArgs {
+    StepArgs {
+        evm: Some(EvmArgs {
+            nonce: 0,
+            max_fee_per_gas: U128(1_500_000_000),
+            max_priority_fee_per_gas: U128(1_000_000),
+            gas_limit: U128(21_000),
+        }),
+        solana: None,
+    }
+}
+
+fn sol_args() -> StepArgs {
+    StepArgs { evm: None, solana: Some(SolanaArgs { recent_blockhash: SOL_BH.into() }) }
+}
+
+fn mpc_secp_response() -> serde_json::Value {
+    serde_json::json!({
+        "scheme": "Secp256k1",
+        "big_r": {"affine_point": "02f0fbff08e0e86c9e19272264915b8246a4e3a06dd37d18edf94dcc0d38a5d308"},
+        "s": {"scalar": "39e0ecf2ca35bf30bfa495dae35f7770d13d3a1db7777668c87fbeb6f830b858"},
+        "recovery_id": 1
+    })
+}
+
+fn mpc_ed_response(sig_hex: &str) -> serde_json::Value {
+    serde_json::json!({"scheme": "Ed25519", "signature": hex::decode(sig_hex).unwrap()})
+}
+
+/// Vault 1 triggered with the given payouts and steps 1-2 done (next: step 3).
+fn at_step3(payouts: Vec<ForeignPayout>) -> Contract {
+    let mut c = setup();
+    Ctx::new().set();
+    c.set_foreign_payouts(1.into(), payouts);
+    trigger(&mut c);
+    Ctx::new().by("keeper.testnet").at(T0 + 41_000).set();
+    let _ = c.execute_step(1.into(), None);
+    let _ = c.execute_step(1.into(), None);
+    assert_eq!(v(&c).step, 3);
+    c
+}
+
+fn sol_payout(amount: u128) -> ForeignPayout {
+    ForeignPayout {
+        chain: ForeignChain::Solana, to: SOL_TO.into(), amount: U128(amount),
+        from_address: String::new(), status: ForeignStatus::Pending, signed_tx: None, tx_hash: None,
+    }
+}
+
+fn base_payout() -> ForeignPayout {
+    ForeignPayout { chain: ForeignChain::Base, to: format!("0x{}", "ab".repeat(20)), ..sol_payout(1_000) }
+}
+
+#[test]
+fn step3_solana_flow_stores_base64_tx() {
+    let mut c = at_step3(vec![sol_payout(1_000_000)]);
+    assert!(matches!(c.execute_step(1.into(), Some(sol_args())), PromiseOrValue::Promise(_)));
+    // signer answered derived_public_key for sol-1 -> sign request scheduled
+    Ctx::new().by("dmw.testnet").at(T0 + 41_500).set();
+    let key = format!("ed25519:{SOL_FROM}");
+    assert!(matches!(c.on_foreign_sol_key(1, 0, SOL_BH.into(), None, Ok(key)), PromiseOrValue::Promise(_)));
+    let s = c.on_foreign_signed(1, 0, Ok(mpc_ed_response(SOL_SIG)));
+    assert_eq!(s, 4);
+    let p = &v(&c).foreign[0];
+    assert_eq!(p.status, ForeignStatus::Signed);
+    assert_eq!(p.signed_tx.as_deref(), Some(SOL_RAW_B64));
+}
+
+#[test]
+fn step3_mpc_error_fails_payout_and_advances() {
+    let mut c = at_step3(vec![base_payout(), sol_payout(5)]);
+    let _ = c.execute_step(1.into(), Some(base_args()));
+    Ctx::new().by("dmw.testnet").at(T0 + 41_500).set();
+    assert_eq!(c.on_foreign_signed(1, 0, Err(near_sdk::PromiseError::Failed)), 3);
+    assert_eq!(v(&c).foreign[0].status, ForeignStatus::Failed);
+    assert_eq!(v(&c).foreign_index, 1);
+    // derived key lookup failure on the solana payout also fails + advances
+    Ctx::new().by("keeper.testnet").at(T0 + 42_000).set();
+    let _ = c.execute_step(1.into(), Some(sol_args()));
+    Ctx::new().by("dmw.testnet").at(T0 + 42_500).set();
+    let r = c.on_foreign_sol_key(1, 1, SOL_BH.into(), None, Err(near_sdk::PromiseError::Failed));
+    assert!(matches!(r, PromiseOrValue::Value(4)));
+    assert_eq!(v(&c).foreign[1].status, ForeignStatus::Failed);
+}
+
+#[test]
+#[should_panic(expected = "args.evm is required")]
+fn step3_without_chain_args_panics_so_payout_is_not_burned() {
+    let mut c = at_step3(vec![base_payout()]);
+    let _ = c.execute_step(1.into(), None);
+}
+
+#[test]
+fn step3_unbuildable_payout_fails_via_self_call() {
+    let mut c = at_step3(vec![sol_payout(u128::from(u64::MAX) + 1)]);
+    assert!(matches!(c.execute_step(1.into(), Some(sol_args())), PromiseOrValue::Promise(_)));
+    Ctx::new().by("dmw.testnet").at(T0 + 41_500).set();
+    assert_eq!(c.foreign_fail(1, 0, "amount exceeds u64 lamports".into()), 4);
+    assert_eq!(v(&c).foreign[0].status, ForeignStatus::Failed);
+}
+
+#[test]
+fn resign_after_failure_stores_new_tx_without_moving_steps() {
+    let mut c = at_step3(vec![base_payout()]);
+    let _ = c.execute_step(1.into(), Some(base_args()));
+    Ctx::new().by("dmw.testnet").at(T0 + 41_500).set();
+    assert_eq!(c.on_foreign_signed(1, 0, Err(near_sdk::PromiseError::Failed)), 4);
+    Ctx::new().by("keeper.testnet").at(T0 + 42_000).set();
+    let _ = c.resign_foreign(1.into(), 0, base_args());
+    // simulate callback: rebuild the same pending tx the contract scheduled
+    let payout = v(&c).foreign[0].clone();
+    let (t, _) = foreign::evm_transfer_for(&payout, base_args().evm.as_ref().unwrap()).unwrap();
+    Ctx::new().by("dmw.testnet").at(T0 + 42_500).set();
+    let st = c.on_foreign_resigned(1, 0, foreign::PendingTx::Evm(t), Ok(mpc_secp_response()));
+    assert_eq!(st, "signed");
+    let vault = v(&c);
+    assert!(vault.foreign[0].signed_tx.as_deref().unwrap().starts_with("0x02f8"));
+    assert_eq!(vault.step, 4);
+    assert_eq!(vault.foreign_index, 1);
+}
+
+#[test]
+#[should_panic(expected = "payout not processed yet")]
+fn resign_rejects_unprocessed_payout() {
+    let mut c = at_step3(vec![base_payout()]);
+    let _ = c.resign_foreign(1.into(), 0, base_args());
 }
