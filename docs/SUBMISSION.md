@@ -136,7 +136,7 @@ git ls-remote --tags origin hackathon-submission    # one line
 # 2. fresh clone of the tag
 rm -rf /tmp/dmw-fresh && git clone --branch hackathon-submission https://github.com/agarretson/deadmans-wallet /tmp/dmw-fresh
 cd /tmp/dmw-fresh && make check                      # "All good."
-make build && make test                              # contract 99, keeper 46, dashboard 68, agent 37 passed (about 3 min)
+make build && make test                              # contract 104, keeper 51, dashboard 70, agent 41 passed (about 3 min)
 cd -
 
 # 3. Vercel (set the two URLs first)
@@ -151,7 +151,7 @@ curl -sI $SITE/assets/demo-720p.mp4 | head -1        # 200 only if the mp4 was i
 ffprobe -v error -show_entries format=duration -of csv=p=0 site/assets/demo-720p.mp4   # 170.41 (v3). design/build_site.py copies the v1 file (159.4 s): copy docs/video/dmw-demo-v3-720p.mp4 over it after running it
 
 # 4. NEP-330 link check
-curl -s https://rpc.testnet.near.org -H 'content-type: application/json' -d '{"jsonrpc":"2.0","id":1,"method":"query","params":{"request_type":"call_function","finality":"final","account_id":"dmw-x8cx.testnet","method_name":"contract_source_metadata","args_base64":"e30="}}' \
+curl -s https://rpc.testnet.fastnear.com -H 'content-type: application/json' -d '{"jsonrpc":"2.0","id":1,"method":"query","params":{"request_type":"call_function","finality":"final","account_id":"dmw-x8cx.testnet","method_name":"contract_source_metadata","args_base64":"e30="}}' \
   | python3 -c 'import sys,json;print(bytes(json.load(sys.stdin)["result"]["result"]).decode())'
 #   -> "link" must be the repo URL. On Nov 7 2026 "build_info" is null: the live code (hash 13ug5kLS…fsqU, commit
 #      f0178de) came from `cargo near build non-reproducible-wasm`, so only a same-toolchain `make build` matches it

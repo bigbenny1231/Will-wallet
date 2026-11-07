@@ -25,7 +25,7 @@ The keeper (off-chain) relays the signed foreign transactions and records their 
 
 | Thing | Value |
 | --- | --- |
-| NEAR network | testnet, RPC `https://rpc.testnet.near.org` |
+| NEAR network | testnet, RPC `https://rpc.testnet.fastnear.com` |
 | Contract account | `$DMW_CONTRACT` (e.g. `dmw-1.testnet`); set in `.env` |
 | MPC signer | `v1.signer-prod.testnet` |
 | EVM targets (registry) | Base Sepolia, chain id `84532`, RPC `https://sepolia.base.org`, explorer `https://sepolia.basescan.org/tx/<hash>` |
@@ -179,7 +179,7 @@ red `#e74c3c` Triggered, grey `#7f8c8d` Settled), vault id, state word, "next be
 ### 2.6 Tests
 
 - Unit tests with `near_sdk::testing_env!` for: state derivation, policy allow/deny each reason, poke timing, step ordering and idempotence, bps math, NFT ownership rules.
-- Integration: `scripts/e2e.sh` against testnet (create account via faucet, deploy, create vault with 20 s interval, add keys, agent pay allowed + denied, kill, poke, steps, assert final state). Must pass before submission.
+- Integration against testnet: `contracts/smoke.sh` (contract-level smoke run) and `scripts/demo.sh` + `make agent` + `make kill` (faucet account, deploy, vault with a short interval, keys, agent pay allowed + denied, kill, poke, steps to Settled). `scripts/e2e.sh` was never written; the judge sequence in `docs/JUDGE_DRY_RUN_*.md` replaces it.
 
 ### 2.7 Implementation notes (contracts agent, 2026-11-07)
 
@@ -196,7 +196,7 @@ These are the places where the shipped contract (`contracts/dmw`, deployed at `d
 - **`mark_broadcast`** otherwise requires `status == "signed"`, so a recorded hash cannot be overwritten. It is still permissionless, but `tx_hash` must equal the id of the stored `signed_tx` (EVM `0x`+keccak256(raw), Solana base58 of the first signature). Re-reporting the same hash is a no-op. "broadcast" means relayed, not confirmed.
 - **Security review changes (2026-11-07, docs/SECURITY_REVIEW.md):**
   - **EVM nonce is set by the contract.** Base payout `i` uses nonce = the number of Base payouts before it. `args.evm.nonce` is ignored.
-  - **EVM fee and gas caps.** `gas_limit` must be 21000..=100000, `max_fee_per_gas` 1..=100 gwei, and `max_priority_fee_per_gas` ≤ `max_fee_per_gas`.
+  - **EVM fee and gas caps.** `gas_limit` must be 21000..=100000 (callers may send 21000; the contract raises the EVM gas it signs with to the 50,000 floor, final audit H-5), `max_fee_per_gas` 1..=100 gwei on Base and 1..=1000 gwei on Monad (per-chain cap, published in `get_config().chains[].max_fee_per_gas`), and `max_priority_fee_per_gas` ≤ `max_fee_per_gas`.
   - **`resign_foreign` rules:**
     - One re-sign per payout in flight (a request counts as lost after 10 min).
     - EVM `signed`/`broadcast`: both fees must be ≥ 110% of the last request.
@@ -279,10 +279,10 @@ Routes:
 
 Design: dark, calm, one accent; large type (recorded at 125%). No marketing copy in the app.
 
-## 5. Site: `site/` (static, single `index.html` + Tailwind CDN)
+## 5. Site: `site/` (static, hand-written `index.html` + `styles.css` + `app.js`, self-hosted fonts, no CDN, no Tailwind)
 
 Landing page per the mockup in the plan doc: hero "Crypto that arrives.", vault card, trust strip,
-three steps, heir claim band, FAQ, waitlist form (Formspree or Supabase; placeholder OK), footer disclaimer
+three steps, heir claim band, FAQ, a "follow mainnet" link to GitHub releases (no waitlist backend exists), footer disclaimer
 "Not a will. Not a custodian. Configure it with your estate attorney."
 
 ## 6. Repo conventions
@@ -290,4 +290,4 @@ three steps, heir claim band, FAQ, waitlist form (Formspree or Supabase; placeho
 - Directories are owned: `contracts/` (contract agents), `keeper/`, `dashboard/`, `site/`. Don't edit outside your directory except `SPEC.md` (with a note) and your own entry in `README.md`.
 - Conventional commits. No secrets ever; `gitleaks` in CI.
 - `make build | test | deploy | demo | kill` at repo root (`Makefile`), each printing what to expect.
-- Everything must run from a clean clone on Linux/macOS with Rust, Node 22 and near-cli-rs.
+- Everything must run from a clean clone on Linux/macOS with Rust, Node 22, openssl and curl. `near-cli-rs` is optional (`scripts/check.sh` lists it as nice-to-have); account creation, calls and views go through `scripts/near-admin.mjs` (near-api-js) and `contracts/tools/tx.mjs`.

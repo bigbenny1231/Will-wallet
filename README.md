@@ -38,7 +38,7 @@ Live keeper run (alive → settled, both foreign payouts signed, none relayed): 
 Showcase vault for the demo video: [`keeper/SHOWCASE.md`](keeper/SHOWCASE.md) ·
 Smoke run with 21 transaction links, plus the live Sputnik run: [`contracts/TESTNET_SMOKE.md`](contracts/TESTNET_SMOKE.md) ·
 Chain Signatures proof: [`docs/chainsig-notes.md`](docs/chainsig-notes.md) ·
-Security review: [`docs/SECURITY_REVIEW.md`](docs/SECURITY_REVIEW.md)
+Security reviews and audits: [`docs/SECURITY_REVIEW.md`](docs/SECURITY_REVIEW.md) and five more audits (see [Security model](#security-model))
 
 ## The problem
 
@@ -63,7 +63,7 @@ No `.env`, keys or near-cli credentials are needed beforehand. `make deploy` cre
 git clone https://github.com/agarretson/deadmans-wallet deadmans-wallet && cd deadmans-wallet
 make check     # verify toolchain   -> "All good." (optional tools only warn)
 make build     # build the contract -> contracts/dmw/target/near/dmw.wasm and its code hash (about 1 min)
-make test      # unit tests         -> contract "99 passed", keeper "46 passed", dashboard "68 passed", agent "37 passed" (runs npm ci first)
+make test      # unit tests         -> contract "104 passed", keeper "51 passed", dashboard "70 passed", agent "41 passed" (runs npm ci first)
 make deploy    # faucet accounts    -> creates dmw-<rand>.testnet + dmw-keeper-<rand>.testnet, deploys, inits,
                #                       calls set_keeper, writes .env, ends with "deployed dmw-xxxxxx.testnet"
 make demo      # live demo          -> see below (about 1.5 min)
@@ -177,7 +177,7 @@ source addresses; the faucets need a human login), and step 4 is skipped because
 | Settlement deletes the keys | TESTNET_SMOKE.md item 8, key list before/after |
 | The contract itself requests MPC signatures | `docs/chainsig-notes.md`: NEAR txs where `dmw` calls `v1.signer-prod.testnet.sign`. The probe contract `ecrecover`s the Base signature on-chain to the derived address; for `dmw` the signed Base tx recovers off-chain (viem) to the derived address |
 | Step 4 files and ratifies a Sputnik proposal | TESTNET_SMOKE.md, last section: vault 10 on `dmw-x8cx.testnet`, [`add_proposal` from the contract](https://testnet.nearblocks.io/txns/FAzezve68HDjUDsNzsb8qV7KnE6SNE8kVap6S5Hmkd6e), proposal 0 on `estate-82bd1f.sputnik-v2.testnet`, [approved and executed](https://testnet.nearblocks.io/txns/5y9hspPGwhmzfU2ivNggFQhPrTaHtznqpaB5dNcfBgeB) |
-| The live contract is this source | `view_account dmw-x8cx.testnet` → code hash `13ug5kLS5oCUSHBjJ7P5sEJ7gANxaATHtHtfdDUZfsqU`, the last redeploy ([tx](https://testnet.nearblocks.io/txns/81DnDj5PrzPdpaA1aWiAw4NpLtzQ2nRebmuaC8gPNhAV)), built with `cargo near build non-reproducible-wasm` from commit `f0178de` (the contract source is unchanged since). `make build` on that source with rustc 1.97.0 and cargo-near 0.23.0 gives the same hash (re-checked Nov 7 2026); another toolchain gives a different one. It is **not** a reproducible build: `contract_source_metadata` returns `link` but `build_info: null`. The Docker build of `88cd83b` (`G6eiYJj6…25hM`) was deployed earlier and has since been replaced |
+| The live contract is this source | `view_account dmw-x8cx.testnet` → code hash `5H5vWiKFX1tF13ujkmozuke1DcdNExqeLTg8jAbRYdux`. It corresponds to commit `7ac4fed` (the final-audit contract fix), built with rustc 1.97.0 and cargo-near 0.23.0 using `cargo near build non-reproducible-wasm`. `make build` on the current tree with those toolchain versions gives the same hash (re-checked Nov 7 2026; the contract source has not changed since `7ac4fed`); another toolchain gives a different one. It is **not** a reproducible build: `contract_source_metadata` returns `link` but `build_info: null` |
 | The Will NFT holds funds and redraws itself | `nft_token {"token_id":"4"}` → `media` is an on-chain SVG data URI (grey, Settled) |
 
 ## How NEAR fits
@@ -237,6 +237,8 @@ Two review rounds by a separate AI agent that did not write the code (not a thir
 redeployed; the other Medium/Low items are documented with their mitigations. Full findings:
 [`docs/SECURITY_REVIEW.md`](docs/SECURITY_REVIEW.md), [`docs/SECURITY_REVIEW_2.md`](docs/SECURITY_REVIEW_2.md).
 
+Five later passes, all by AI agents that did not write the code, are in `docs/`: [`AUDIT_CLAIMS.md`](docs/AUDIT_CLAIMS.md) (every public claim checked against the repo and the chain), [`AUDIT_REPO_HYGIENE.md`](docs/AUDIT_REPO_HYGIENE.md) (secrets, licences, pre-publication), [`AUDIT_FINAL_OFFCHAIN.md`](docs/AUDIT_FINAL_OFFCHAIN.md) (keeper, dashboard, agent, site, CSP), [`AUDIT_FINAL_CONTRACT.md`](docs/AUDIT_FINAL_CONTRACT.md) (final contract audit; the EVM gas floor H-5 came from it) and [`AUDIT_ONCHAIN_STATE.md`](docs/AUDIT_ONCHAIN_STATE.md) (live state of `dmw-x8cx.testnet`: keys, solvency, vaults, MPC signatures). None is a third-party audit.
+
 ## Repository
 
 | Path | What |
@@ -248,7 +250,7 @@ redeployed; the other Medium/Low items are documented with their mitigations. Fu
 | `dashboard/` | Vite + React app: create vault, live Will NFT, agent log, keys, guardian, settlement timeline, heir view, phone pulse (`/pulse`) |
 | `site/` | public landing page |
 | `scripts/` | `near-admin.mjs` (faucet/deploy/call without near-cli), `deploy.sh`, `demo.sh`, `kill.sh`, `check.sh` |
-| `docs/` | Chain Signatures notes, security review, diagrams, attorney one-pager, judge dry runs (`JUDGE_DRY_RUN.md`, `_2`, `_3`, `_4`), claims audit (`AUDIT_CLAIMS.md`) |
+| `docs/` | Chain Signatures notes, security review, diagrams, attorney one-pager, judge dry runs (`JUDGE_DRY_RUN.md`, `_2` to `_5`), the audits (`AUDIT_*.md`) |
 | `SPEC.md` | the interface every component was built against |
 
 ## Libraries, templates and AI-generated code
