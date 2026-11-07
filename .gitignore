@@ -12,3 +12,4 @@ keys/
 .DS_Store
 keys/
 .demo/
+docs/video/*.mp4
