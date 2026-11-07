@@ -72,6 +72,31 @@ async function scrollThrough(page) {
     await page.close();
   }
 
+  // Open Graph card: the seal and the headline, 1200x630 PNG (site/assets/og.png).
+  if (!only || only === 'og') {
+    const seal = fs.readFileSync(path.join(__dirname, 'seal.svg'), 'utf8');
+    const page = await browser.newPage({ viewport: { width: 1200, height: 630 }, deviceScaleFactor: 1 });
+    await page.goto(`${base}/design/tokens.css`);
+    await page.setContent(`<!doctype html><html><head>
+      <link rel="stylesheet" href="${base}/design/tokens.css">
+      <link rel="stylesheet" href="${base}/site/styles.css">
+      <style>
+        body{margin:0;width:1200px;height:630px;overflow:hidden;display:grid;grid-template-columns:1fr 440px;align-items:center;padding:0 88px 0 80px;gap:48px}
+        body::after{opacity:.05}
+        .s{width:440px;height:440px}
+        .s .trace-hi,.s .glow{animation-play-state:paused!important;animation-delay:-0.62s!important}
+        h1{font-size:96px;line-height:1;letter-spacing:-.015em;margin:0 0 26px}
+        p{font-size:26px;color:var(--bone-2);margin:0;max-width:19em;line-height:1.4}
+        .k{margin-top:44px;font:500 14px/1 var(--font-text);letter-spacing:.12em;text-transform:uppercase;color:var(--brass);padding-top:18px;border-top:1px solid var(--hair-strong);max-width:520px}
+      </style></head><body>
+      <div><h1>Crypto that <em>arrives.</em></h1><p>While you are alive, nothing happens. When you are not, this executes.</p><div class="k">Dead Man&#8217;s Wallet &middot; NEAR</div></div>
+      <div class="s">${seal}</div></body></html>`, { waitUntil: 'networkidle' });
+    await page.evaluate(async () => { await Promise.all(['400 40px "Instrument Serif"', 'italic 400 40px "Instrument Serif"', '400 16px "Inter Tight"', '500 16px "Inter Tight"', '400 14px "JetBrains Mono"'].map(f => document.fonts.load(f))); await document.fonts.ready; });
+    await page.waitForTimeout(300);
+    await page.screenshot({ path: path.join(ROOT, 'site', 'assets', 'og.png'), type: 'png' });
+    await page.close();
+  }
+
   if (!only || only === 'seal') {
     const page = await browser.newPage({ viewport: { width: 800, height: 800 }, deviceScaleFactor: 1 });
     const seal = fs.readFileSync(path.join(__dirname, 'seal.svg'), 'utf8');

@@ -93,9 +93,9 @@ code { color: var(--bone); background: var(--ink-3); padding: .08em .35em; borde
 .vault-meta { display: grid; grid-template-columns: repeat(3, 1fr); margin: 0; border-top: 1px solid var(--hair); border-bottom: 1px solid var(--hair); }
 .vault-meta div { padding: 12px 0 12px 14px; border-left: 1px solid var(--hair); }
 .vault-meta div:first-child { border-left: 0; padding-left: 0; }
-.vault-meta dt { font-size: 10.5px; color: var(--brass-2); }
+.vault-meta dt { font-size: 10.5px; color: var(--brass); }
 .vault-meta dd { margin: 4px 0 0; font-size: 14px; color: var(--bone); line-height: 1.35; }
-.meta-note { margin: 10px 0 0; color: var(--bone-2); opacity: .6; font-size: 10.5px; text-align: right; }
+.meta-note { margin: 10px 0 0; color: var(--bone-2); font-size: 10.5px; text-align: right; }
 
 @media (min-width: 900px) {
   .hero { padding: 72px 0 0; }
@@ -205,7 +205,7 @@ code { color: var(--bone); background: var(--ink-3); padding: .08em .35em; borde
 .ledger thead th { text-align: left; padding: 0 24px 14px 0; border-bottom: 1px solid var(--hair-strong); font-weight: 500; }
 .ledger tbody th, .ledger td { text-align: left; vertical-align: top; padding: 22px 24px 22px 0; border-bottom: 1px solid var(--hair); }
 .ledger tbody th { font: 400 24px/1.2 var(--font-display); color: var(--bone); width: 26%; }
-.ledger tbody th .aside { display: block; margin-top: 8px; color: var(--brass-2); font-size: 10.5px; }
+.ledger tbody th .aside { display: block; margin-top: 8px; color: var(--brass); font-size: 10.5px; }
 .ledger td { color: var(--bone-2); width: 37%; }
 .ledger td:last-child { color: var(--bone); }
 @media (min-width: 900px) {
@@ -242,7 +242,7 @@ code { color: var(--bone); background: var(--ink-3); padding: .08em .35em; borde
 .clause blockquote p { font: 400 20px/1.55 var(--font-display); color: var(--bone); margin: 0; }
 .clause-title { font-style: italic; }
 .clause-foot { display: flex; gap: 32px; margin-top: 36px; }
-.clause-foot span { flex: 1; border-top: 1px solid var(--hair-strong); padding-top: 8px; font-size: 11px; letter-spacing: var(--track-label); text-transform: uppercase; color: var(--bone-2); opacity: .7; }
+.clause-foot span { flex: 1; border-top: 1px solid var(--hair-strong); padding-top: 8px; font-size: 11px; letter-spacing: var(--track-label); text-transform: uppercase; color: var(--bone-2); }
 @media (min-width: 900px) {
   .attorneys { padding: 144px 0; }
   .att-grid { grid-template-columns: repeat(12, 1fr); gap: 0 24px; align-items: start; }
