@@ -112,7 +112,7 @@ for them exists anywhere; the contract requests signatures at settlement time.
 | `create_vault({heartbeat_interval_s, grace_missed, heirs, policy?, bounty?})` → `token_id` | anyone | ≥ 0.1 NEAR (storage) + vault balance | mints Will NFT to caller; `last_beat = now`; `balance = deposit − storage` |
 | `deposit({token_id})` | anyone | > 0 | adds to vault balance |
 | `heartbeat({token_id})` | owner, or pulse key (predecessor == contract && signer_pk ∈ pulse_keys) | — | `last_beat = now`; event |
-| `add_pulse_key({token_id, public_key})` | owner | — | stores pk; `Promise::new(current).add_access_key_allowance(pk, 0.25 NEAR, current, "heartbeat")` |
+| `add_pulse_key({token_id, public_key})` | owner | — | stores pk; `Promise::new(current).add_access_key_allowance(pk, 1 NEAR, current, "heartbeat")` (see §2.7) |
 | `add_agent_key({token_id, public_key})` | owner | — | stores pk; FC key scoped to `agent_pay` |
 | `remove_key({token_id, public_key})` | owner | — | removes from vault + `delete_key` |
 | `agent_pay({token_id, receiver_id, amount, memo?})` | agent key only | — | policy check; on allow: `balance -= amount`, `Promise::new(receiver).transfer(amount)`; event `agent_pay_allowed` / `agent_pay_denied` with `reason` in {`over_per_tx_max`, `over_daily_max`, `receiver_not_allowlisted`, `vault_not_alive`, `insufficient_balance`}. Denied calls **do not panic** (so the log entry persists) |
@@ -157,6 +157,26 @@ red `#e74c3c` Triggered, grey `#7f8c8d` Settled), vault id, state word, "next be
 
 - Unit tests with `near_sdk::testing_env!` for: state derivation, policy allow/deny each reason, poke timing, step ordering and idempotence, bps math, NFT ownership rules.
 - Integration: `scripts/e2e.sh` against testnet (create account via faucet, deploy, create vault with 20 s interval, add keys, agent pay allowed + denied, kill, poke, steps, assert final state). Must pass before submission.
+
+### 2.7 Implementation notes (contracts agent, 2026-11-07)
+
+These are the places where the shipped contract (`contracts/dmw`, deployed at `dmw-x8cx.testnet`) differs from or adds to §2.1–2.5:
+
+- **`token_id` input** is accepted as a JSON number (`1`) or a string (`"1"`). Views always return a string.
+- **Key gas allowance is 1 NEAR, not 0.25.** Gas burned by function-call keys comes out of the contract account, which pools every vault's NEAR. So `add_*_key` takes the allowance from the vault's own `balance` (the vault needs ≥ 1 NEAR) and gives it back if AddKey fails. A heartbeat at 10 TGas costs ~0.011 NEAR of allowance, so one key covers ~90 beats. Tell the keeper to attach **≤ 10 TGas** for `heartbeat` (the allowance is charged for prepaid gas, not gas actually used).
+- **Keys work only after AddKey succeeds** (`on_key_added` callback). There is a global registry `public_key -> token_id`, so one key can belong to only one vault. This stops a vault from listing someone else's key (or the contract's full-access key) and getting it deleted in step 2 or by `remove_key`.
+- **`agent_pay` denies with `vault_not_alive` in Warning too.** The agent is disarmed as soon as a beat is missed. Check order: `vault_not_alive`, `receiver_not_allowlisted`, `over_per_tx_max`, `over_daily_max`, `insufficient_balance`. If `policy` is omitted, everything is denied (all limits 0). Authorization failures (not an agent key of this vault) still panic.
+- **Step 1 reserve** is 1.5 NEAR when a DAO is set (proposal bond + gas), otherwise 0.1 NEAR. This replaces "0.05 + bounty", since the bounty is already paid at `poke`. Whatever is left is claimable by the NFT owner after Settled. The `step_1` log `detail` is `"<account> <amount> NEAR, ..."` (the dashboard parses it).
+- **Failed outgoing transfers** (heir, agent, bounty, claim) go back into the vault balance through a callback.
+- **`execute_step`** returns the new `step`. Steps 3 and 4 return it through their callback. Step 3 has an in-flight guard: calling it again while a signature is pending does nothing and returns 3. A request still pending after 10 min is marked `failed` and settlement moves on. With no foreign payouts, step 3 goes straight to 4. The keeper should attach **300 TGas** to every `execute_step`.
+- **Step 4** creates a Sputnik v2 `FunctionCall` proposal (text/`Vote` proposals are not valid in v2): `mark_broadcast({token_id, index: 0, tx_hash: "dao-ratified"})` on this contract, 1 NEAR bond, 100 TGas. The proposal id is stored. If it fails, the bond goes back to the vault and settlement continues. `mark_broadcast` with `tx_hash == "dao-ratified"` is accepted only from the vault's `dao_id` and only logs `dao_ratified`.
+- **`mark_broadcast`** otherwise requires `status == "signed"`, so a recorded hash cannot be overwritten.
+- **Limits:** ≤ 10 heirs, ≤ 5 keys per kind, ≤ 4 foreign payouts, ≤ 10 allowlist entries, interval 10 s..10 y, `grace_missed` ≤ 1000. The log keeps the last 40 entries.
+- **Defaults:** bounty 0.01 NEAR; storage fee 0.1 NEAR flat. `set_dao({token_id, dao_id: null})` clears the DAO. `set_foreign_payouts({token_id, payouts})` forces `status: "pending"`.
+- **NFT:** approvals (NEP-178) are not supported (`approval_id` must be null). `nft_transfer_call` reverts if the receiver returns `true`. `extra.heirs` is the heir count.
+- **Extra views:** `get_config()`. `get_vaults({from_index, limit})` takes JSON numbers (limit ≤ 100).
+- **Callbacks:** `on_key_added`, `on_transfer_done`, `on_dao_proposal`, `on_foreign_signed`, `nft_resolve_transfer` (all `#[private]`). `on_foreign_signed` returns the new step.
+- **Build:** near-sdk 5.30 needs `--cfg near` for on-chain builds without cargo-near. `contracts/dmw/build.sh` handles it.
 
 ## 3. Keeper: `keeper/` (TypeScript, Node 22, ESM)
 
