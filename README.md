@@ -10,6 +10,8 @@ Built at NEAR Hackathon, Nov 1–14 2026. Tracks: `security` (06 AI Security & D
 Testnet only. Not a will, not a custodian, not audited. MIT license.
 
 Live contract: [`dmw-x8cx.testnet`](https://testnet.nearblocks.io/address/dmw-x8cx.testnet) ·
+Live keeper run (alive → settled, both foreign payouts signed): [`keeper/LIVE_RUN.md`](keeper/LIVE_RUN.md) ·
+Showcase vault for the demo video: [`keeper/SHOWCASE.md`](keeper/SHOWCASE.md) ·
 Smoke run with 22 explorer links: [`contracts/TESTNET_SMOKE.md`](contracts/TESTNET_SMOKE.md) ·
 Chain Signatures proof: [`docs/chainsig-notes.md`](docs/chainsig-notes.md) ·
 Security review: [`docs/SECURITY_REVIEW.md`](docs/SECURITY_REVIEW.md)
@@ -31,7 +33,7 @@ installed by the scripts. `make check` prints the exact fix for anything missing
 git clone <repo> deadmans-wallet && cd deadmans-wallet
 make check          # do: verify toolchain       -> see: "All good."
 make build          # do: build the contract      -> see: contracts/dmw/target/wasm32-unknown-unknown/release/dmw.wasm
-make test           # do: run unit tests          -> see: "test result: ok. 6x passed" and "35 passed" (keeper)
+make test           # do: run unit tests          -> see: "test result: ok. 76 passed" (contract) and "38 passed" (keeper)
 make deploy         # do: faucet account + deploy -> see: "deployed dmw-xxxx.testnet", written to .env
 make demo           # do: full live demo          -> see below
 ```
@@ -108,7 +110,10 @@ step 5      Will NFT -> primary heir, state Settled
 | Estate DAO | execute the ratification call the proposal names | anything else on the vault |
 | Contract | hold the plan, request MPC signatures, delete its own keys | sign for a foreign chain before `Triggered` |
 
-Full findings and what was fixed: [`docs/SECURITY_REVIEW.md`](docs/SECURITY_REVIEW.md).
+An independent review (a separate agent that had not seen the code) found 1 Critical, 3 High, 4 Medium, 6 Low: a
+double-payout path on foreign chains via caller-chosen nonces, fake `mark_broadcast` hashes, unbounded EVM gas, and
+keys surviving an NFT transfer. All Critical/High items are fixed with regression tests and redeployed; the Medium/Low
+items are documented with their mitigations. Full findings: [`docs/SECURITY_REVIEW.md`](docs/SECURITY_REVIEW.md).
 
 ## Repository
 
