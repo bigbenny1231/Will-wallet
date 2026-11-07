@@ -7,16 +7,17 @@
 //
 // Until those land, every method throws "not wired".
 import type { Config } from './config.js';
-import type { EvmStepArgs } from './types.js';
+import type { ChainName, EvmStepArgs } from './types.js';
 
 export interface Chains {
-  deriveAddresses(contractId: string, tokenId: string): Promise<{ base: string; solana: string }>;
-  evmParams(fromAddress: string): Promise<EvmStepArgs>;
+  deriveAddresses(contractId: string, tokenId: string): Promise<{ base: string; monad: string; solana: string }>;
+  /** `chain` selects the EVM chain (default base): its RPC and fee cap. */
+  evmParams(fromAddress: string, chain?: 'base' | 'monad'): Promise<EvmStepArgs>;
   solanaParams(): Promise<{ recent_blockhash: string }>;
-  broadcastEvm(rawHex: string): Promise<string>;
+  broadcastEvm(rawHex: string, chain?: 'base' | 'monad'): Promise<string>;
   broadcastSolana(rawBase64: string): Promise<string>;
   /** True when the tx id (EVM hash / Solana signature) is known to the chain (pending, mined or landed with an error). */
-  txLanded(chain: 'base' | 'solana', id: string): Promise<boolean>;
+  txLanded(chain: ChainName, id: string): Promise<boolean>;
 }
 
 export class NotWiredError extends Error {
@@ -58,32 +59,35 @@ export function loadRealChains(cfg: Config): Chains {
     if (!fn) throw new NotWiredError(what);
     return fn as (...a: any[]) => T;
   };
+  // Base keeps the configured RPC; other EVM chains pass their name (chains/evm.ts resolves RPC + MONAD_RPC override).
+  const rpcFor = (chain: ChainName) => (chain === 'base' ? cfg.baseRpc : chain);
   return {
     async deriveAddresses(contractId, tokenId) {
       const fn = await need<any>('derive', 'derive', ['deriveAddresses', 'deriveForVault', 'derive', 'deriveAll']);
       const r = await fn(contractId, tokenId, cfg);
-      return { base: addr(r.base ?? r.evm ?? r.baseAddress), solana: addr(r.solana ?? r.sol ?? r.solanaAddress) };
+      const base = addr(r.base ?? r.evm ?? r.baseAddress);
+      return { base, monad: r.monad ? addr(r.monad) : base, solana: addr(r.solana ?? r.sol ?? r.solanaAddress) };
     },
-    async evmParams(from) {
+    async evmParams(from, chain = 'base') {
       const fn = await need<any>('evm', 'evm params', ['getEvmStepArgs', 'getStepArgs', 'evmStepArgs', 'getEvmParams']);
-      return fn(from, cfg.baseRpc);
+      return fn(from, rpcFor(chain));
     },
     async solanaParams() {
       const fn = await need<any>('solana', 'solana params', ['getSolanaStepArgs', 'getStepArgs', 'solanaStepArgs', 'getSolanaParams']);
       return fn(cfg.solanaRpc);
     },
-    async broadcastEvm(raw) {
+    async broadcastEvm(raw, chain = 'base') {
       const fn = await need<any>('evm', 'evm broadcast', ['broadcastEvm', 'broadcast', 'sendRawTransaction']);
-      return fn(raw, cfg.baseRpc);
+      return fn(raw, rpcFor(chain));
     },
     async broadcastSolana(raw) {
       const fn = await need<any>('solana', 'solana broadcast', ['broadcastSolana', 'broadcast', 'sendTransaction']);
       return fn(raw, cfg.solanaRpc);
     },
     async txLanded(chain, id) {
-      if (chain === 'base') {
+      if (chain !== 'solana') {
         const fn = await need<any>('evm', 'evm tx lookup', ['evmTxKnown']);
-        return fn(id, cfg.baseRpc);
+        return fn(id, rpcFor(chain));
       }
       const fn = await need<any>('solana', 'solana status lookup', ['solanaSignatureLanded']);
       return fn(id, cfg.solanaRpc);

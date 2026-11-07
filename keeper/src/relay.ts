@@ -10,7 +10,7 @@ const EVM_STALE = /nonce too low|nonce is too low|replacement transaction underp
 export function classifyRelayError(chain: ChainName, e: unknown): RelayErrorKind {
   const msg = String((e as Error)?.message ?? e);
   if (chain === 'solana' && isBlockhashExpired(e)) return 'stale';
-  if (chain === 'base' && EVM_STALE.test(msg)) return 'stale';
+  if (chain !== 'solana' && EVM_STALE.test(msg)) return 'stale';
   if (UNFUNDED.test(msg)) return 'unfunded';
   return 'other';
 }

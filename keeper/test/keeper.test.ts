@@ -8,7 +8,7 @@ import { startPulse } from '../src/commands/pulse.js';
 import { driveVault, makeDeps, runKeeper, tickOnce, type Logger } from '../src/keeperLoop.js';
 import { MockBackend, mockChains } from '../src/mock.js';
 import { bumpedEvmArgs, clampEvm, msUntilResign } from '../src/resign.js';
-import { backoffDelay, isTransient, nearTxLink, parseEvents, withRetry } from '../src/util.js';
+import { backoffDelay, foreignTxLink, isTransient, nearTxLink, parseEvents, withRetry } from '../src/util.js';
 
 const quiet: Logger = { ok() {}, warn() {}, err() {}, info() {} };
 const fresh = (clock: { t: number }, seed = {}) => {
@@ -229,6 +229,32 @@ describe('relay failures', () => {
     expect(sent.max_priority_fee_per_gas).toBe('1100000');
     expect(sent.gas_limit).toBe('21000');
     expect((await backend.getVault('1')).foreign[0].status).toBe('broadcast');
+  });
+
+  it('monad payout: EVM args for the monad chain, relayed through the monad RPC, linked on monadexplorer', async () => {
+    const clock = { t: 1_000_000 };
+    const backend = fresh(clock, { foreign: 'monad' });
+    await backend.getVaults();
+    clock.t += 25_000;
+    const chains = mockChains();
+    const params = vi.spyOn(chains, 'evmParams');
+    const bcast = vi.spyOn(chains, 'broadcastEvm');
+    const deps = makeDeps({ backend, chains, contractId: 'c', now: () => clock.t, log: quiet });
+    const r = await tickOnce(deps);
+    expect(r.error).toBeUndefined();
+    expect(params).toHaveBeenCalledWith('0xMOCKfromMonad', 'monad');
+    expect(bcast.mock.calls[0][1]).toBe('monad');
+    const v = await backend.getVault('1');
+    expect(v.foreign[0].chain).toBe('monad');
+    expect(v.foreign[0].status).toBe('broadcast');
+    expect(foreignTxLink('monad', '0xabc')).toBe('https://testnet.monadexplorer.com/tx/0xabc');
+  });
+
+  it('monad fee cap is 1000 gwei (Base 100 gwei)', () => {
+    const a = { nonce: 0, max_fee_per_gas: '300000000000', max_priority_fee_per_gas: '1', gas_limit: '21000' };
+    expect(clampEvm(a, 'monad').max_fee_per_gas).toBe('300000000000');
+    expect(clampEvm(a, 'base').max_fee_per_gas).toBe('100000000000');
+    expect(bumpedEvmArgs(a, { max_fee_per_gas: '300000000000', max_priority_fee_per_gas: '1' }, 'monad')!.max_fee_per_gas).toBe('330000000000');
   });
 
   it('relays the stored signed_tx again when a broadcast payout hash is not on chain', async () => {

@@ -59,8 +59,11 @@ export function baseTxLink(hash: string): string {
 export function solanaTxLink(sig: string): string {
   return isMockHash(sig) ? `(mock tx ${sig})` : `https://explorer.solana.com/tx/${sig}?cluster=devnet`;
 }
-export function foreignTxLink(chain: 'base' | 'solana', hash: string): string {
-  return chain === 'base' ? baseTxLink(hash) : solanaTxLink(hash);
+export function monadTxLink(hash: string): string {
+  return isMockHash(hash) ? `(mock tx ${hash})` : `https://testnet.monadexplorer.com/tx/${hash}`;
+}
+export function foreignTxLink(chain: 'base' | 'monad' | 'solana', hash: string): string {
+  return chain === 'base' ? baseTxLink(hash) : chain === 'monad' ? monadTxLink(hash) : solanaTxLink(hash);
 }
 
 // ------------------------------------------------------------------- logging

@@ -19,7 +19,7 @@ export interface MockOpts {
   balance?: bigint;
   bounty?: bigint;
   withDao?: boolean;
-  foreign?: 'both' | 'none' | 'base' | 'solana';
+  foreign?: 'both' | 'none' | 'base' | 'monad' | 'solana';
 }
 
 export function mockCreate(now: number, o: MockOpts = {}): VaultView {
@@ -31,6 +31,16 @@ export function mockCreate(now: number, o: MockOpts = {}): VaultView {
       to: '0x000000000000000000000000000000000000dEaD',
       amount: '1000000000000000',
       from_address: '0xMOCKfromBase',
+      status: 'pending',
+      signed_tx: null,
+      tx_hash: null,
+    });
+  if (f === 'monad')
+    foreign.push({
+      chain: 'monad',
+      to: '0x000000000000000000000000000000000000dEaD',
+      amount: '1000000000000000',
+      from_address: '0xMOCKfromMonad',
       status: 'pending',
       signed_tx: null,
       tx_hash: null,
@@ -119,10 +129,10 @@ export function mockExecuteStep(v: VaultView, now: number, args?: StepArgs): { l
     case 3: {
       if (v.foreign_index < v.foreign.length) {
         const p = v.foreign[v.foreign_index];
-        if (p.chain === 'base' && !args?.evm) throw new Error('execute_step: missing args.evm');
+        if (p.chain !== 'solana' && !args?.evm) throw new Error('execute_step: missing args.evm');
         if (p.chain === 'solana' && !args?.solana?.recent_blockhash) throw new Error('execute_step: missing args.solana');
         p.status = 'signed';
-        p.signed_tx = p.chain === 'base' ? `0xmocksigned${v.foreign_index}` : Buffer.from(`mocksigned${v.foreign_index}`).toString('base64');
+        p.signed_tx = p.chain !== 'solana' ? `0xmocksigned${v.foreign_index}` : Buffer.from(`mocksigned${v.foreign_index}`).toString('base64');
         v.foreign_index += 1;
         push(v, now, 'step_3', `signed payout ${v.foreign_index - 1} (${p.chain})`);
       }
@@ -270,8 +280,8 @@ export class MockBackend implements Backend {
     this.tracks.set(`${tokenId}:${index}`, {
       last_request_ms: now,
       inflight: false,
-      max_fee_per_gas: chain === 'base' ? (args?.evm?.max_fee_per_gas ?? '0') : '0',
-      max_priority_fee_per_gas: chain === 'base' ? (args?.evm?.max_priority_fee_per_gas ?? '0') : '0',
+      max_fee_per_gas: chain !== 'solana' ? (args?.evm?.max_fee_per_gas ?? '0') : '0',
+      max_priority_fee_per_gas: chain !== 'solana' ? (args?.evm?.max_priority_fee_per_gas ?? '0') : '0',
       resign_allowed_after_ms: now + 300_000,
     });
   }
@@ -327,7 +337,7 @@ export function mockChains(): Chains {
   const sent = new Set<string>();
   return {
     async deriveAddresses(_c, tokenId) {
-      return { base: `0xMOCK${tokenId.padStart(36, '0')}`, solana: `MOCKsol${tokenId}` };
+      return { base: `0xMOCK${tokenId.padStart(36, '0')}`, monad: `0xMONAD${tokenId.padStart(35, '0')}`, solana: `MOCKsol${tokenId}` };
     },
     async evmParams() {
       return { nonce: nonce++, max_fee_per_gas: '1500000000', max_priority_fee_per_gas: '1000000', gas_limit: '21000' };

@@ -6,6 +6,7 @@ export async function deriveCommand(chains: Chains, contractId: string, tokenId:
     contract: contractId,
     token_id: tokenId,
     base: { path: `base-${tokenId}`, address: a.base, faucet: 'https://www.alchemy.com/faucets/base-sepolia', explorer: `https://sepolia.basescan.org/address/${a.base}` },
+    monad: { path: `monad-${tokenId}`, address: a.monad, faucet: 'https://faucet.monad.xyz', explorer: `https://testnet.monadexplorer.com/address/${a.monad}` },
     solana: { path: `sol-${tokenId}`, address: a.solana, faucet: 'https://faucet.solana.com', explorer: `https://explorer.solana.com/address/${a.solana}?cluster=devnet` },
   };
 }

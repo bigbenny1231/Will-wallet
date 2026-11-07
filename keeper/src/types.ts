@@ -1,7 +1,7 @@
 // Wire types from SPEC.md §2.1 (JSON form returned by the contract).
 
 export type VaultState = 'Alive' | 'Warning' | 'Triggered' | 'Settled';
-export type ChainName = 'base' | 'solana';
+export type ChainName = 'base' | 'monad' | 'solana';
 export type PayoutStatus = 'pending' | 'signed' | 'broadcast' | 'failed';
 
 export interface Heir {

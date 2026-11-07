@@ -2,7 +2,7 @@
 import type { Backend } from './backend.js';
 import type { Chains } from './chainsApi.js';
 import { deriveState, describeAction, nextAction } from './machine.js';
-import type { StepArgs, TxResult, VaultView } from './types.js';
+import type { ChainName, StepArgs, TxResult, VaultView } from './types.js';
 import { MAX_RESIGNS, RELAY_COOLDOWN, classifyRelayError } from './relay.js';
 import { bumpedEvmArgs, clampEvm, msUntilResign, payoutTxId } from './resign.js';
 import { errMsg, foreignTxLink, logErr, logInfo, logOk, logWarn, nearTxLink, sleep } from './util.js';
@@ -49,11 +49,11 @@ export interface ActionRecord {
   ok: boolean;
 }
 
-export async function stepArgsFor(deps: KeeperDeps, v: VaultView, chain: 'base' | 'solana', index: number): Promise<StepArgs> {
-  if (chain === 'base') {
-    const from = v.foreign[index].from_address || (await deps.chains.deriveAddresses(deps.contractId, v.token_id)).base;
-    // The contract sets the nonce itself (SPEC 2.7) and ignores ours; we still send it. Fees/gas stay inside its caps.
-    return { evm: clampEvm(await deps.chains.evmParams(from)) };
+export async function stepArgsFor(deps: KeeperDeps, v: VaultView, chain: ChainName, index: number): Promise<StepArgs> {
+  if (chain === 'base' || chain === 'monad') {
+    const from = v.foreign[index].from_address || (await deps.chains.deriveAddresses(deps.contractId, v.token_id))[chain];
+    // The contract sets the nonce itself (SPEC 2.7) and ignores ours; we still send it. Fees/gas stay inside its per-chain caps.
+    return { evm: clampEvm(await deps.chains.evmParams(from, chain), chain) };
   }
   return { solana: await deps.chains.solanaParams() };
 }
@@ -96,7 +96,7 @@ type StaleResult = { kind: 'resigned' } | { kind: 'landed'; hash: string } | { k
  *  - EVM: both fees = max(fresh, 1.1 x last), inside 21000..100000 gas and 100 gwei;
  *  - Solana: the call must come from the keeper account (set_keeper), which is the account this backend signs with.
  */
-async function handleStale(deps: KeeperDeps, v: VaultView, index: number, chain: 'base' | 'solana', why: string, out: ActionRecord[]): Promise<StaleResult> {
+async function handleStale(deps: KeeperDeps, v: VaultView, index: number, chain: ChainName, why: string, out: ActionRecord[]): Promise<StaleResult> {
   const { backend, chains, log } = deps;
   const id = v.token_id;
   const key = `${id}:${index}`;
@@ -125,11 +125,11 @@ async function handleStale(deps: KeeperDeps, v: VaultView, index: number, chain:
       return { kind: 'wait' };
     }
     let args = await stepArgsFor(deps, v, chain, index);
-    if (chain === 'base' && args.evm && (p.status === 'signed' || p.status === 'broadcast')) {
-      const bumped = bumpedEvmArgs(args.evm, track);
+    if (chain !== 'solana' && args.evm && (p.status === 'signed' || p.status === 'broadcast')) {
+      const bumped = bumpedEvmArgs(args.evm, track, chain);
       if (!bumped) {
         park(RELAY_COOLDOWN.resignCap, 'fee-cap');
-        log.err('resign', `${label}: a 1.1x fee bump over the last request exceeds the 100 gwei cap; cannot re-sign`);
+        log.err('resign', `${label}: a 1.1x fee bump over the last request exceeds the chain's max-fee cap; cannot re-sign`);
         return { kind: 'wait' };
       }
       args = { evm: bumped };
@@ -266,7 +266,7 @@ export async function driveVault(deps: KeeperDeps, initial: VaultView): Promise<
         let alreadyLanded = false;
         if (!hash) {
           try {
-            hash = action.chain === 'base' ? await chains.broadcastEvm(p.signed_tx!) : await chains.broadcastSolana(p.signed_tx!);
+            hash = action.chain !== 'solana' ? await chains.broadcastEvm(p.signed_tx!, action.chain) : await chains.broadcastSolana(p.signed_tx!);
           } catch (e) {
             const kind = classifyRelayError(action.chain, e);
             if (kind === 'stale') {
@@ -286,7 +286,7 @@ export async function driveVault(deps: KeeperDeps, initial: VaultView): Promise<
             } else if (kind === 'unfunded') {
               const prev = deps.relayBlock.get(key);
               deps.relayBlock.set(key, { until: deps.now() + RELAY_COOLDOWN.unfunded, reason: 'unfunded' });
-              const from = p.from_address || (await deps.chains.deriveAddresses(deps.contractId, id).then((a) => (action.chain === 'base' ? a.base : a.solana)).catch(() => 'the derived address'));
+              const from = p.from_address || (await deps.chains.deriveAddresses(deps.contractId, id).then((a) => (action.chain === 'solana' ? a.solana : a[action.chain])).catch(() => 'the derived address'));
               if (prev?.reason === 'unfunded') log.info('relay', `${label} still unfunded; status stays ${p.status}, retry in ${RELAY_COOLDOWN.unfunded / 1000}s`);
               else log.warn('relay', `${label} NOT broadcast: source ${from} is unfunded (${errMsg(e)}). Status stays ${p.status}; fund it and the keeper will relay. Retry in ${RELAY_COOLDOWN.unfunded / 1000}s`);
               out.push({ kind: 'broadcast', tokenId: id, ok: false, detail: 'unfunded' });

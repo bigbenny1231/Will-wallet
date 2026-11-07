@@ -248,13 +248,13 @@ Commands (`npm run <cmd>` or `npx dmw <cmd>`):
 
 | cmd | does |
 | --- | --- |
-| `derive --token <id>` | prints derived Base and Solana source addresses for the vault (chainsig.js) |
+| `derive --token <id>` | prints derived Base, Monad and Solana source addresses for the vault (chainsig.js) |
 | `pulse --token <id> --key <ed25519:...> [--interval 60]` | heartbeat daemon; prints a countdown; Ctrl-C = "death" |
-| `keeper [--poll 5]` | loop: `get_vaults`, `poke` any vault past deadline, `execute_step` any Triggered vault (fetching nonce/fees from Base RPC and blockhash from Solana for step 3), relay any `signed` payout (eth_sendRawTransaction / sendTransaction), then `mark_broadcast`. Logs every action with explorer links |
+| `keeper [--poll 5] [--once] [--token <id,id,...>]` | `--token` restricts the loop to those vaults (default: every vault; `pulse` takes a single `--token`). Loop: `get_vaults`, `poke` any vault past deadline, `execute_step` any Triggered vault (fetching nonce/fees from the payout chain's RPC, Base or Monad, and blockhash from Solana for step 3), relay any `signed` payout (eth_sendRawTransaction / sendTransaction), then `mark_broadcast`. Logs every action with explorer links |
 | `agent-demo --token <id> --key <agent key>` | runs two `agent_pay` calls: one allowed (small, allowlisted) and one denied (over cap, unknown receiver); prints the on-chain log lines |
 | `dao create --name estate-<id>` | creates a Sputnik v2 DAO on testnet with the owner as council and prints its id |
 
-Config via `.env` (`.env.example` committed): `NEAR_NETWORK`, `DMW_CONTRACT`, `KEEPER_ACCOUNT_ID`, `KEEPER_PRIVATE_KEY`, `BASE_RPC`, `SOLANA_RPC`.
+Config via `.env` (`.env.example` committed): `NEAR_NETWORK`, `DMW_CONTRACT`, `KEEPER_ACCOUNT_ID`, `KEEPER_PRIVATE_KEY`, `BASE_RPC`, `MONAD_RPC`, `SOLANA_RPC`.
 Solana blockhashes expire in ~60–90 s; keeper fetches a fresh one right before `execute_step` and retries once with a new blockhash if the sign callback reports failure.
 
 ## 4. Dashboard: `dashboard/` (Vite + React + TypeScript, wallet-selector with MyNearWallet + Meteor)

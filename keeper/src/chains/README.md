@@ -37,9 +37,7 @@ base/monad payout and `solana` for a solana payout (sending both every time is f
 shared: the contract picks the chain id (84532 / 10143), the path and the nonce from the payout's `chain`.
 Each EVM chain has its own derived address and its own nonce sequence.
 
-Not yet wired in the keeper loop (outside this directory): `chainsApi.ts` still passes `cfg.baseRpc` for
-every EVM payout. Pass the payout's `chain` instead (`getEvmStepArgs(from, p.chain)`,
-`broadcastEvm(raw, p.chain)`, `evmTxKnown(hash, p.chain)`) to relay Monad payouts.
+Wired: the keeper loop passes the payout's `chain` to `getEvmStepArgs`, `broadcastEvm` and `evmTxKnown` (Monad payouts relay like Base ones; fee cap per chain in `resign.ts`).
 
 If a relay fails because the Solana blockhash expired (`isBlockhashExpired(e)`) or the EVM nonce went
 stale, call `dmw.resign_foreign({ token_id, index, args })` with fresh args (300 TGas). It re-signs a

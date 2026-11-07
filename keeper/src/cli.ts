@@ -37,6 +37,7 @@ program
       });
       if (o.json) return void console.log(JSON.stringify(r, null, 2));
       console.log(`${pc.bold('Base Sepolia')}  ${r.base.address}\n  path ${r.base.path} · fund: ${r.base.faucet}\n  ${r.base.explorer}`);
+      console.log(`${pc.bold('Monad testnet')} ${r.monad.address}\n  path ${r.monad.path} · fund: ${r.monad.faucet}\n  ${r.monad.explorer}`);
       console.log(`${pc.bold('Solana devnet')} ${r.solana.address}\n  path ${r.solana.path} · fund: ${r.solana.faucet}\n  ${r.solana.explorer}`);
     }),
   );
