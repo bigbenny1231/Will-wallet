@@ -4,19 +4,24 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Dead Man's Wallet | Crypto that arrives.</title>
-<meta name="description" content="A non-custodial NEAR contract that executes the distribution your will or trust specifies. Proof of life while you're here, automatic settlement when you're not. Heirs sign in with Google.">
-<meta name="theme-color" content="#0b0f14">
+<meta name="description" content="A non-custodial NEAR contract that executes the distribution your will or trust specifies. Proof of life while you are here, settlement when you are not. Heirs sign in with Google.">
+<meta name="theme-color" content="#0B0C0F">
+<meta name="color-scheme" content="dark">
 <link rel="canonical" href="https://deadmanswallet.dev/">
 <meta property="og:type" content="website">
 <meta property="og:title" content="Dead Man's Wallet | Crypto that arrives.">
-<meta property="og:description" content="Proof of life while you're here. Automatic settlement when you're not. Non-custodial, works alongside your will or trust.">
+<meta property="og:description" content="Proof of life while you are here. Settlement when you are not. Non-custodial, works alongside your will or trust.">
 <meta property="og:url" content="https://deadmanswallet.dev/">
-<meta property="og:image" content="https://deadmanswallet.dev/og.png">
+<meta property="og:image" content="https://deadmanswallet.dev/assets/poster.jpg">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Dead Man's Wallet | Crypto that arrives.">
 <meta name="twitter:description" content="Non-custodial NEAR contract that executes the distribution your will or trust specifies.">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230b0f14'/%3E%3Ccircle cx='16' cy='16' r='9' fill='none' stroke='%2334d399' stroke-width='3' stroke-dasharray='42 14' transform='rotate(-90 16 16)'/%3E%3C/svg%3E">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="preload" href="fonts/instrument-serif-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fonts/inter-tight-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="assets/tokens.css">
 <link rel="stylesheet" href="styles.css">
+<script>document.documentElement.classList.add('js')</script>
 </head>
 <body>
 <a class="skip" href="#main">Skip to content</a>
@@ -24,170 +29,274 @@
 <header class="nav">
   <div class="wrap nav-inner">
     <a class="brand" href="#top" aria-label="Dead Man's Wallet, home">
-      <svg width="22" height="22" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="10" fill="none" stroke="#34d399" stroke-width="3.5" stroke-dasharray="47 16" transform="rotate(-90 16 16)"/></svg>
-      <span>Dead Man's Wallet</span>
+      <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="14.5" fill="none" stroke="currentColor" stroke-width="1.1"/><circle cx="16" cy="16" r="12" fill="none" stroke="currentColor" stroke-width=".6"/><path d="M6.5 16.5h6l1.4-5 2.2 9.5 1.6-4.5h7.8" fill="none" stroke="#3DDC84" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <span>Dead Man&#8217;s Wallet</span>
     </a>
     <nav aria-label="Primary">
       <ul class="nav-links">
         <li><a href="#how">How it works</a></li>
         <li><a href="#heirs">For heirs</a></li>
         <li><a href="#attorneys">For attorneys</a></li>
+        <li><a href="#security">Security</a></li>
         <li><a href="#docs" data-link="docs">Docs</a></li>
       </ul>
     </nav>
-    <a class="btn btn-ghost" href="#waitlist">Join waitlist</a>
+    <a class="link nav-cta" href="#waitlist">Join the waitlist</a>
   </div>
 </header>
 
 <main id="main">
-<section class="hero" id="top">
+
+<section class="hero" id="top" aria-labelledby="hero-h">
   <div class="wrap hero-grid">
     <div class="hero-copy">
-      <h1>Crypto that arrives.</h1>
-      <p class="lede">Proof of life while you're here. Automatic settlement when you're not. Your heirs sign in with Google. No seed phrase, nobody locked out.</p>
+      <h1 id="hero-h">Crypto that arrives.</h1>
+      <p class="lede">While you are alive, nothing happens. When you are not, your vault pays each heir on every chain you hold, the way your will or trust says. They sign in with Google. No seed phrase. Nobody locked out.</p>
       <div class="cta-row">
-        <a class="btn btn-primary" href="https://app.deadmanswallet.dev" data-link="dashboard">Set up a vault</a>
-        <a class="btn btn-ghost" href="#demo">Watch the 2-minute demo</a>
+        <a class="pill" href="https://app.deadmanswallet.dev" data-link="dashboard">Set up a vault</a>
+        <a class="link" href="#demo">Watch the demo, 2:39</a>
       </div>
-      <p class="fine">Non-custodial. Works alongside your will or trust.</p>
+      <p class="fine">Non-custodial. Open source. Works alongside your will or trust.</p>
     </div>
 
-    <figure class="vault" aria-label="Example vault status">
-      <div class="vault-top">
-        <span class="pill"><i class="dot" aria-hidden="true"></i> ALIVE</span>
-        <span class="muted small">Example</span>
+    <figure class="hero-seal">
+      <div class="seal-wrap">
+<!-- seal -->
+<svg class="seal" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" role="img" aria-labelledby="seal-title seal-desc" style="--state:#3DDC84">
+  <title id="seal-title">Will seal, vault 0042: alive</title>
+  <desc id="seal-desc">A circular medallion with a double brass ring, the inscription Dead Man's Wallet, vault 0042, alive, around the rim, and a heartbeat trace in the centre that beats every three seconds.</desc>
+  <style>
+    .seal { overflow: visible; }
+    .seal .rim { fill: none; stroke: #C8A96A; }
+    .seal .inscription { font-family: "Inter Tight", "Inter", system-ui, sans-serif; font-weight: 500; font-size: 13px; fill: #C8A96A; letter-spacing: 0.12em; }
+    .seal .inscription .state { fill: var(--state); }
+    .seal .grid { stroke: #C8A96A; stroke-opacity: 0.075; stroke-width: 0.75; }
+    .seal .trace { fill: none; stroke: var(--state); stroke-linecap: round; stroke-linejoin: round; }
+    .seal .trace-base { stroke-width: 1.5; stroke-opacity: 0.42; }
+    .seal .trace-hi { stroke-width: 2.25; stroke-dasharray: 26 174; stroke-dashoffset: 26; animation: seal-sweep var(--beat, 3s) linear infinite; }
+    .seal .glow { transform-origin: 200px 200px; animation: seal-breathe var(--beat, 3s) cubic-bezier(0.22, 1, 0.36, 1) infinite; }
+    .seal .word { font-family: "Instrument Serif", Georgia, serif; font-style: italic; font-size: 34px; fill: #EDE7DC; }
+    .seal .no { font-family: "Inter Tight", "Inter", system-ui, sans-serif; font-weight: 500; font-size: 10px; letter-spacing: 0.2em; fill: #A9A399; }
+    @keyframes seal-sweep {
+      0%   { stroke-dashoffset: 26; }
+      55%  { stroke-dashoffset: -100; }
+      100% { stroke-dashoffset: -100; }
+    }
+    @keyframes seal-breathe {
+      0%   { opacity: 0.45; transform: scale(0.97); }
+      19%  { opacity: 0.5;  transform: scale(0.98); }
+      26%  { opacity: 1;    transform: scale(1.03); }
+      70%  { opacity: 0.5;  transform: scale(0.985); }
+      100% { opacity: 0.45; transform: scale(0.97); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .seal .trace-hi { animation: none; stroke-dasharray: none; stroke-opacity: 0.9; }
+      .seal .glow { animation: none; opacity: 0.7; }
+    }
+  </style>
+  <defs>
+    <radialGradient id="seal-glow-fill" cx="50%" cy="50%" r="50%">
+      <stop offset="0" style="stop-color:var(--state)" stop-opacity="0.22"/>
+      <stop offset="0.62" style="stop-color:var(--state)" stop-opacity="0.07"/>
+      <stop offset="1" style="stop-color:var(--state)" stop-opacity="0"/>
+    </radialGradient>
+    <path id="seal-rim-path" d="M200,200 m-160.5,0 a160.5,160.5 0 1,1 321,0 a160.5,160.5 0 1,1 -321,0"/>
+    <clipPath id="seal-field"><circle cx="200" cy="200" r="145"/></clipPath>
+    <filter id="seal-bloom" x="-10%" y="-60%" width="120%" height="220%">
+      <feGaussianBlur stdDeviation="2.6" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <circle class="glow" cx="200" cy="200" r="206" fill="url(#seal-glow-fill)"/>
+
+  <circle class="rim" cx="200" cy="200" r="190" stroke-width="1.25"/>
+  <circle class="rim" cx="200" cy="200" r="184.5" stroke-width="0.6"/>
+  <text class="inscription"><textPath href="#seal-rim-path" textLength="1000" lengthAdjust="spacing">DEAD MAN&#8217;S WALLET &#183; VAULT 0042 &#183; <tspan class="state">ALIVE</tspan> &#183; DEAD MAN&#8217;S WALLET &#183; VAULT 0042 &#183; <tspan class="state">ALIVE</tspan> &#183;</textPath></text>
+  <circle class="rim" cx="200" cy="200" r="145" stroke-width="0.75"/>
+
+  <g clip-path="url(#seal-field)">
+    <path class="grid" d="M55,140H345M55,160H345M55,180H345M55,200H345M55,220H345M55,240H345M55,260H345M55,120H345M55,280H345M100,55V345M120,55V345M140,55V345M160,55V345M180,55V345M200,55V345M220,55V345M240,55V345M260,55V345M280,55V345M300,55V345"/>
+    <path class="trace trace-base" d="M50,196H118C122,196 125,187 130,187C135,187 138,196 142,196H156L161,204L171,124L181,226L187,196H203C211,196 215,179 226,179C237,179 241,196 249,196H350"/>
+    <path class="trace trace-hi" pathLength="100" filter="url(#seal-bloom)" d="M50,196H118C122,196 125,187 130,187C135,187 138,196 142,196H156L161,204L171,124L181,226L187,196H203C211,196 215,179 226,179C237,179 241,196 249,196H350"/>
+  </g>
+
+  <text class="word" x="200" y="272" text-anchor="middle">Alive</text>
+  <text class="no" x="200" y="296" text-anchor="middle">NO. 0042</text>
+</svg>
+<!-- /seal -->
       </div>
-      <div class="ring-wrap">
-        <svg class="ring" viewBox="0 0 140 140" role="img" aria-label="75 percent of the proof-of-life interval remaining">
-          <circle class="ring-bg" cx="70" cy="70" r="54"/>
-          <circle class="ring-fg" cx="70" cy="70" r="54" pathLength="100"/>
-        </svg>
-        <div class="ring-label">
-          <strong>42</strong>
-          <span>days left</span>
-        </div>
-      </div>
-      <dl class="vault-meta">
-        <div><dt class="sr">Vault</dt><dd>Vault #0042 &middot; NEAR &middot; Base &middot; Solana</dd></div>
-        <div><dt>Heirs</dt><dd>Sarah 60% &middot; Ben 40%</dd></div>
-        <div><dt>Last heartbeat</dt><dd>today, 9:14 am</dd></div>
-      </dl>
+      <figcaption>
+        <dl class="vault-meta">
+          <div><dt>Heirs</dt><dd>Sarah 60%, Ben 40%</dd></div>
+          <div><dt>Chains</dt><dd>NEAR, Base, Solana</dd></div>
+          <div><dt>Last heartbeat</dt><dd>today, 9:14 am</dd></div>
+        </dl>
+        <p class="meta-note">An example vault.</p>
+      </figcaption>
     </figure>
   </div>
 </section>
 
-<section class="strip" aria-label="Trust">
-  <div class="wrap">
-    <ul>
-      <li>Open source</li>
-      <li>Non-custodial</li>
-      <li>RUFADAA online tool</li>
-      <li>Built on NEAR Chain Signatures</li>
-    </ul>
-  </div>
-</section>
-
-<section class="section" id="how">
-  <div class="wrap">
-    <h2>How it works</h2>
-    <ol class="steps">
-      <li class="card">
-        <span class="num" aria-hidden="true">1</span>
-        <h3>1. Set the plan</h3>
-        <p>Name heirs and shares, mirror your will or trust, add the chains you hold on. Ten minutes.</p>
-      </li>
-      <li class="card">
-        <span class="num" aria-hidden="true">2</span>
-        <h3>2. Stay alive</h3>
-        <p>A pulse key sends a heartbeat (today a small daemon you run; phone app <span class="soon">coming soon</span>). Reminders when you miss one and a guardian who can pause the vault are <span class="soon">coming soon</span>.</p>
-      </li>
-      <li class="card">
-        <span class="num" aria-hidden="true">3</span>
-        <h3>3. It arrives</h3>
-        <p>The contract pays each heir on every chain and disarms any agent you ran. They sign in.</p>
-      </li>
-    </ol>
-  </div>
-</section>
-
-<section class="section alt" id="demo">
-  <div class="wrap narrow">
-    <h2>The 2-minute demo</h2>
-    <p class="sub">A vault is created, a heartbeat is missed, and settlement runs on testnet.</p>
-    <video controls preload="none" playsinline width="1280" height="720"
-      poster="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1280 720'%3E%3Crect width='1280' height='720' fill='%23121923'/%3E%3Ccircle cx='640' cy='360' r='56' fill='none' stroke='%2334d399' stroke-width='4'/%3E%3Cpath d='M624 330l48 30-48 30z' fill='%2334d399'/%3E%3Ctext x='640' y='470' fill='%239aa7b5' font-family='sans-serif' font-size='26' text-anchor='middle'%3EDemo video coming soon%3C/text%3E%3C/svg%3E">
-      <!-- <source src="demo.mp4" type="video/mp4"> -->
-      <p>Your browser does not support embedded video. The demo will be available from the Docs.</p>
-    </video>
-  </div>
-</section>
-
-<section class="band" id="heirs">
-  <div class="wrap band-inner">
-    <div>
-      <h2>Got an email saying someone left you something?</h2>
-      <p class="sub">Sign in with the email it was sent to. The assets are already in your name.</p>
+<section class="how" id="how" aria-labelledby="how-h">
+  <div class="strip" id="strip">
+<!-- strip -->
+<svg class="strip-svg" viewBox="0 0 2400 140" preserveAspectRatio="xMidYMid slice" aria-hidden="true" focusable="false"><defs><filter id="strip-bloom" x="-20%" y="-80%" width="140%" height="260%"><feGaussianBlur stdDeviation="2.4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs><path class="strip-base" d="M0,70H2400"/><g class="beat" style="--i:0"><path class="beat-base" d="M50,70C54,70 56,64 60,64C64,64 66,70 70,70L80,70L84,75L90,24L96,86L100,70L110,70C116,70 120,58 128,58C136,58 140,70 146,70L150,70"/><path class="beat-hi" pathLength="100" filter="url(#strip-bloom)" d="M50,70C54,70 56,64 60,64C64,64 66,70 70,70L80,70L84,75L90,24L96,86L100,70L110,70C116,70 120,58 128,58C136,58 140,70 146,70L150,70"/></g><g class="beat" style="--i:1"><path class="beat-base" d="M250,70C254,70 256,64 260,64C264,64 266,70 270,70L280,70L284,75L290,24L296,86L300,70L310,70C316,70 320,58 328,58C336,58 340,70 346,70L350,70"/><path class="beat-hi" pathLength="100" filter="url(#strip-bloom)" d="M250,70C254,70 256,64 260,64C264,64 266,70 270,70L280,70L284,75L290,24L296,86L300,70L310,70C316,70 320,58 328,58C336,58 340,70 346,70L350,70"/></g><g class="beat" style="--i:2"><path class="beat-base" d="M450,70C454,70 456,64 460,64C464,64 466,70 470,70L480,70L484,75L490,24L496,86L500,70L510,70C516,70 520,58 528,58C536,58 540,70 546,70L550,70"/><path class="beat-hi" pathLength="100" filter="url(#strip-bloom)" d="M450,70C454,70 456,64 460,64C464,64 466,70 470,70L480,70L484,75L490,24L496,86L500,70L510,70C516,70 520,58 528,58C536,58 540,70 546,70L550,70"/></g><g class="beat" style="--i:3"><path class="beat-base" d="M650,70C654,70 656,64 660,64C664,64 666,70 670,70L680,70L684,75L690,24L696,86L700,70L710,70C716,70 720,58 728,58C736,58 740,70 746,70L750,70"/><path class="beat-hi" pathLength="100" filter="url(#strip-bloom)" d="M650,70C654,70 656,64 660,64C664,64 666,70 670,70L680,70L684,75L690,24L696,86L700,70L710,70C716,70 720,58 728,58C736,58 740,70 746,70L750,70"/></g><g class="beat" style="--i:4"><path class="beat-base" d="M850,70C854,70 856,64 860,64C864,64 866,70 870,70L880,70L884,75L890,24L896,86L900,70L910,70C916,70 920,58 928,58C936,58 940,70 946,70L950,70"/><path class="beat-hi" pathLength="100" filter="url(#strip-bloom)" d="M850,70C854,70 856,64 860,64C864,64 866,70 870,70L880,70L884,75L890,24L896,86L900,70L910,70C916,70 920,58 928,58C936,58 940,70 946,70L950,70"/></g><g class="beat" style="--i:5"><path class="beat-base" d="M1050,70C1054,70 1056,64 1060,64C1064,64 1066,70 1070,70L1080,70L1084,75L1090,24L1096,86L1100,70L1110,70C1116,70 1120,58 1128,58C1136,58 1140,70 1146,70L1150,70"/><path class="beat-hi" pathLength="100" filter="url(#strip-bloom)" d="M1050,70C1054,70 1056,64 1060,64C1064,64 1066,70 1070,70L1080,70L1084,75L1090,24L1096,86L1100,70L1110,70C1116,70 1120,58 1128,58C1136,58 1140,70 1146,70L1150,70"/></g><g class="beat" style="--i:6"><path class="beat-base" d="M1250,70C1254,70 1256,64 1260,64C1264,64 1266,70 1270,70L1280,70L1284,75L1290,24L1296,86L1300,70L1310,70C1316,70 1320,58 1328,58C1336,58 1340,70 1346,70L1350,70"/><path class="beat-hi" pathLength="100" filter="url(#strip-bloom)" d="M1250,70C1254,70 1256,64 1260,64C1264,64 1266,70 1270,70L1280,70L1284,75L1290,24L1296,86L1300,70L1310,70C1316,70 1320,58 1328,58C1336,58 1340,70 1346,70L1350,70"/></g><g class="beat" style="--i:7"><path class="beat-base" d="M1450,70C1454,70 1456,64 1460,64C1464,64 1466,70 1470,70L1480,70L1484,75L1490,24L1496,86L1500,70L1510,70C1516,70 1520,58 1528,58C1536,58 1540,70 1546,70L1550,70"/><path class="beat-hi" pathLength="100" filter="url(#strip-bloom)" d="M1450,70C1454,70 1456,64 1460,64C1464,64 1466,70 1470,70L1480,70L1484,75L1490,24L1496,86L1500,70L1510,70C1516,70 1520,58 1528,58C1536,58 1540,70 1546,70L1550,70"/></g><g class="beat" style="--i:8"><path class="beat-base" d="M1650,70C1654,70 1656,64 1660,64C1664,64 1666,70 1670,70L1680,70L1684,75L1690,24L1696,86L1700,70L1710,70C1716,70 1720,58 1728,58C1736,58 1740,70 1746,70L1750,70"/><path class="beat-hi" pathLength="100" filter="url(#strip-bloom)" d="M1650,70C1654,70 1656,64 1660,64C1664,64 1666,70 1670,70L1680,70L1684,75L1690,24L1696,86L1700,70L1710,70C1716,70 1720,58 1728,58C1736,58 1740,70 1746,70L1750,70"/></g><g class="beat" style="--i:9"><path class="beat-base" d="M1850,70C1854,70 1856,64 1860,64C1864,64 1866,70 1870,70L1880,70L1884,75L1890,24L1896,86L1900,70L1910,70C1916,70 1920,58 1928,58C1936,58 1940,70 1946,70L1950,70"/><path class="beat-hi" pathLength="100" filter="url(#strip-bloom)" d="M1850,70C1854,70 1856,64 1860,64C1864,64 1866,70 1870,70L1880,70L1884,75L1890,24L1896,86L1900,70L1910,70C1916,70 1920,58 1928,58C1936,58 1940,70 1946,70L1950,70"/></g><g class="beat" style="--i:10"><path class="beat-base" d="M2050,70C2054,70 2056,64 2060,64C2064,64 2066,70 2070,70L2080,70L2084,75L2090,24L2096,86L2100,70L2110,70C2116,70 2120,58 2128,58C2136,58 2140,70 2146,70L2150,70"/><path class="beat-hi" pathLength="100" filter="url(#strip-bloom)" d="M2050,70C2054,70 2056,64 2060,64C2064,64 2066,70 2070,70L2080,70L2084,75L2090,24L2096,86L2100,70L2110,70C2116,70 2120,58 2128,58C2136,58 2140,70 2146,70L2150,70"/></g><g class="beat" style="--i:11"><path class="beat-base" d="M2250,70C2254,70 2256,64 2260,64C2264,64 2266,70 2270,70L2280,70L2284,75L2290,24L2296,86L2300,70L2310,70C2316,70 2320,58 2328,58C2336,58 2340,70 2346,70L2350,70"/><path class="beat-hi" pathLength="100" filter="url(#strip-bloom)" d="M2250,70C2254,70 2256,64 2260,64C2264,64 2266,70 2270,70L2280,70L2284,75L2290,24L2296,86L2300,70L2310,70C2316,70 2320,58 2328,58C2336,58 2340,70 2346,70L2350,70"/></g></svg>
+<!-- /strip -->
+    <div class="wrap how-grid">
+      <div class="how-head">
+        <h2 id="how-h">How it works</h2>
+        <p>While the line beats, nothing happens. When it stops, the plan runs, in three steps.</p>
+      </div>
+      <ol class="steps">
+        <li class="step" style="--n:0">
+          <span class="step-n" aria-hidden="true">I</span>
+          <h3>Set the plan.</h3>
+          <p>Name your heirs and their shares, mirror your will or trust, and add the chains you hold on. About ten minutes.</p>
+        </li>
+        <li class="step" style="--n:1">
+          <span class="step-n" aria-hidden="true">II</span>
+          <h3>Stay alive.</h3>
+          <p>A pulse key sends a heartbeat. Today that is a small daemon you run. A phone app, reminders, and a guardian who can pause the vault are <span class="soon">coming soon</span>.</p>
+        </li>
+        <li class="step" style="--n:2">
+          <span class="step-n" aria-hidden="true">III</span>
+          <h3>It arrives.</h3>
+          <p>If the heartbeats stop, the contract pays each heir on every chain and disarms any agent you ran. Your heirs sign in.</p>
+        </li>
+      </ol>
     </div>
-    <a class="btn btn-primary" href="https://app.deadmanswallet.dev/heir" data-link="heir">Claim with Google</a>
   </div>
 </section>
 
-<section class="section" id="attorneys">
-  <div class="wrap narrow">
-    <h2>For attorneys</h2>
-    <p>Dead Man's Wallet is a RUFADAA-style online tool that the client configures. The client names heirs and shares, chooses the chains, and sets the proof-of-life interval, working from the distribution their will or trust specifies. The contract executes that configured distribution. It does not interpret or amend the governing document.</p>
-    <p>The product is non-custodial: no party, including us, holds the client's keys or can move assets outside the configured plan. Because the plan is stored on-chain, a fiduciary can read exactly what was configured and when it last changed.</p>
-    <p>Counsel can reference the tool in the instrument. The clause below is a starting point only.</p>
+<section class="demo" id="demo" aria-labelledby="demo-h">
+  <div class="wrap demo-grid">
+    <div class="demo-head">
+      <h2 id="demo-h">Watch a vault settle.</h2>
+      <p>A vault is created, its agent is refused a payment, the heartbeats stop, and settlement runs. Every frame is a real run on NEAR testnet. Nothing is mocked.</p>
+    </div>
+    <figure class="player">
+      <div class="player-frame">
+        <video id="demo-video" preload="none" playsinline width="1280" height="720" poster="assets/poster.jpg" aria-describedby="demo-cap">
+          <source src="assets/demo-720p.mp4" type="video/mp4">
+          <p>Your browser cannot play this video. The demo is linked from the <a href="#docs" data-link="docs">docs</a>.</p>
+        </video>
+        <button class="play" type="button" aria-controls="demo-video">
+          <span>Play the demo</span>
+          <svg viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="31" fill="none" stroke="currentColor" stroke-width="1"/><path d="M26 21.5v21l17-10.5z" fill="currentColor"/></svg>
+        </button>
+      </div>
+      <figcaption id="demo-cap">2 minutes 39 seconds, silent, captions burned in. Vault 11 on <span class="mono">dmw-x8cx.testnet</span>.</figcaption>
+    </figure>
+  </div>
+</section>
+
+<section class="heirs" id="heirs" aria-labelledby="heirs-h">
+  <div class="wrap heirs-grid">
+    <h2 id="heirs-h">Got an email saying someone left you something?</h2>
+    <div class="heirs-body">
+      <p>Sign in with the address it was sent to. The assets are already in your name. You do not need a wallet, a seed phrase, or to know what NEAR is.</p>
+      <a class="link link-ink" href="https://app.deadmanswallet.dev/heir" data-link="heir">Claim with Google</a>
+    </div>
+  </div>
+</section>
+
+<section class="security" id="security" aria-labelledby="security-h">
+  <div class="wrap">
+    <div class="sec-head">
+      <h2 id="security-h">The security model, in plain words.</h2>
+      <p>Every key does one thing. None of them can change who gets what.</p>
+    </div>
+    <div class="table-scroll" tabindex="0" role="region" aria-labelledby="security-h">
+      <table class="ledger">
+        <thead>
+          <tr><th scope="col">Who</th><th scope="col">Can</th><th scope="col">Cannot</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <th scope="row">The pulse key</th>
+            <td>Send a heartbeat.</td>
+            <td>Move funds, change heirs, or read anything private.</td>
+          </tr>
+          <tr>
+            <th scope="row">The agent key</th>
+            <td>Call <code>agent_pay</code>, only within the spending policy you set. If you run an AI agent, this is its key.</td>
+            <td>Pay a receiver outside the allowlist, or exceed the per-payment and daily limits.</td>
+          </tr>
+          <tr>
+            <th scope="row">The contract</th>
+            <td>Hold the plan. At settlement, pay heirs, request an MPC signature for each foreign-chain payout, then delete the pulse and agent keys.</td>
+            <td>Move assets outside the configured plan.</td>
+          </tr>
+          <tr>
+            <th scope="row">A keeper <span class="aside">anyone can be one</span></th>
+            <td>Supply the nonce and gas that settlement needs.</td>
+            <td>Change who gets what.</td>
+          </tr>
+          <tr>
+            <th scope="row">A thief with your device</th>
+            <td>Send a heartbeat, which only says you are still here.</td>
+            <td>Anything useful. The device holds only a pulse key.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section class="attorneys" id="attorneys" aria-labelledby="attorneys-h">
+  <div class="wrap att-grid">
+    <div class="att-copy">
+      <h2 id="attorneys-h">For attorneys</h2>
+      <p>Dead Man&#8217;s Wallet is a RUFADAA-style online tool that your client configures. The client names heirs and shares, chooses the chains, and sets the proof-of-life interval, working from the distribution their will or trust specifies. The contract executes that configuration. It does not interpret or amend the governing document.</p>
+      <p>It is non-custodial: no party, including us, holds the client&#8217;s keys or can move assets outside the configured plan. The plan lives on-chain, so a fiduciary can read exactly what was configured and when it last changed.</p>
+      <p>Counsel can reference the tool in the instrument. The clause is a starting point only.</p>
+      <p><a class="link" href="#" data-link="onepager" download>One-pager for counsel, PDF</a> <span class="soon">coming soon</span></p>
+    </div>
     <aside class="clause" id="clause" aria-labelledby="clause-h">
-      <h3 id="clause-h">Sample trust clause <span class="tag">Sample. Review with counsel.</span></h3>
+      <header class="clause-head">
+        <h3 id="clause-h">Sample trust clause</h3>
+        <p class="clause-tag">Sample. Review with counsel.</p>
+      </header>
       <blockquote>
-        <p><strong>Digital asset distribution tool.</strong> The Settlor may configure an online tool known as Dead Man's Wallet (the "Vault") to hold or distribute digital assets. The Trustee is authorized to rely on the distribution configured in the Vault as of the date of the Settlor's incapacity or death, to the extent it is consistent with this instrument, and to access, manage, and transfer on-chain assets associated with the Vault as necessary to administer the trust. In the event of any inconsistency between the Vault's configuration and this instrument, this instrument controls, and the Trustee may take such steps as are needed to give effect to it.</p>
+        <p><span class="clause-title">Digital asset distribution tool.</span> The Settlor may configure an online tool known as Dead Man&#8217;s Wallet (the &#8220;Vault&#8221;) to hold or distribute digital assets. The Trustee is authorized to rely on the distribution configured in the Vault as of the date of the Settlor&#8217;s incapacity or death, to the extent it is consistent with this instrument, and to access, manage, and transfer on-chain assets associated with the Vault as necessary to administer the trust. In the event of any inconsistency between the Vault&#8217;s configuration and this instrument, this instrument controls, and the Trustee may take such steps as are needed to give effect to it.</p>
       </blockquote>
+      <footer class="clause-foot"><span>Initials</span><span>Date</span></footer>
     </aside>
-    <p><a class="link" href="#" data-link="onepager" download>Download the one-pager for counsel (PDF, coming soon)</a></p>
   </div>
 </section>
 
-<section class="section alt" id="security">
-  <div class="wrap">
-    <h2>Security model, in plain words</h2>
-    <div class="grid2">
-      <div class="card"><h3>The pulse key</h3><p>Can only send a heartbeat. It cannot move funds, change heirs, or read anything private.</p></div>
-      <div class="card"><h3>The agent key</h3><p>Can only call <code>agent_pay</code>, and only within the spending policy you set. If you ran an AI agent, this is its key.</p></div>
-      <div class="card"><h3>The contract</h3><p>Holds the plan. At settlement it pays heirs and requests MPC signatures for each foreign-chain payout, then deletes the pulse and agent keys.</p></div>
-      <div class="card"><h3>The keeper</h3><p>Anyone can be one. A keeper can only supply the nonce and gas that settlement needs. It cannot change who gets what.</p></div>
-      <div class="card wide"><h3>A thief with your device</h3><p>Can do nothing useful. The device holds only a pulse key, and a pulse key can only say you are still here.</p></div>
+<section class="faq" id="faq" aria-labelledby="faq-h">
+  <div class="wrap faq-grid">
+    <h2 id="faq-h">Questions</h2>
+    <div class="faq-list">
+      <details><summary>What if I am in the hospital?</summary>
+        <p>Choose an interval and a grace period that suit your life: up to ten years between heartbeats, plus missed beats of grace. Reminders after a missed heartbeat, and a guardian you name who can pause the vault, are <span class="soon">coming soon</span>. Neither is in the hackathon build.</p></details>
+      <details><summary>Is this a will?</summary>
+        <p>No. It is not a will or a trust. It executes the distribution your will or trust specifies, so configure it with your estate attorney and keep the two consistent.</p></details>
+      <details><summary>What is a heartbeat?</summary>
+        <p>A small signed message from your pulse key saying you are still here. It is the proof of life. Nothing happens while heartbeats keep arriving.</p></details>
+      <details><summary>Which chains?</summary>
+        <p>NEAR, plus Base and Solana through NEAR Chain Signatures. The demo uses Base Sepolia and Solana devnet. Assets must be held at the vault&#8217;s derived addresses to be included.</p></details>
+      <details><summary>Can my heirs see my balance?</summary>
+        <p>Not through the app. They see nothing until settlement. NEAR is a public ledger, though, so the plan and balances in the contract are visible to anyone who looks up the vault on-chain.</p></details>
+      <details><summary>What does it cost?</summary>
+        <p>The hackathon version runs on testnet and is free. Mainnet pricing has not been set; the waitlist hears first.</p></details>
     </div>
   </div>
 </section>
 
-<section class="section" id="faq">
-  <div class="wrap narrow">
-    <h2>Questions</h2>
-    <details><summary>What if I'm in the hospital?</summary>
-      <p>Set an interval and grace period that suit your life: up to ten years between heartbeats, plus missed beats of grace. Reminders after a missed heartbeat and a guardian you name who can pause the vault are <span class="soon">coming soon</span>; neither is in the hackathon build.</p></details>
-    <details><summary>Is this a will?</summary>
-      <p>No. It is not a will or a trust. It executes the distribution your will or trust specifies, so configure it with your estate attorney and keep the two consistent.</p></details>
-    <details><summary>What does it cost?</summary>
-      <p>The hackathon version runs on testnet and is free. Mainnet pricing has not been set; waitlist members will hear first.</p></details>
-    <details><summary>Which chains?</summary>
-      <p>NEAR, plus Base and Solana through NEAR Chain Signatures. The demo uses Base Sepolia and Solana devnet. Assets must be held at the vault's derived addresses to be included.</p></details>
-    <details><summary>What is a heartbeat?</summary>
-      <p>A small signed message from your pulse key saying you are still here. It is the proof of life. Nothing happens while heartbeats keep arriving.</p></details>
-    <details><summary>Can my heirs see my balance?</summary>
-      <p>Not through the app. They see nothing until settlement. Note that NEAR is a public ledger, so the plan and balances in the contract are visible to anyone who looks up the vault on-chain.</p></details>
-  </div>
-</section>
-
-<section class="section alt" id="waitlist">
-  <div class="wrap narrow">
-    <h2>Join the waitlist</h2>
-    <p class="sub">One email when mainnet opens. Nothing else.</p>
+<section class="waitlist" id="waitlist" aria-labelledby="waitlist-h">
+  <div class="wrap wait-grid">
+    <div>
+      <h2 id="waitlist-h">Join the waitlist</h2>
+      <p>One email when mainnet opens. Nothing else.</p>
+    </div>
     <form id="waitlist-form" method="post" action="https://formspree.io/f/PLACEHOLDER" novalidate>
       <label for="email">Email address</label>
       <div class="form-row">
         <input id="email" name="email" type="email" required autocomplete="email" placeholder="you@example.com">
-        <button class="btn btn-primary" type="submit">Join waitlist</button>
+        <button class="btn" type="submit">Join the waitlist</button>
       </div>
       <div class="hp" aria-hidden="true"><label>Leave this empty <input type="text" name="_gotcha" tabindex="-1" autocomplete="off"></label></div>
       <p id="form-status" class="status" role="status" aria-live="polite"></p>
@@ -197,18 +306,20 @@
 </main>
 
 <footer class="footer">
-  <div class="wrap">
+  <div class="wrap foot-grid">
     <p class="disclaimer">Not a will. Not a custodian. Configure it with your estate attorney.</p>
-    <ul>
+    <ul class="foot-links">
       <li><a href="#docs" data-link="docs">Docs</a></li>
       <li><a href="#security">Security model</a></li>
       <li><a href="#clause">Sample trust clause</a></li>
       <li><a href="mailto:hello@deadmanswallet.dev" data-link="contact">Contact</a></li>
       <li><a href="https://github.com/PLACEHOLDER/deadmans-wallet" data-link="github" rel="noopener">GitHub</a></li>
     </ul>
+    <p class="colophon">Built on NEAR Chain Signatures for the NEAR Hackathon, November 2026. Testnet only.</p>
   </div>
 </footer>
 
+<script src="assets/pulse.js" defer></script>
 <script src="app.js" defer></script>
 </body>
 </html>

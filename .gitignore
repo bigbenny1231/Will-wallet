@@ -13,3 +13,5 @@ keys/
 keys/
 .demo/
 docs/video/*.mp4
+# demo video copied into the site by design/build_site.py; too large for git, see site/README.md
+site/assets/*.mp4

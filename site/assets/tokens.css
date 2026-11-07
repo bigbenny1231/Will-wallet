@@ -1,0 +1,41 @@
+/* Dead Man's Wallet design tokens. Source of truth: DESIGN.md. Shared by site, dashboard, NFT art, video.
+   design/build_site.py copies this file to site/assets/tokens.css; edit it here, not there. */
+:root {
+  --ink:   #0B0C0F;  /* background */
+  --ink-2: #121419;  /* panels */
+  --ink-3: #1A1D24;  /* borders */
+  --hair:  rgba(237, 231, 220, 0.12);  /* 1px hairline rules on ink */
+  --hair-strong: rgba(237, 231, 220, 0.22);
+  --bone:   #EDE7DC; /* primary text */
+  --bone-2: #A9A399; /* secondary text */
+  --brass:   #C8A96A; /* accent: links, small caps labels, seal rim */
+  --brass-2: #8C7446; /* accent muted */
+  --life:  #3DDC84;  /* Alive */
+  --warn:  #F5B942;  /* Warning */
+  --dead:  #FF4D4D;  /* Triggered */
+  --still: #7A7F87;  /* Settled */
+
+  /* 3% fractal noise, fixed over everything, pointer-events none */
+  --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 1 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+
+  --font-display: "Instrument Serif", "Iowan Old Style", Georgia, serif;
+  --font-text: "Inter Tight", "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+
+  --fs-display-1: 72px;
+  --fs-display-2: 64px;
+  --fs-display-3: 48px;
+  --fs-h2: 32px;
+  --fs-lede: 20px;
+  --fs-body: 17px;
+  --fs-label: 12px;
+  --fs-mono: 14px;
+  --track-label: 0.12em;
+
+  --radius: 4px;
+  --max: 1200px;
+  --gutter: 24px;
+  --ease: cubic-bezier(0.22, 1, 0.36, 1); /* ease-out-quint */
+  --slow: 900ms;
+  --beat: 3s;
+}

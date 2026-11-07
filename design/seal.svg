@@ -1,0 +1,62 @@
+<svg class="seal" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" role="img" aria-labelledby="seal-title seal-desc" style="--state:#3DDC84">
+  <title id="seal-title">Will seal, vault 0042: alive</title>
+  <desc id="seal-desc">A circular medallion with a double brass ring, the inscription Dead Man's Wallet, vault 0042, alive, around the rim, and a heartbeat trace in the centre that beats every three seconds.</desc>
+  <style>
+    .seal { overflow: visible; }
+    .seal .rim { fill: none; stroke: #C8A96A; }
+    .seal .inscription { font-family: "Inter Tight", "Inter", system-ui, sans-serif; font-weight: 500; font-size: 13px; fill: #C8A96A; letter-spacing: 0.12em; }
+    .seal .inscription .state { fill: var(--state); }
+    .seal .grid { stroke: #C8A96A; stroke-opacity: 0.075; stroke-width: 0.75; }
+    .seal .trace { fill: none; stroke: var(--state); stroke-linecap: round; stroke-linejoin: round; }
+    .seal .trace-base { stroke-width: 1.5; stroke-opacity: 0.42; }
+    .seal .trace-hi { stroke-width: 2.25; stroke-dasharray: 26 174; stroke-dashoffset: 26; animation: seal-sweep var(--beat, 3s) linear infinite; }
+    .seal .glow { transform-origin: 200px 200px; animation: seal-breathe var(--beat, 3s) cubic-bezier(0.22, 1, 0.36, 1) infinite; }
+    .seal .word { font-family: "Instrument Serif", Georgia, serif; font-style: italic; font-size: 34px; fill: #EDE7DC; }
+    .seal .no { font-family: "Inter Tight", "Inter", system-ui, sans-serif; font-weight: 500; font-size: 10px; letter-spacing: 0.2em; fill: #A9A399; }
+    @keyframes seal-sweep {
+      0%   { stroke-dashoffset: 26; }
+      55%  { stroke-dashoffset: -100; }
+      100% { stroke-dashoffset: -100; }
+    }
+    @keyframes seal-breathe {
+      0%   { opacity: 0.45; transform: scale(0.97); }
+      19%  { opacity: 0.5;  transform: scale(0.98); }
+      26%  { opacity: 1;    transform: scale(1.03); }
+      70%  { opacity: 0.5;  transform: scale(0.985); }
+      100% { opacity: 0.45; transform: scale(0.97); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .seal .trace-hi { animation: none; stroke-dasharray: none; stroke-opacity: 0.9; }
+      .seal .glow { animation: none; opacity: 0.7; }
+    }
+  </style>
+  <defs>
+    <radialGradient id="seal-glow-fill" cx="50%" cy="50%" r="50%">
+      <stop offset="0" style="stop-color:var(--state)" stop-opacity="0.22"/>
+      <stop offset="0.62" style="stop-color:var(--state)" stop-opacity="0.07"/>
+      <stop offset="1" style="stop-color:var(--state)" stop-opacity="0"/>
+    </radialGradient>
+    <path id="seal-rim-path" d="M200,200 m-160.5,0 a160.5,160.5 0 1,1 321,0 a160.5,160.5 0 1,1 -321,0"/>
+    <clipPath id="seal-field"><circle cx="200" cy="200" r="145"/></clipPath>
+    <filter id="seal-bloom" x="-10%" y="-60%" width="120%" height="220%">
+      <feGaussianBlur stdDeviation="2.6" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <circle class="glow" cx="200" cy="200" r="206" fill="url(#seal-glow-fill)"/>
+
+  <circle class="rim" cx="200" cy="200" r="190" stroke-width="1.25"/>
+  <circle class="rim" cx="200" cy="200" r="184.5" stroke-width="0.6"/>
+  <text class="inscription"><textPath href="#seal-rim-path" textLength="1000" lengthAdjust="spacing">DEAD MAN&#8217;S WALLET &#183; VAULT 0042 &#183; <tspan class="state">ALIVE</tspan> &#183; DEAD MAN&#8217;S WALLET &#183; VAULT 0042 &#183; <tspan class="state">ALIVE</tspan> &#183;</textPath></text>
+  <circle class="rim" cx="200" cy="200" r="145" stroke-width="0.75"/>
+
+  <g clip-path="url(#seal-field)">
+    <path class="grid" d="M55,140H345M55,160H345M55,180H345M55,200H345M55,220H345M55,240H345M55,260H345M55,120H345M55,280H345M100,55V345M120,55V345M140,55V345M160,55V345M180,55V345M200,55V345M220,55V345M240,55V345M260,55V345M280,55V345M300,55V345"/>
+    <path class="trace trace-base" d="M50,196H118C122,196 125,187 130,187C135,187 138,196 142,196H156L161,204L171,124L181,226L187,196H203C211,196 215,179 226,179C237,179 241,196 249,196H350"/>
+    <path class="trace trace-hi" pathLength="100" filter="url(#seal-bloom)" d="M50,196H118C122,196 125,187 130,187C135,187 138,196 142,196H156L161,204L171,124L181,226L187,196H203C211,196 215,179 226,179C237,179 241,196 249,196H350"/>
+  </g>
+
+  <text class="word" x="200" y="272" text-anchor="middle">Alive</text>
+  <text class="no" x="200" y="296" text-anchor="middle">NO. 0042</text>
+</svg>
