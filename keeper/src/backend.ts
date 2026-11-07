@@ -1,6 +1,6 @@
 // The keeper talks to a vault through this interface; NearBackend is the real one, MockBackend lives in mock.ts.
 import { Account, KeyPair, KeyPairSigner, providers } from 'near-api-js';
-import type { AgentPayArgs, StepArgs, TxResult, VaultView } from './types.js';
+import type { AgentPayArgs, SignTrack, StepArgs, TxResult, VaultView } from './types.js';
 import { withRetry } from './util.js';
 
 export interface Backend {
@@ -14,6 +14,8 @@ export interface Backend {
   /** Re-request a signature for a signed/failed payout (expired Solana blockhash, stale EVM nonce). */
   resignForeign(tokenId: string, index: number, args: StepArgs): Promise<TxResult>;
   agentPay(args: AgentPayArgs): Promise<TxResult>;
+  /** View: last signing request, last EVM fees and when a re-sign becomes legal. */
+  getSignTrack(tokenId: string, index: number): Promise<SignTrack>;
 }
 
 type RpcProvider = InstanceType<typeof providers.JsonRpcProvider>;
@@ -128,6 +130,16 @@ export class NearBackend implements Backend {
   }
   resignForeign(tokenId: string, index: number, args: StepArgs) {
     return this.call('resign_foreign', { token_id: tokenId, index, args }, GAS.resignForeign);
+  }
+  async getSignTrack(tokenId: string, index: number): Promise<SignTrack> {
+    const t = await this.view<Record<string, unknown>>('get_sign_track', { token_id: tokenId, index });
+    return {
+      last_request_ms: Number(t.last_request_ms ?? 0),
+      inflight: !!t.inflight,
+      max_fee_per_gas: String(t.max_fee_per_gas ?? '0'),
+      max_priority_fee_per_gas: String(t.max_priority_fee_per_gas ?? '0'),
+      resign_allowed_after_ms: Number(t.resign_allowed_after_ms ?? 0),
+    };
   }
   agentPay(a: AgentPayArgs) {
     return this.call('agent_pay', a, GAS.agentPay);

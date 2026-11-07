@@ -15,6 +15,8 @@ export interface Chains {
   solanaParams(): Promise<{ recent_blockhash: string }>;
   broadcastEvm(rawHex: string): Promise<string>;
   broadcastSolana(rawBase64: string): Promise<string>;
+  /** True when the tx id (EVM hash / Solana signature) is known to the chain (pending, mined or landed with an error). */
+  txLanded(chain: 'base' | 'solana', id: string): Promise<boolean>;
 }
 
 export class NotWiredError extends Error {
@@ -77,6 +79,14 @@ export function loadRealChains(cfg: Config): Chains {
     async broadcastSolana(raw) {
       const fn = await need<any>('solana', 'solana broadcast', ['broadcastSolana', 'broadcast', 'sendTransaction']);
       return fn(raw, cfg.solanaRpc);
+    },
+    async txLanded(chain, id) {
+      if (chain === 'base') {
+        const fn = await need<any>('evm', 'evm tx lookup', ['evmTxKnown']);
+        return fn(id, cfg.baseRpc);
+      }
+      const fn = await need<any>('solana', 'solana status lookup', ['solanaSignatureLanded']);
+      return fn(id, cfg.solanaRpc);
     },
   };
 }

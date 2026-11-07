@@ -77,7 +77,8 @@ export const bpsTotal = (heirs: { bps: number }[]) => heirs.reduce((a, h) => a +
 // ---------------------------------------------------------------- scheduling
 
 export type KeeperAction =
-  | { kind: 'relay'; index: number; chain: ChainName }
+  /** `rebroadcast`: payout is already `broadcast` but its tx is not on chain; relay the stored tx again, no mark. */
+  | { kind: 'relay'; index: number; chain: ChainName; rebroadcast?: boolean }
   | { kind: 'poke' }
   /** `chain` is set when step 3 needs chain-environment params for foreign[index]. */
   | { kind: 'step'; step: number; chain?: ChainName; index?: number };
@@ -87,10 +88,18 @@ export type KeeperAction =
  * Relaying comes first: a Solana blockhash baked into a signed tx expires in ~60-90 s.
  * `skipRelay` lets the loop park a payout whose relay is failing (unfunded source) so it never blocks settlement.
  */
-export function nextAction(v: VaultView, now: number, skipRelay: (index: number) => boolean = () => false): KeeperAction | null {
+export function nextAction(
+  v: VaultView,
+  now: number,
+  skipRelay: (index: number) => boolean = () => false,
+  /** payouts with status `broadcast` whose hash is not on chain (SPEC 2.7: relay the stored signed_tx anyway) */
+  rebroadcast: (index: number) => boolean = () => false,
+): KeeperAction | null {
   if (v.state === 'Triggered' || v.state === 'Settled') {
     const idx = v.foreign.findIndex((p, i) => p.status === 'signed' && !!p.signed_tx && !skipRelay(i));
     if (idx >= 0) return { kind: 'relay', index: idx, chain: v.foreign[idx].chain };
+    const rb = v.foreign.findIndex((p, i) => p.status === 'broadcast' && !!p.signed_tx && !skipRelay(i) && rebroadcast(i));
+    if (rb >= 0) return { kind: 'relay', index: rb, chain: v.foreign[rb].chain, rebroadcast: true };
   }
   if (v.state === 'Settled') return null;
   if (v.state === 'Triggered') {

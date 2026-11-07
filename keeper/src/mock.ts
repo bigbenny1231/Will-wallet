@@ -6,7 +6,7 @@ import type { Backend } from './backend.js';
 import type { Chains } from './chainsApi.js';
 import { KEEPER_DIR } from './config.js';
 import { bpsShare, deriveState, isDue, triggerAtMs } from './machine.js';
-import type { AgentPayArgs, StepArgs, TxResult, VaultView } from './types.js';
+import type { AgentPayArgs, SignTrack, StepArgs, TxResult, VaultView } from './types.js';
 
 const NEAR = 10n ** 24n;
 export const MOCK_RESERVE = NEAR / 20n; // 0.05 NEAR kept for later steps
@@ -262,20 +262,57 @@ export class MockBackend implements Backend {
     const { result, hash } = this.mutate(tokenId, (v, now) => mockPoke(v, now));
     return { hash, logs: result, returnValue: null };
   }
+  /** in-memory sign tracks ("token:index"), like the contract's get_sign_track */
+  tracks = new Map<string, SignTrack>();
+  /** tests flip this to emulate a non-keeper caller on a signed Solana payout */
+  callerIsKeeper = true;
+  private track(tokenId: string, index: number, args: StepArgs | undefined, chain: string, now: number) {
+    this.tracks.set(`${tokenId}:${index}`, {
+      last_request_ms: now,
+      inflight: false,
+      max_fee_per_gas: chain === 'base' ? (args?.evm?.max_fee_per_gas ?? '0') : '0',
+      max_priority_fee_per_gas: chain === 'base' ? (args?.evm?.max_priority_fee_per_gas ?? '0') : '0',
+      resign_allowed_after_ms: now + 300_000,
+    });
+  }
+  async getSignTrack(tokenId: string, index: number): Promise<SignTrack> {
+    return this.tracks.get(`${tokenId}:${index}`) ?? { last_request_ms: 0, inflight: false, max_fee_per_gas: '0', max_priority_fee_per_gas: '0', resign_allowed_after_ms: 300_000 };
+  }
   async executeStep(tokenId: string, args?: StepArgs): Promise<TxResult> {
+    const before = this.load().vaults[tokenId];
+    const idx = before && before.step === 3 ? before.foreign_index : -1;
+    const chain = before?.foreign[idx]?.chain;
     const { result, hash } = this.mutate(tokenId, (v, now) => mockExecuteStep(v, now, args));
+    if (chain) this.track(tokenId, idx, args, chain, this.clock());
     return { hash, logs: result.logs, returnValue: result.step };
   }
   async markBroadcast(tokenId: string, index: number, txHash: string): Promise<TxResult> {
     const { hash } = this.mutate(tokenId, (v, now) => mockMarkBroadcast(v, index, txHash, now));
     return { hash, logs: [], returnValue: null };
   }
-  async resignForeign(tokenId: string, index: number, _args: StepArgs): Promise<TxResult> {
-    const { hash } = this.mutate(tokenId, (v) => {
+  async resignForeign(tokenId: string, index: number, args: StepArgs): Promise<TxResult> {
+    const { hash } = this.mutate(tokenId, (v, now) => {
       const p = v.foreign[index];
-      if (!p || (p.status !== 'signed' && p.status !== 'failed')) throw new Error('payout is not failed/signed');
+      if (!p || p.status === 'pending') throw new Error('payout is pending');
+      const t = this.tracks.get(`${tokenId}:${index}`);
+      const hasSig = p.status === 'signed' || p.status === 'broadcast';
+      const cooled = !t || now >= t.resign_allowed_after_ms;
+      if (p.chain === 'solana') {
+        if (!cooled) throw new Error('resign cooldown: wait 5 min after the last request');
+        if (hasSig && !this.callerIsKeeper) throw new Error('only the contract owner or keeper may re-sign a signed solana payout');
+      } else {
+        const e = args.evm;
+        if (!e) throw new Error('args.evm is required for a base payout');
+        if (BigInt(e.gas_limit) < 21000n || BigInt(e.gas_limit) > 100000n) throw new Error('gas_limit out of range');
+        if (BigInt(e.max_fee_per_gas) > 100_000_000_000n) throw new Error('max_fee_per_gas above cap');
+        if (hasSig && t && (BigInt(e.max_fee_per_gas) * 100n < BigInt(t.max_fee_per_gas) * 110n || BigInt(e.max_priority_fee_per_gas) * 100n < BigInt(t.max_priority_fee_per_gas) * 110n))
+          throw new Error('re-sign of a signed evm payout must raise both fees by >= 10%');
+        if (p.status === 'broadcast' && !cooled) throw new Error('resign cooldown: wait 5 min after the last request');
+      }
       p.status = 'signed';
+      p.tx_hash = null;
       p.signed_tx = `${p.signed_tx ?? 'mock'}r`;
+      this.track(tokenId, index, args, p.chain, now);
     });
     return { hash, logs: [], returnValue: 'signed' };
   }
@@ -287,6 +324,7 @@ export class MockBackend implements Backend {
 
 export function mockChains(): Chains {
   let nonce = 0;
+  const sent = new Set<string>();
   return {
     async deriveAddresses(_c, tokenId) {
       return { base: `0xMOCK${tokenId.padStart(36, '0')}`, solana: `MOCKsol${tokenId}` };
@@ -298,10 +336,17 @@ export function mockChains(): Chains {
       return { recent_blockhash: `MOCKblockhash${Date.now()}` };
     },
     async broadcastEvm(raw) {
-      return `mock0xevm${raw.slice(-6)}`;
+      const h = `mock0xevm${raw.slice(-6)}`;
+      sent.add(h);
+      return h;
     },
     async broadcastSolana(raw) {
-      return `mocksolsig${raw.slice(-6)}`;
+      const h = `mocksolsig${raw.slice(-6)}`;
+      sent.add(h);
+      return h;
+    },
+    async txLanded(_chain, id) {
+      return sent.has(id);
     },
   };
 }

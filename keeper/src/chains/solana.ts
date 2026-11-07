@@ -46,6 +46,15 @@ export async function broadcastSolana(rawBase64: string, solanaRpc: string = SOL
 /** True when the error means "blockhash expired": call dmw.resign_foreign with a fresh one. */
 export const isBlockhashExpired = (e: unknown) => /BlockhashNotFound|blockhash not found/i.test(String((e as Error)?.message ?? e));
 
+/**
+ * getSignatureStatuses with full history search. True when the signature landed at all (even with an
+ * execution error: the blockhash is consumed and the tx can never be replayed).
+ */
+export async function solanaSignatureLanded(signature: string, solanaRpc: string = SOLANA_DEVNET_RPC): Promise<boolean> {
+  const r = await rpc<{ value: ({ slot: number } | null)[] }>(solanaRpc, 'getSignatureStatuses', [[signature], { searchTransactionHistory: true }]);
+  return r.value?.[0] != null;
+}
+
 export async function getSolanaBalance(address: string, solanaRpc: string = SOLANA_DEVNET_RPC): Promise<number> {
   base58Decode(address);
   return (await rpc<{ value: number }>(solanaRpc, 'getBalance', [address])).value;

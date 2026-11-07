@@ -7,6 +7,7 @@ import { daoArgs, nearCliCommand, validDaoName } from '../src/commands/dao.js';
 import { startPulse } from '../src/commands/pulse.js';
 import { driveVault, makeDeps, runKeeper, tickOnce, type Logger } from '../src/keeperLoop.js';
 import { MockBackend, mockChains } from '../src/mock.js';
+import { bumpedEvmArgs, clampEvm, msUntilResign } from '../src/resign.js';
 import { backoffDelay, isTransient, nearTxLink, parseEvents, withRetry } from '../src/util.js';
 
 const quiet: Logger = { ok() {}, warn() {}, err() {}, info() {} };
@@ -157,27 +158,122 @@ describe('relay failures', () => {
     expect(send).toHaveBeenCalledTimes(1);
   });
 
-  it('an expired solana blockhash triggers resign_foreign, then relays the new signature', async () => {
+  it('after the cooldown a still-stale solana tx is re-signed by the keeper, unless the old signature landed', async () => {
     const clock = { t: 1_000_000 };
     const backend = fresh(clock, { foreign: 'solana' });
     await backend.getVaults();
     clock.t += 25_000;
     const chains = mockChains();
-    let first = true;
+    let stale = true;
     chains.broadcastSolana = async (raw) => {
-      if (first) {
-        first = false;
-        throw new Error('sendTransaction: Blockhash not found');
-      }
+      if (stale) throw new Error('sendTransaction: Blockhash not found');
       return `mocksolsig${raw.slice(-6)}`;
     };
     const resign = vi.spyOn(backend, 'resignForeign');
     const deps = makeDeps({ backend, chains, contractId: 'c', now: () => clock.t, log: quiet });
     await tickOnce(deps);
-    expect(resign).toHaveBeenCalledTimes(1);
+    clock.t += 310_000;
+    // old signature landed: record it, never sign again
+    chains.txLanded = async () => true;
+    const landedDeps = makeDeps({ backend, chains, contractId: 'c', now: () => clock.t, log: quiet });
+    await tickOnce(landedDeps);
+    expect(resign).not.toHaveBeenCalled();
     expect((await backend.getVault('1')).foreign[0].status).toBe('broadcast');
   });
 
+  it('re-signs a never-landed stale solana payout once allowed, then relays the new signature', async () => {
+    const clock = { t: 1_000_000 };
+    const backend = fresh(clock, { foreign: 'solana' });
+    await backend.getVaults();
+    clock.t += 25_000;
+    const chains = mockChains();
+    let calls = 0;
+    chains.broadcastSolana = async (raw) => {
+      if (++calls === 1) throw new Error('sendTransaction: Blockhash not found');
+      return `mocksolsig${raw.slice(-6)}`;
+    };
+    const resign = vi.spyOn(backend, 'resignForeign');
+    const deps = makeDeps({ backend, chains, contractId: 'c', now: () => clock.t, log: quiet });
+    await tickOnce(deps); // stale, parked until allowed
+    expect(resign).not.toHaveBeenCalled();
+    clock.t += 310_000;
+    // first retry after the wait would succeed in this mock; force it stale once more
+    calls = 0;
+    await tickOnce(deps);
+    expect(resign).toHaveBeenCalledTimes(1);
+    const v = await backend.getVault('1');
+    expect(v.foreign[0].status).toBe('broadcast');
+    expect(v.foreign[0].signed_tx!.endsWith('r')).toBe(true);
+  });
+
+  it('EVM re-sign waits, then sends max(fresh, 1.1 x last) for both fees', async () => {
+    const clock = { t: 1_000_000 };
+    const backend = fresh(clock, { foreign: 'base' });
+    await backend.getVaults();
+    clock.t += 25_000;
+    const chains = mockChains();
+    let n = 0;
+    chains.broadcastEvm = async (raw) => {
+      if (++n <= 2) throw new Error('eth_sendRawTransaction: replacement transaction underpriced');
+      return `mock0xevm${raw.slice(-6)}`;
+    };
+    const resign = vi.spyOn(backend, 'resignForeign');
+    const deps = makeDeps({ backend, chains, contractId: 'c', now: () => clock.t, log: quiet });
+    await tickOnce(deps);
+    expect(resign).not.toHaveBeenCalled();
+    clock.t += 310_000;
+    await tickOnce(deps);
+    expect(resign).toHaveBeenCalledTimes(1);
+    const sent = resign.mock.calls[0][2].evm!;
+    expect(sent.max_fee_per_gas).toBe('1650000000'); // 1.1 x 1.5 gwei
+    expect(sent.max_priority_fee_per_gas).toBe('1100000');
+    expect(sent.gas_limit).toBe('21000');
+    expect((await backend.getVault('1')).foreign[0].status).toBe('broadcast');
+  });
+
+  it('relays the stored signed_tx again when a broadcast payout hash is not on chain', async () => {
+    const clock = { t: 1_000_000 };
+    const backend = fresh(clock, { foreign: 'base' });
+    await backend.getVaults();
+    clock.t += 25_000;
+    const chains = mockChains();
+    const deps = makeDeps({ backend, chains, contractId: 'c', now: () => clock.t, log: quiet });
+    await tickOnce(deps);
+    expect((await backend.getVault('1')).foreign[0].status).toBe('broadcast');
+    // the network dropped it
+    chains.txLanded = async () => false;
+    const send = vi.spyOn(chains, 'broadcastEvm');
+    clock.t += 31_000;
+    await tickOnce(deps);
+    expect(send).toHaveBeenCalledTimes(1);
+    expect((await backend.getVault('1')).foreign[0].status).toBe('broadcast');
+  });
+});
+
+describe('resign planning (hardened contract)', () => {
+  const fresh1 = { nonce: 0, max_fee_per_gas: '1000000000', max_priority_fee_per_gas: '1000000', gas_limit: '21000' };
+  it('takes max(fresh, 1.1 x last) for both fees, rounding up', () => {
+    const r = bumpedEvmArgs(fresh1, { max_fee_per_gas: '2000000000', max_priority_fee_per_gas: '1000001' })!;
+    expect(r.max_fee_per_gas).toBe('2200000000');
+    expect(r.max_priority_fee_per_gas).toBe('1100002');
+    // fresh already higher: keep fresh
+    const r2 = bumpedEvmArgs({ ...fresh1, max_fee_per_gas: '9000000000' }, { max_fee_per_gas: '2000000000', max_priority_fee_per_gas: '1' })!;
+    expect(r2.max_fee_per_gas).toBe('9000000000');
+    expect(BigInt(r.max_fee_per_gas) * 100n).toBeGreaterThanOrEqual(2_000_000_000n * 110n);
+  });
+  it('clamps gas and fee caps, and refuses a bump over 100 gwei', () => {
+    expect(clampEvm({ ...fresh1, gas_limit: '500000', max_fee_per_gas: '900000000000' }).gas_limit).toBe('100000');
+    expect(clampEvm({ ...fresh1, max_fee_per_gas: '900000000000' }).max_fee_per_gas).toBe('100000000000');
+    expect(clampEvm({ ...fresh1, gas_limit: '1' }).gas_limit).toBe('21000');
+    expect(bumpedEvmArgs(fresh1, { max_fee_per_gas: '95000000000', max_priority_fee_per_gas: '1' })).toBeNull();
+  });
+  it('waits until resign_allowed_after_ms', () => {
+    expect(msUntilResign({ resign_allowed_after_ms: 10_000 }, 0)).toBe(13_000);
+    expect(msUntilResign({ resign_allowed_after_ms: 10_000 }, 20_000)).toBe(0);
+  });
+});
+
+describe('filtering', () => {
   it('--token style filter leaves other vaults alone', async () => {
     const clock = { t: 1_000_000 };
     const backend = fresh(clock);

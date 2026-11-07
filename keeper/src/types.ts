@@ -32,6 +32,15 @@ export interface EvmStepArgs {
   gas_limit: string;
 }
 
+/** `get_sign_track` view: last signature request for a payout (SPEC 2.7). */
+export interface SignTrack {
+  last_request_ms: number;
+  inflight: boolean;
+  max_fee_per_gas: string;
+  max_priority_fee_per_gas: string;
+  resign_allowed_after_ms: number;
+}
+
 export interface StepArgs {
   evm?: EvmStepArgs;
   solana?: { recent_blockhash: string };

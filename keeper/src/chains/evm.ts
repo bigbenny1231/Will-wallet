@@ -67,6 +67,11 @@ export async function broadcastEvm(rawHex: string, baseRpc: string = BASE_SEPOLI
   }
 }
 
+/** True when the node knows this tx (mempool or mined). */
+export async function evmTxKnown(hash: string, baseRpc: string = BASE_SEPOLIA_RPC): Promise<boolean> {
+  return (await rpc<unknown>(baseRpc, 'eth_getTransactionByHash', [hash])) != null;
+}
+
 export async function getEvmBalance(address: string, baseRpc: string = BASE_SEPOLIA_RPC): Promise<bigint> {
   return BigInt(await rpc<string>(baseRpc, 'eth_getBalance', [address, 'latest']));
 }

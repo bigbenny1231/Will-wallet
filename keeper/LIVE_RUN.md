@@ -172,3 +172,39 @@ vault 7  Settled
   10:21:31 step_5 will nft -> dmw-demo-sarah-3b15.testnet
   10:21:31 settled dmw-demo-sarah-3b15.testnet
 ```
+
+## 7. Run 2 (post-hardening, 2026-11-07)
+
+Same `make demo` + `make kill` against `dmw-x8cx.testnet` after the hardened contract (commit 7a12c23) was deployed, with the updated keeper
+(nonce no longer relied on, `get_sign_track`-based re-sign planning, no immediate Solana retry, `broadcast`-but-missing relay).
+
+| | |
+| --- | --- |
+| Vault | token **9**, owner `dmw-demo-owner-4822cb.testnet`, interval 60 s, grace 1, bounty 0.05 NEAR |
+| Heirs | `dmw-demo-sarah-3b15.testnet` 60%, `dmw-demo-ben-3b15.testnet` 40% |
+| Source addresses (derived, unfunded) | Base `0x20A7A32A5Dc59537d9AdcA889C196c9888FF0c9a`, Solana `HvyAXu3dZZMBDwuTZuTXmQaBpj9rDTJyb8JEnrjjFaB5` |
+
+Result: clean **Settled**, both payouts `signed` (MPC signatures stored, the Will NFT moved to `dmw-demo-sarah-3b15.testnet`).
+The sources are unfunded again, so the relays were parked as `signed` and retried every 60 s. That is expected. No re-sign was needed, so the
+cooldown and fee-bump paths were covered by unit tests only; the live `get_sign_track` view was read for both payouts
+(`last_request_ms` set, Base fees 11000000 / 1000000, `resign_allowed_after_ms` = last request + 300000).
+
+- create_vault: https://testnet.nearblocks.io/txns/Bv9ZyVb3oHMJUxKCWhGLgqsvz4JGRRvkoE1vag8bAE2r
+- add_pulse_key: https://testnet.nearblocks.io/txns/Aq58nRAcMUXGyizq8nG9TwFSfdnc1nfBaEEYZEd9gzEY
+- add_agent_key: https://testnet.nearblocks.io/txns/Hkg7YikZTZKJ8WyUvPbru8sZGEbQZHG3jrNg5AWx9NXB
+- set_foreign_payouts: https://testnet.nearblocks.io/txns/Hs2StWN8rBdgevWm9BnELpqf8ZdsQbdJf3x2dBSEpfWc
+- agent_pay allowed: https://testnet.nearblocks.io/txns/E5sfmnZcGJKFvDRcCHsckd4x26htsUNzkJ5LemQtwGtw
+- agent_pay denied: https://testnet.nearblocks.io/txns/7nk9n3Rp1kmLbi9BbZEkAXwhK1YLNGX1GfxRwTM5NBUk
+
+```text
+10:38:45 poke      vault 9 → Triggered  https://testnet.nearblocks.io/txns/25EzCVZkkL4Ntkzq34M4mn3YeRDJUn6EnBW8ebA5aNpw
+10:39:01 step      vault 9 step 1/5  https://testnet.nearblocks.io/txns/5MLoJTpt6xPR5TaBvyFTwkgtpDdjZ36EHKtaGP9uHzQQ
+10:39:16 step      vault 9 step 2/5  https://testnet.nearblocks.io/txns/9iKizdXGVFewNRQRyZom9GzJ2pduGo63kdYiuv5RYDpV
+10:39:36 step      vault 9 step 3/5 (base #0)  https://testnet.nearblocks.io/txns/DBh1ZR1D9or4J7LeavfNxEnXnihq7NemqABSK6TGz5sS
+10:39:56 step      vault 9 step 3/5 (solana #1)  https://testnet.nearblocks.io/txns/G8ixNTuLT2zoYS3mC4LWTLVRMn7SyYvns43oSHdbR6pV
+10:40:15 step      vault 9 step 4/5  https://testnet.nearblocks.io/txns/8DYqUdAi2gp6R4oxaGcAbrvbbymPFoyiFbso852LJjk4
+10:40:30 step      vault 9 step 5/5  https://testnet.nearblocks.io/txns/FYfBB4aL4VzZtPbTUyVKZXz4mwYL1NAGWHxj46xuAjBw
+10:40:33 state     vault 9: Triggered → Settled
+  payout #0 base ... · signed
+  payout #1 solana ... · signed
+```
