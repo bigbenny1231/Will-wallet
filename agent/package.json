@@ -1,0 +1,23 @@
+{
+  "name": "dmw-agent",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Autonomous agent with a scoped wallet wrapper for Dead Man's Wallet (LLM brains + offline scripted brain)",
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "agent": "tsx src/cli.ts",
+    "probe": "tsx src/probe.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "near-api-js": "^6.5.1"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vitest": "^5.1.0"
+  }
+}
