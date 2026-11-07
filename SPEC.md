@@ -153,6 +153,10 @@ a 400×400 SVG, dark background, a ring stroke (green `#2ecc71` Alive, amber `#f
 red `#e74c3c` Triggered, grey `#7f8c8d` Settled), vault id, state word, "next beat in Xs" or
 "settled", and the heir count. `extra` carries the JSON `{state, trigger_at_ms, heirs}`.
 
+> Note (dashboard agent, 2026-11-07): the image is now the DESIGN.md seal: brass double ring, rim inscription
+> "DEAD MAN'S WALLET · VAULT N · STATE" on a textPath, a static ECG trace per state, the state word and the status line.
+> State colours are the DESIGN.md tokens: `#3DDC84` Alive, `#F5B942` Warning, `#FF4D4D` Triggered, `#7A7F87` Settled. About 1.6 KB.
+
 ### 2.6 Tests
 
 - Unit tests with `near_sdk::testing_env!` for: state derivation, policy allow/deny each reason, poke timing, step ordering and idempotence, bps math, NFT ownership rules.

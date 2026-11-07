@@ -1,6 +1,7 @@
 //! Unit tests (SPEC §2.6) using `near_sdk::testing_env!`.
 
 use super::*;
+use crate::nft::{COLOR_ALIVE, COLOR_SETTLED, COLOR_TRIGGERED, COLOR_WARNING};
 use near_sdk::base64::{engine::general_purpose::STANDARD, Engine};
 use near_sdk::test_utils::{get_logs, VMContextBuilder};
 use near_sdk::{testing_env, NearToken, PromiseResult};
@@ -908,8 +909,19 @@ fn svg_media_color_per_state() {
     let mut c = setup();
     Ctx::new().at(T0 + 1_000).set();
     let svg = media_svg(&c);
-    assert!(svg.contains("#2ecc71") && svg.contains(">Alive<") && svg.contains("next beat in 19s"));
-    assert!(svg.contains("2 heirs") && svg.contains("WILL #1") && svg.contains("width=\"400\""));
+    assert!(
+        svg.contains(COLOR_ALIVE) && svg.contains(">Alive<") && svg.contains("next beat in 19s")
+    );
+    assert!(
+        svg.contains("2 HEIRS")
+            && svg.contains("VAULT 1 \u{b7} ALIVE")
+            && svg.contains("width=\"400\"")
+    );
+    assert!(
+        svg.contains("<textPath") && svg.len() < 6 * 1024,
+        "seal is {} bytes",
+        svg.len()
+    );
     let extra = c
         .nft_token("1".into())
         .unwrap()
@@ -924,18 +936,20 @@ fn svg_media_color_per_state() {
 
     Ctx::new().at(T0 + 25_000).set();
     let svg = media_svg(&c);
-    assert!(svg.contains("#f39c12") && svg.contains(">Warning<") && !svg.contains("#2ecc71"));
+    assert!(svg.contains(COLOR_WARNING) && svg.contains(">Warning<") && !svg.contains(COLOR_ALIVE));
 
     trigger(&mut c);
     let svg = media_svg(&c);
-    assert!(svg.contains("#e74c3c") && svg.contains(">Triggered<"));
+    assert!(
+        svg.contains(COLOR_TRIGGERED) && svg.contains(">Triggered<") && svg.contains("M92 200h216")
+    );
 
     Ctx::new().by("keeper.testnet").at(T0 + 41_000).set();
     for _ in 0..5 {
         let _ = c.execute_step(1.into(), None);
     }
     let svg = media_svg(&c);
-    assert!(svg.contains("#7f8c8d") && svg.contains(">Settled<") && svg.contains("settled"));
+    assert!(svg.contains(COLOR_SETTLED) && svg.contains(">Settled<") && svg.contains("settled"));
 }
 
 #[test]

@@ -20,10 +20,11 @@ use crate::{Contract, ContractExt};
 const GAS_NFT_ON_TRANSFER: Gas = Gas::from_tgas(40);
 const GAS_NFT_RESOLVE: Gas = Gas::from_tgas(15);
 
-pub const COLOR_ALIVE: &str = "#2ecc71";
-pub const COLOR_WARNING: &str = "#f39c12";
-pub const COLOR_TRIGGERED: &str = "#e74c3c";
-pub const COLOR_SETTLED: &str = "#7f8c8d";
+// State colours (DESIGN.md tokens: life, warn, dead, still).
+pub const COLOR_ALIVE: &str = "#3DDC84";
+pub const COLOR_WARNING: &str = "#F5B942";
+pub const COLOR_TRIGGERED: &str = "#FF4D4D";
+pub const COLOR_SETTLED: &str = "#7A7F87";
 
 const ICON: &str = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTIiIGZpbGw9IiMwZjExMTUiLz48Y2lyY2xlIGN4PSIzMiIgY3k9IjMyIiByPSIyMCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjMmVjYzcxIiBzdHJva2Utd2lkdGg9IjUiLz48L3N2Zz4=";
 
@@ -76,55 +77,80 @@ pub fn state_color(s: VaultState) -> &'static str {
     }
 }
 
-/// 400x400 SVG for the vault at `now_ms` (SPEC §2.5). Contains no user strings.
+// ECG traces drawn inside the seal (x 92..308, baseline y 200). The dashboard overlays the same
+// geometry (dashboard/src/lib/pulse.ts) to animate live beats, so keep the two in sync.
+const BEAT: &str = "h10q4-6 8 0h6l3 5l5-48l5 58l4-15h8q7-11 14 0h9";
+const TRACE_WARNING: &str = "M92 200h46l3 4l4-26l4 32l3-10h52q4-4 8 0h18l2 3l3-14l3 17l2-6h68";
+const TRACE_FLAT: &str = "M92 200h216";
+
+/// "19s", "4m 05s", "23h 59m", "2d 04h".
+fn fmt_secs(s: u64) -> String {
+    match s {
+        0..=59 => format!("{s}s"),
+        60..=3599 => format!("{}m {:02}s", s / 60, s % 60),
+        3600..=86_399 => format!("{}h {:02}m", s / 3600, (s % 3600) / 60),
+        _ => format!("{}d {:02}h", s / 86_400, (s % 86_400) / 3600),
+    }
+}
+
+/// The Will seal (DESIGN.md): 400x400, ink ground, brass double ring with the rim inscription on a
+/// textPath, a state-coloured ECG trace, the state word and a status line. Contains no user strings.
 pub fn render_svg(id: u64, v: &Vault, now_ms: u64) -> String {
     let state = v.state_at(now_ms);
     let color = state_color(state);
     let status = match state {
         VaultState::Alive => format!(
-            "next beat in {}s",
-            v.warning_at_ms().saturating_sub(now_ms).div_ceil(1000)
+            "next beat in {}",
+            fmt_secs(v.warning_at_ms().saturating_sub(now_ms).div_ceil(1000))
         ),
         VaultState::Warning => format!(
-            "overdue - trigger in {}s",
-            v.trigger_at_ms().saturating_sub(now_ms).div_ceil(1000)
+            "overdue, settles in {}",
+            fmt_secs(v.trigger_at_ms().saturating_sub(now_ms).div_ceil(1000))
         ),
-        VaultState::Triggered => format!("settling - step {}/5", v.step.min(5)),
+        VaultState::Triggered => format!("settling, step {} of 5", v.step.min(5)),
         VaultState::Settled => "settled".to_string(),
     };
-    let heirs = v.heirs.len();
-    let plural = if heirs == 1 { "" } else { "s" };
-    // Ring progress: fraction of the trigger window remaining.
-    let circumference: u64 = 943; // 2*pi*150
-    let dash = match state {
-        VaultState::Alive | VaultState::Warning => {
-            let window = v.trigger_at_ms().saturating_sub(v.last_beat_ms).max(1);
-            let left = v.trigger_at_ms().saturating_sub(now_ms);
-            circumference * left.min(window) / window
-        }
-        _ => circumference,
+    let trace = match state {
+        VaultState::Alive => format!("M92 200{BEAT}{BEAT}{BEAT}"),
+        VaultState::Warning => TRACE_WARNING.to_string(),
+        _ => TRACE_FLAT.to_string(),
     };
+    let glow = match state {
+        VaultState::Alive | VaultState::Warning => "0.22",
+        VaultState::Triggered => "0.14",
+        VaultState::Settled => "0",
+    };
+    let heirs = v.heirs.len();
+    let plural = if heirs == 1 { "" } else { "S" };
+    let word = state.as_str();
+    let rim = format!(
+        "DEAD MAN\u{2019}S WALLET \u{b7} VAULT {id} \u{b7} {}",
+        word.to_uppercase()
+    );
     format!(
         concat!(
-            r##"<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400">"##,
-            r##"<rect width="400" height="400" fill="#0f1115"/>"##,
-            r##"<circle cx="200" cy="200" r="150" fill="none" stroke="#1f232b" stroke-width="14"/>"##,
-            r##"<circle cx="200" cy="200" r="150" fill="none" stroke="{color}" stroke-width="14" stroke-linecap="round" stroke-dasharray="{dash} {circ}" transform="rotate(-90 200 200)"/>"##,
-            r##"<text x="200" y="150" text-anchor="middle" font-family="monospace" font-size="18" fill="#9aa3b2">WILL #{id}</text>"##,
-            r##"<text x="200" y="210" text-anchor="middle" font-family="sans-serif" font-size="44" font-weight="700" fill="{color}">{state}</text>"##,
-            r##"<text x="200" y="250" text-anchor="middle" font-family="monospace" font-size="16" fill="#e6e9ef">{status}</text>"##,
-            r##"<text x="200" y="280" text-anchor="middle" font-family="monospace" font-size="14" fill="#9aa3b2">{heirs} heir{plural}</text>"##,
-            r##"<text x="200" y="385" text-anchor="middle" font-family="monospace" font-size="11" fill="#5c6370">Dead Man's Wallet</text>"##,
+            r##"<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="400" height="400" viewBox="0 0 400 400">"##,
+            r##"<defs><radialGradient id="g"><stop offset="0" stop-color="{c}" stop-opacity="{glow}"/><stop offset="1" stop-color="{c}" stop-opacity="0"/></radialGradient>"##,
+            r##"<path id="t" d="M37 200a163 163 0 0 1 326 0"/><path id="b" d="M28 200a172 172 0 0 0 344 0"/></defs>"##,
+            r##"<rect width="400" height="400" fill="#0B0C0F"/>"##,
+            r##"<circle cx="200" cy="200" r="150" fill="url(#g)"/>"##,
+            r##"<g fill="none" stroke="#C8A96A"><circle cx="200" cy="200" r="186" stroke-width="1.5"/><circle cx="200" cy="200" r="180" stroke-width=".75"/></g>"##,
+            r##"<circle cx="200" cy="200" r="148" fill="none" stroke="#8C7446" stroke-width=".75"/>"##,
+            r##"<g font-family="Inter Tight,Helvetica,Arial,sans-serif" font-size="12.5" letter-spacing="3.2" text-anchor="middle" fill="#C8A96A"><text><textPath xlink:href="#t" startOffset="50%">{rim}</textPath></text>"##,
+            r##"<text><textPath xlink:href="#b" startOffset="50%">{heirs} HEIR{plural} · NEAR</textPath></text></g>"##,
+            r##"<path d="{trace}" fill="none" stroke="{c}" stroke-width="2.25" stroke-linejoin="round" stroke-linecap="round"/>"##,
+            r##"<text x="200" y="266" text-anchor="middle" font-family="Instrument Serif,Georgia,serif" font-style="italic" font-size="36" fill="#EDE7DC">{word}</text>"##,
+            r##"<text x="200" y="292" text-anchor="middle" font-family="JetBrains Mono,Menlo,monospace" font-size="11" fill="#A9A399">{status}</text>"##,
             "</svg>"
         ),
-        color = color,
-        dash = dash,
-        circ = circumference,
-        id = id,
-        state = state.as_str(),
-        status = status,
+        c = color,
+        glow = glow,
+        rim = rim,
         heirs = heirs,
         plural = plural,
+        trace = trace,
+        word = word,
+        status = status,
     )
 }
 
