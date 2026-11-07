@@ -87,18 +87,25 @@ export class NearBackend implements Backend {
     return withRetry(async () => (await this.provider.callFunction(this.contractId, method, args)) as T);
   }
 
-  private async call(method: string, args: Record<string, unknown>, gas: bigint, deposit = 0n): Promise<TxResult> {
-    return withRetry(async () => {
-      const outcome = await this.account.callFunctionRaw({
-        contractId: this.contractId,
-        methodName: method,
-        args,
-        gas,
-        deposit,
-        waitUntil: 'EXECUTED',
-      });
-      return toTxResult(outcome);
+  private async send(method: string, args: Record<string, unknown>, gas: bigint, deposit = 0n): Promise<TxResult> {
+    const outcome = await this.account.callFunctionRaw({
+      contractId: this.contractId,
+      methodName: method,
+      args,
+      gas,
+      deposit,
+      waitUntil: 'EXECUTED',
     });
+    return toTxResult(outcome);
+  }
+
+  /**
+   * State-changing call, retried on transport errors. Only for methods where a duplicate execution is harmless
+   * because the contract's state machine rejects or ignores it (heartbeat, poke, execute_step, mark_broadcast,
+   * resign_foreign). A timeout can mean "sent and executed", so a retry is a second transaction.
+   */
+  private call(method: string, args: Record<string, unknown>, gas: bigint, deposit = 0n): Promise<TxResult> {
+    return withRetry(() => this.send(method, args, gas, deposit));
   }
 
   async getVaults(): Promise<VaultView[]> {
@@ -142,6 +149,8 @@ export class NearBackend implements Backend {
     };
   }
   agentPay(a: AgentPayArgs) {
-    return this.call('agent_pay', a, GAS.agentPay);
+    // Never retried: agent_pay moves money, and a retry after an ambiguous timeout would pay twice
+    // within the policy (AUDIT_FINAL_OFFCHAIN F-03; agent/src/near.ts already sends it once).
+    return this.send('agent_pay', a as unknown as Record<string, unknown>, GAS.agentPay);
   }
 }

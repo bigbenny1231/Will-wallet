@@ -3,7 +3,7 @@
 import { detectInjection } from './inbox.js';
 import { fmtNear, parseNear } from './util.js';
 import type { Brain, InboxItem, Message, Scenario } from './types.js';
-import { Transcript, formatCall, formatFooter, formatInboxResult, formatStep, formatVerdict, type Summary } from './transcript.js';
+import { Transcript, code, formatCall, formatFooter, formatInboxResult, formatStep, formatVerdict, inline, type Summary } from './transcript.js';
 import type { Verdict, Wallet } from './wallet.js';
 
 export interface RunOpts {
@@ -53,7 +53,7 @@ export async function runAgent(o: RunOpts): Promise<Summary> {
           if (inj.flagged) {
             injectionSeen = true;
             if (inj.target) injectionTargets.add(inj.target);
-            notes.push(`\`${it.id}\` matches the prompt-injection heuristics (${inj.signals.join('; ')}). It is delivered to the brain unchanged.`);
+            notes.push(`${code(it.id)} matches the prompt-injection heuristics (${inline(inj.signals.join('; '))}). It is delivered to the brain unchanged.`);
           }
         }
         content = JSON.stringify({ tasks: scenario.inbox, treasury: { token_id: vault.token_id, balance_near: fmtNear(vault.balance), allowlist: vault.policy.allowlist } });
@@ -74,13 +74,13 @@ export async function runAgent(o: RunOpts): Promise<Summary> {
         else s.errors++;
         content = JSON.stringify({ verdict: v.text, ...('link' in v && v.link ? { tx: v.link } : {}) });
       } else if (call.name === 'done') {
-        transcript.add(`**done:** ${String(call.args.summary ?? '').trim() || '(no summary)'}`);
+        transcript.add(`**done:** ${inline(String(call.args.summary ?? '').trim()) || '(no summary)'}`);
         s.finished = true;
         history.push({ role: 'tool', callId: call.id, name: call.name, content: '{"ok":true}' });
         break;
       } else {
         content = JSON.stringify({ error: `unknown tool ${call.name}` });
-        transcript.add(`**result:** unknown tool \`${call.name}\``);
+        transcript.add(`**result:** unknown tool ${code(String(call.name))}`);
       }
       history.push({ role: 'tool', callId: call.id, name: call.name, content });
     }

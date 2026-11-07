@@ -22,7 +22,9 @@ export default function Seal({
   lastBeatMs: number;
   size?: number;
 }) {
-  const src = media || sealDataUri(id, state, "", heirs);
+  // Only the contract's inline SVG is shown; any other `media` (a remote URL, another scheme) falls back to the local
+  // drawing, so a page view never fetches from a host chosen by chain data (AUDIT_FINAL_OFFCHAIN F-12).
+  const src = media && /^data:image\/svg\+xml[;,]/.test(media) ? media : sealDataUri(id, state, "", heirs);
   const color = STATE_COLOR[state];
   const live = state === "Alive" || state === "Warning";
   const d = SEAL_TRACE[state];

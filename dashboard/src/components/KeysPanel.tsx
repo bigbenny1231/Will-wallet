@@ -28,10 +28,15 @@ function load(token: string): Fresh | null {
   }
 }
 
+/**
+ * The key goes in through the environment, not `--key`: a process's argv is world-readable (`ps`), its environment is
+ * not, and the pulse daemon runs for hours (AUDIT_FINAL_OFFCHAIN F-10). The leading space keeps it out of shell
+ * history where HISTCONTROL=ignorespace (bash default on most distros).
+ */
 export function cliCommand(f: Fresh): string {
   return f.kind === "pulse"
-    ? `npm run pulse -- --token ${f.token} --key ${f.priv}`
-    : `npm run agent-demo -- --token ${f.token} --key ${f.priv}`;
+    ? ` DMW_PULSE_KEY=${f.priv} npm run pulse -- --token ${f.token}`
+    : ` DMW_AGENT_KEY=${f.priv} npm run agent-demo -- --token ${f.token}`;
 }
 
 export default function KeysPanel({ v, isOwner }: { v: VaultView; isOwner: boolean }) {

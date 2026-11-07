@@ -15,7 +15,26 @@ export class Transcript {
   }
 }
 
-const esc = (s: string) => s.replace(/\|/g, '\\|').replace(/\n/g, ' ');
+// Untrusted text (inbox messages, LLM thoughts/arguments/summaries, node errors) reaches this file. It is written to
+// .demo/agent-transcript.md (rendered as Markdown, e.g. on GitHub or in an editor preview) and streamed to the
+// terminal, so it is neutralised here (AUDIT_FINAL_OFFCHAIN F-04):
+//  - control characters (ESC/CSI/BEL, C1) are dropped, so nothing can drive the terminal;
+//  - `inline` escapes Markdown/HTML punctuation, so an inbox subject cannot inject a link, image, HTML tag or table cell;
+//  - `code` wraps text in a code span whose backtick fence is longer than any backtick run inside it.
+const CONTROL = /[\u0000-\u0008\u000b-\u001f\u007f-\u009f]/g;
+export const stripControl = (s: string) => String(s).replace(CONTROL, '');
+export const inline = (s: string) =>
+  stripControl(s)
+    .replace(/[\r\n\t]+/g, ' ')
+    .replace(/[\\`*[\]<>|~]/g, (c) => '\\' + c);
+export function code(s: string): string {
+  const t = stripControl(s).replace(/[\r\n\t]+/g, ' ');
+  const longest = Math.max(0, ...(t.match(/`+/g) ?? []).map((r) => r.length));
+  const fence = '`'.repeat(longest + 1);
+  const pad = longest > 0 || t.startsWith('`') || t.endsWith('`') ? ' ' : '';
+  return `${fence}${pad}${t}${pad}${fence}`;
+}
+const esc = inline;
 const q = (s: string) => JSON.stringify(s);
 
 export interface RunMeta {
@@ -29,27 +48,27 @@ export interface RunMeta {
 }
 
 export function formatPolicy(p: Policy): string {
-  return `per-tx cap ${fmtNear(p.per_tx_max)} NEAR · daily cap ${fmtNear(p.daily_max)} NEAR · allowlist ${p.allowlist.length ? p.allowlist.map((a) => `\`${a}\``).join(', ') : '(none, any receiver)'}`;
+  return `per-tx cap ${fmtNear(p.per_tx_max)} NEAR · daily cap ${fmtNear(p.daily_max)} NEAR · allowlist ${p.allowlist.length ? p.allowlist.map((a) => code(a)).join(', ') : '(none, any receiver)'}`;
 }
 
 export function formatHeader(m: RunMeta, vault: VaultView, audit: KeyAudit): string {
   const lines = [
-    `# Agent transcript: ${m.scenario}`,
+    `# Agent transcript: ${inline(m.scenario)}`,
     '',
     '| | |',
     '|---|---|',
     `| Brain | ${esc(m.brain)} |`,
-    `| Vault | token ${m.tokenId} on \`${m.contract}\` (owner \`${vault.owner_id}\`, state **${vault.state}**) |`,
+    `| Vault | token ${inline(m.tokenId)} on ${code(m.contract)} (owner ${code(vault.owner_id)}, state **${inline(vault.state)}**) |`,
     `| Balance | ${fmtNear(vault.balance)} NEAR |`,
     `| On-chain policy | ${formatPolicy(vault.policy)} |`,
     `| Daily spent so far | ${fmtNear(vault.daily_spent)} NEAR |`,
-    `| Agent key | \`${m.agentKey}\` |`,
+    `| Agent key | ${code(m.agentKey)} |`,
     `| Layer 1 (wallet pre-checks) | ${m.localChecks ? 'ON' : '**OFF (demo switch --no-local-checks): the contract is the only guard**'} |`,
     `| Started | ${m.startedAt} |`,
     '',
     '## The key and its limits',
     '',
-    audit.ok ? '**Key audit passed.** This process holds one secret, a function-call key on the vault contract.' : `**Key audit FAILED: ${audit.problems.join('; ')}**`,
+    audit.ok ? '**Key audit passed.** This process holds one secret, a function-call key on the vault contract.' : `**Key audit FAILED: ${inline(audit.problems.join('; '))}**`,
     '',
     ...audit.explain.map((l) => `- ${l}`),
     '',
@@ -60,7 +79,7 @@ export function formatHeader(m: RunMeta, vault: VaultView, audit: KeyAudit): str
 
 export function formatStep(n: number, thought?: string): string {
   const t = thought?.trim();
-  return `### Step ${n}${t ? `\n\n> **thought:** ${t.replace(/\n+/g, ' ')}` : ''}`;
+  return `### Step ${n}${t ? `\n\n> **thought:** ${inline(t)}` : ''}`;
 }
 
 export function formatArgs(args: Record<string, unknown>): string {
@@ -69,12 +88,12 @@ export function formatArgs(args: Record<string, unknown>): string {
     .join(', ');
 }
 
-export const formatCall = (name: string, args: Record<string, unknown>) => `**tool call:** \`${name}(${formatArgs(args)})\``;
+export const formatCall = (name: string, args: Record<string, unknown>) => `**tool call:** ${code(`${name}(${formatArgs(args)})`)}`;
 
 export function formatInboxResult(items: { id: string; from: string; subject: string }[], notes: string[]): string {
-  const rows = items.map((i) => `- \`${i.id}\` from ${i.from}: ${i.subject}`);
+  const rows = items.map((i) => `- ${code(i.id)} from ${inline(i.from)}: ${inline(i.subject)}`);
   const out = [`**result:** ${items.length} message${items.length === 1 ? '' : 's'}`, ...rows];
-  for (const n of notes) out.push('', `> **harness note:** ${n}`);
+  for (const n of notes) out.push('', `> **harness note:** ${stripControl(n).replace(/[\r\n]+/g, ' ')}`);
   return out.join('\n');
 }
 
@@ -82,17 +101,17 @@ export function formatVerdict(v: Verdict, amountNear: string, receiver: string, 
   const rows: [string, string][] = [];
   if (v.status === 'refused_locally') {
     const also = v.reasons.length > 1 ? ` (also failing: ${v.reasons.slice(1).join(', ')})` : '';
-    rows.push(['1. wallet wrapper (local)', `**${v.text}**${also}. Not signed.`]);
+    rows.push(['1. wallet wrapper (local)', `**${inline(v.text)}**${inline(also)}. Not signed.`]);
     rows.push(['2. contract (on-chain)', 'not reached: no transaction was created']);
   } else {
     rows.push(['1. wallet wrapper (local)', localChecks ? 'pre-checks passed, signing `agent_pay`' : 'pre-checks SKIPPED (demo switch), signing `agent_pay`']);
     if (v.status === 'allowed') {
       const extra = v.dailySpent ? ` · daily spent now ${fmtNear(v.dailySpent)} NEAR` : '';
       rows.push(['2. contract (on-chain)', `**allowed**${extra} · [tx](${v.link})`]);
-    } else if (v.status === 'denied') rows.push(['2. contract (on-chain)', `**${v.text}** · funds did not move · [tx](${v.link})`]);
+    } else if (v.status === 'denied') rows.push(['2. contract (on-chain)', `**${inline(v.text)}** · funds did not move · [tx](${v.link})`]);
     else rows.push(['2. contract (on-chain)', `**${esc(v.text)}**${v.link ? ` · [tx](${v.link})` : ''}`]);
   }
-  return [`**payment:** ${amountNear} NEAR → \`${receiver}\``, '', '| layer | verdict |', '|---|---|', ...rows.map(([a, b]) => `| ${a} | ${b} |`)].join('\n');
+  return [`**payment:** ${inline(amountNear)} NEAR → ${code(receiver)}`, '', '| layer | verdict |', '|---|---|', ...rows.map(([a, b]) => `| ${a} | ${b} |`)].join('\n');
 }
 
 export interface Summary {

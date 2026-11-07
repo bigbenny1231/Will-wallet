@@ -2,7 +2,7 @@ import { randomBytes } from 'node:crypto';
 import pc from 'picocolors';
 import type { Backend } from '../backend.js';
 import type { TxResult } from '../types.js';
-import { formatYocto, nearTxLink, parseEvents } from '../util.js';
+import { formatYocto, nearTxLink, parseEvents, termSafe } from '../util.js';
 
 export interface DemoCall {
   label: string;
@@ -30,7 +30,7 @@ export function renderEvent(e: { event: string; data: Record<string, unknown> })
   const detail = [d.receiver_id && `to ${d.receiver_id}`, d.amount && formatYocto(String(d.amount)), d.reason && `reason=${d.reason}`]
     .filter(Boolean)
     .join(' · ');
-  const line = `  event ${e.event}${detail ? '  ' + detail : ''}`;
+  const line = termSafe(`  event ${e.event}${detail ? '  ' + detail : ''}`);
   if (e.event.endsWith('denied')) return pc.red(line);
   if (e.event.endsWith('allowed')) return pc.green(line);
   return pc.dim(line);

@@ -10,7 +10,7 @@ import { loadAgentEnv } from './env.js';
 import { loadScenario } from './inbox.js';
 import { NearChain } from './near.js';
 import { SimChain, simVault } from './sim.js';
-import { Transcript, formatHeader } from './transcript.js';
+import { Transcript, formatHeader, inline } from './transcript.js';
 import { Wallet } from './wallet.js';
 import { errMsg } from './util.js';
 
@@ -89,7 +89,7 @@ async function main() {
     process.exitCode = 2;
     return;
   }
-  transcript.add(`*Scenario:* ${scenario.description}`);
+  transcript.add(`*Scenario:* ${inline(String(scenario.description ?? ''))}`);
   const summary = await runAgent({ brain, wallet, scenario, transcript, maxSteps: a['max-steps'] ? Number(a['max-steps']) : 12 });
   const out = save(transcript, a.out);
   console.log(`transcript saved to ${out}`);

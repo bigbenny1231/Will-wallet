@@ -50,8 +50,9 @@ echo $TOKEN > $D/vault_id
 
 # 4. keys (secrets stay in .demo/, which is gitignored)
 say "keys"
-$ADMIN genkey > $D/pulse.key.json; $ADMIN genkey > $D/agent.key.json; chmod 600 $D/*.key.json
-jqk() { node -e "console.log(JSON.parse(require('fs').readFileSync('$1','utf8')).$2)"; }
+# umask 077 so the files are 0600 from the first byte (no window where they are world-readable)
+( umask 077; $ADMIN genkey > $D/pulse.key.json; $ADMIN genkey > $D/agent.key.json ); chmod 600 $D/*.key.json
+jqk() { node -e "console.log(JSON.parse(require('fs').readFileSync(process.argv[1],'utf8'))[process.argv[2]])" "$1" "$2"; }
 PULSE_PUB=$(jqk $D/pulse.key.json public_key); AGENT_PUB=$(jqk $D/agent.key.json public_key)
 $TX call $OWNER $C add_pulse_key "{\"token_id\":\"$TOKEN\",\"public_key\":\"$PULSE_PUB\"}" 50 1y | grep -E '^tx |result'
 $TX call $OWNER $C add_agent_key "{\"token_id\":\"$TOKEN\",\"public_key\":\"$AGENT_PUB\"}" 50 1y | grep -E '^tx |result'

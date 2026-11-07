@@ -1,5 +1,5 @@
 import { config as loadDotenv } from 'dotenv';
-import { existsSync } from 'node:fs';
+import { existsSync, statSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -9,7 +9,16 @@ export const REPO_ROOT = resolve(KEEPER_DIR, '..');
 
 // process env wins, then keeper/.env, then the repo-root .env (where the deploy agent writes DMW_CONTRACT).
 for (const p of [resolve(KEEPER_DIR, '.env'), resolve(REPO_ROOT, '.env')]) {
-  if (existsSync(p)) loadDotenv({ path: p, quiet: true });
+  if (!existsSync(p)) continue;
+  warnIfShared(p);
+  loadDotenv({ path: p, quiet: true });
+}
+
+/** .env holds KEEPER_PRIVATE_KEY (and the contract's full-access key): warn when other local users can read it. */
+export function warnIfShared(p: string, mode = statSync(p).mode, platform = process.platform): boolean {
+  if (platform === 'win32' || (mode & 0o077) === 0) return false;
+  process.stderr.write(`warning: ${p} is readable by other users (mode ${(mode & 0o777).toString(8)}); it holds private keys. Run: chmod 600 ${p}\n`);
+  return true;
 }
 
 export interface Config {

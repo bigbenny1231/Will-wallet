@@ -1,15 +1,12 @@
 import "./polyfills";
 import React from "react";
 import ReactDOM from "react-dom/client";
-import { BrowserRouter } from "react-router-dom";
 import "@fontsource/instrument-serif/400.css";
 import "@fontsource/instrument-serif/400-italic.css";
 import "@fontsource/inter-tight/400.css";
 import "@fontsource/inter-tight/500.css";
 import "@fontsource/inter-tight/600.css";
 import "@fontsource/jetbrains-mono/400.css";
-import App from "./App";
-import { WalletProvider } from "./lib/wallet";
 import "./index.css";
 
 // The phone page is an installable app: manifest, icons and an offline shell. Only /pulse opts in, so the
@@ -34,12 +31,35 @@ if (window.location.pathname.startsWith("/pulse")) {
   }
 }
 
-ReactDOM.createRoot(document.getElementById("root")!).render(
-  <React.StrictMode>
-    <BrowserRouter>
-      <WalletProvider>
-        <App />
-      </WalletProvider>
-    </BrowserRouter>
-  </React.StrictMode>,
-);
+// /pulse holds the pulse private key in localStorage. It is rendered on its own, without the wallet selector:
+// no wallet SDK code (and none of its dependencies) is even loaded on that page, so the only scripts that run next
+// to the key are this app's own and near-api-js (AUDIT_FINAL_OFFCHAIN F-05). The dashboard loads as before.
+const root = ReactDOM.createRoot(document.getElementById("root")!);
+// A stylesheet that fails to preload (the wallet-selector CSS @imports Google Fonts; an ad blocker, a firewall or the
+// CSP can block that) must not reject the page's dynamic import and leave a blank screen. JS chunk failures still throw.
+window.addEventListener("vite:preloadError", (e) => {
+  const err = (e as Event & { payload?: unknown }).payload;
+  if (/preload CSS/i.test(String((err as Error)?.message ?? err))) e.preventDefault();
+});
+if (window.location.pathname.startsWith("/pulse")) {
+  void import("./pages/Pulse").then(({ default: Pulse }) =>
+    root.render(
+      <React.StrictMode>
+        <div className="grain" aria-hidden />
+        <Pulse />
+      </React.StrictMode>,
+    ),
+  );
+} else {
+  void Promise.all([import("react-router-dom"), import("./App"), import("./lib/wallet")]).then(([{ BrowserRouter }, { default: App }, { WalletProvider }]) =>
+    root.render(
+      <React.StrictMode>
+        <BrowserRouter>
+          <WalletProvider>
+            <App />
+          </WalletProvider>
+        </BrowserRouter>
+      </React.StrictMode>,
+    ),
+  );
+}

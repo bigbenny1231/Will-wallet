@@ -109,7 +109,13 @@ export async function broadcastEvm(rawHex: string, rpcOrChain: string = BASE_SEP
   const raw = rawHex.startsWith('0x') ? rawHex : `0x${rawHex}`;
   const expected = evmTxHash(raw);
   try {
-    return await rpc<string>(baseRpc, 'eth_sendRawTransaction', [raw]);
+    // The tx id is keccak256(raw), known locally. Never trust the node's answer for it: a wrong hash would make
+    // mark_broadcast fail (the contract checks it, H-1) and stall the payout (AUDIT_FINAL_OFFCHAIN F-07).
+    const got = await rpc<string>(baseRpc, 'eth_sendRawTransaction', [raw]);
+    if (typeof got === 'string' && got.toLowerCase() !== expected) {
+      process.stderr.write(`warning: ${baseRpc} answered eth_sendRawTransaction with ${got}, expected ${expected}; using the local hash\n`);
+    }
+    return expected;
   } catch (e) {
     const msg = String((e as Error).message);
     if (/already known|known transaction/i.test(msg)) return expected;

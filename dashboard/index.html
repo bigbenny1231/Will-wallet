@@ -8,6 +8,7 @@
   </head>
   <body>
     <div id="root"></div>
+    <!-- CSP: this inline script is allowed by its sha256 in vercel.json. Edit it and the hash there must change too. -->
     <script>window.process = window.process || { env: {}, version: "", versions: {}, browser: true, nextTick: function (f) { setTimeout(f, 0); } };</script>
     <script type="module" src="/src/main.tsx"></script>
   </body>

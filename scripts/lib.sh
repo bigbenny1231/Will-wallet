@@ -4,7 +4,7 @@ if [ -t 1 ]; then B=$'\033[1m' R=$'\033[31m' N=$'\033[0m'; else B='' R='' N=''; 
 say() { printf '%s== %s%s\n' "$B" "$*" "$N"; }
 die() { printf '%serror: %s%s\n' "$R" "$*" "$N" >&2; exit 1; }
 
-load_env() { if [ -f .env ]; then set -a; . ./.env; set +a; fi; }
+load_env() { if [ -f .env ]; then chmod 600 .env 2>/dev/null || true; set -a; . ./.env; set +a; fi; }
 
 # set_env KEY VALUE: replace KEY=... in .env, or append it. Creates .env (mode 600) if missing.
 set_env() {
@@ -15,6 +15,7 @@ set_env() {
   else
     printf '%s=%s\n' "$1" "$2" >> .env
   fi
+  chmod 600 .env   # holds KEEPER_PRIVATE_KEY and DMW_CONTRACT_KEY; also tightens a .env made by hand (AUDIT_FINAL_OFFCHAIN F-01)
   export "$1=$2"
 }
 
@@ -30,7 +31,8 @@ ensure_deps() {
 rand_hex() { openssl rand -hex "$1"; }
 
 # private key of an account created by near-admin.mjs (keys/<acct>.json)
-key_of() { node -e "console.log(JSON.parse(require('fs').readFileSync('keys/$1.json','utf8')).private_key)"; }
+# (the path goes in as argv, never spliced into the JS source)
+key_of() { node -e "console.log(JSON.parse(require('fs').readFileSync(process.argv[1],'utf8')).private_key)" "keys/$1.json"; }
 
 account_exists() {
   curl -s "${NEAR_RPC:-https://rpc.testnet.near.org}" -H 'content-type: application/json' \

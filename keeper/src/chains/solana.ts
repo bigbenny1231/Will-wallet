@@ -34,11 +34,14 @@ export function solanaTxSignature(rawBase64: string): string {
 
 /** sendTransaction (base64). Returns the signature. Throws on simulation failure / expired blockhash. */
 export async function broadcastSolana(rawBase64: string, solanaRpc: string = SOLANA_DEVNET_RPC): Promise<string> {
+  const expected = solanaTxSignature(rawBase64);
   try {
-    return await rpc<string>(solanaRpc, 'sendTransaction', [rawBase64, { encoding: 'base64', preflightCommitment: 'confirmed' }]);
+    // The signature is in the raw tx; return the local one, not whatever the node says (AUDIT_FINAL_OFFCHAIN F-07).
+    await rpc<string>(solanaRpc, 'sendTransaction', [rawBase64, { encoding: 'base64', preflightCommitment: 'confirmed' }]);
+    return expected;
   } catch (e) {
     const msg = String((e as Error).message);
-    if (/already been processed/i.test(msg)) return solanaTxSignature(rawBase64);
+    if (/already been processed/i.test(msg)) return expected;
     throw e;
   }
 }

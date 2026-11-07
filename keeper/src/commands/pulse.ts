@@ -1,7 +1,7 @@
 import pc from 'picocolors';
 import type { Backend } from '../backend.js';
 import { nextBeatAt, pulseLine } from '../machine.js';
-import { errMsg, nearTxLink } from '../util.js';
+import { errMsg, nearTxLink, termSafe } from '../util.js';
 
 export const PULSE_STOPPED = 'pulse stopped — this is the moment the owner disappears';
 
@@ -38,14 +38,14 @@ export function startPulse(o: PulseOpts): { stop: () => void; done: Promise<void
     nextAt = nextBeatAt(now(), o.intervalS);
     try {
       const tx = await o.backend.heartbeat(o.tokenId);
-      if (tx.failure) say(pc.red(`heartbeat failed: ${tx.failure}  ${nearTxLink(tx.hash)}`));
+      if (tx.failure) say(pc.red(termSafe(`heartbeat failed: ${tx.failure}  ${nearTxLink(tx.hash)}`)));
       else {
         // Without a TTY there is no live countdown line, so each beat carries the next-beat time.
         const next = tty ? '' : `  · ${pulseLine(nextAt - now())}`;
         say(pc.green(`♥ heartbeat sent  ${nearTxLink(tx.hash)}${next}`));
       }
     } catch (e) {
-      say(pc.red(`heartbeat error (will retry next interval): ${errMsg(e)}`));
+      say(pc.red(termSafe(`heartbeat error (will retry next interval): ${errMsg(e)}`)));
     } finally {
       beating = false;
     }

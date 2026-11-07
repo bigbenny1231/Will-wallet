@@ -8,7 +8,7 @@
 //   node scripts/near-admin.mjs send <from> <to> <near>
 //   node scripts/near-admin.mjs keys <acct>
 import { createRequire } from 'node:module';
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, existsSync, chmodSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 const here = dirname(fileURLToPath(import.meta.url));
@@ -43,8 +43,12 @@ async function create(name) {
   });
   const txt = await res.text();
   if (!res.ok) throw new Error(`faucet ${res.status}: ${txt}`);
-  mkdirSync(KEYS, { recursive: true });
-  writeFileSync(join(KEYS, `${name}.json`), JSON.stringify({ account_id: name, public_key: kp.getPublicKey().toString(), private_key: kp.toString() }, null, 2));
+  // Full-access keys: owner-only directory and file (0700 / 0600), never the umask default (AUDIT_FINAL_OFFCHAIN F-01).
+  mkdirSync(KEYS, { recursive: true, mode: 0o700 });
+  chmodSync(KEYS, 0o700);
+  const file = join(KEYS, `${name}.json`);
+  writeFileSync(file, JSON.stringify({ account_id: name, public_key: kp.getPublicKey().toString(), private_key: kp.toString() }, null, 2), { mode: 0o600 });
+  chmodSync(file, 0o600);
   console.log(`created ${name}  key saved to keys/${name}.json`);
 }
 const show = (r) => {

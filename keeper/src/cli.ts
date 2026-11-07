@@ -9,14 +9,14 @@ import { agentBackend, getChains, keeperBackend, pulseBackend } from './factory.
 import { makeDeps, runKeeper } from './keeperLoop.js';
 import { countdown, formatDuration } from './machine.js';
 import { MockBackend } from './mock.js';
-import { errMsg, formatYocto, foreignTxLink } from './util.js';
+import { errMsg, formatYocto, foreignTxLink, termSafe } from './util.js';
 import { viewBackend } from './factory.js';
 
 const program = new Command('dmw').description("Dead Man's Wallet keeper and demo CLI (DMW_MOCK=1 for an offline mock vault)");
 
 const run = (fn: () => Promise<void>) =>
   fn().catch((e) => {
-    console.error(pc.red(`error: ${errMsg(e)}`));
+    console.error(pc.red(`error: ${termSafe(errMsg(e))}`));
     process.exit(1);
   });
 
@@ -56,10 +56,11 @@ program
       const when = c.state === 'Settled' || c.state === 'Triggered' ? '' : c.due ? ' · poke is legal now' : ` · warning in ${formatDuration(c.msToWarning)}, poke legal in ${formatDuration(c.msToTrigger)}`;
       console.log(`${pc.bold(`vault ${v.token_id}`)}  ${c.state}${when}`);
       console.log(`  owner ${v.owner_id} · interval ${v.heartbeat_interval_s}s grace ${v.grace_missed} · balance ${formatYocto(v.balance)} · step ${Math.min(v.step, 5)}/5 · keys ${v.pulse_keys.length} pulse, ${v.agent_keys.length} agent`);
-      console.log(`  heirs ${v.heirs.map((h) => `${h.account_id} ${h.bps / 100}%`).join(', ')}`);
+      // Everything below is chain data (heirs, payout addresses, log details): printed through termSafe.
+      console.log(termSafe(`  heirs ${v.heirs.map((h) => `${h.account_id} ${h.bps / 100}%`).join(', ')}`));
       for (const [i, p] of v.foreign.entries())
-        console.log(`  payout #${i} ${p.chain} ${p.amount} → ${p.to} · ${p.status}${p.tx_hash ? ' ' + foreignTxLink(p.chain, p.tx_hash) : ''}`);
-      for (const l of v.log.slice(-5)) console.log(pc.dim(`  ${new Date(l.ms).toISOString().slice(11, 19)} ${l.event} ${l.detail}`.slice(0, 140)));
+        console.log(termSafe(`  payout #${i} ${p.chain} ${p.amount} → ${p.to} · ${p.status}${p.tx_hash ? ' ' + foreignTxLink(p.chain, p.tx_hash) : ''}`));
+      for (const l of v.log.slice(-5)) console.log(pc.dim(termSafe(`  ${new Date(l.ms).toISOString().slice(11, 19)} ${l.event} ${l.detail}`).slice(0, 140)));
     }),
   );
 

@@ -70,8 +70,15 @@ export function foreignTxLink(chain: 'base' | 'monad' | 'solana', hash: string):
 
 const ts = () => new Date().toISOString().slice(11, 19);
 
+/**
+ * Strip C0/C1 control characters (ESC, CSI, BEL, CR, ...) from text that came from the chain or an RPC node, so a
+ * vault log detail, payout address or node error cannot move the cursor, rewrite earlier lines or retitle the
+ * terminal (AUDIT_FINAL_OFFCHAIN F-09). Newlines and tabs become spaces.
+ */
+export const termSafe = (s: string): string => String(s).replace(/[\u0000-\u001f\u007f-\u009f]/g, (c) => (c === '\n' || c === '\t' ? ' ' : ''));
+
 export function logLine(tag: string, msg: string, color: (s: string) => string = (s) => s): void {
-  process.stdout.write(`${pc.dim(ts())} ${color(tag.padEnd(9))} ${msg}\n`);
+  process.stdout.write(`${pc.dim(ts())} ${color(tag.padEnd(9))} ${termSafe(msg)}\n`);
 }
 export const logOk = (tag: string, msg: string) => logLine(tag, msg, pc.green);
 export const logWarn = (tag: string, msg: string) => logLine(tag, msg, pc.yellow);
