@@ -4,10 +4,20 @@ description = "Dead Man's Wallet: heartbeat-triggered inheritance vaults as Will
 version = "0.1.0"
 edition = "2021"
 license = "MIT"
+# NEP-330: exposed by the `contract_source_metadata` view as `link`
+repository = "https://github.com/agarretson/deadmans-wallet"
 
 [lib]
 crate-type = ["cdylib", "rlib"]
 
+
+# NEP-330 reproducible build: `cargo near build reproducible-wasm` (needs Docker) builds the
+# committed tree inside this pinned image, so anyone gets the same code hash for the same commit.
+[package.metadata.near.reproducible_build]
+image = "sourcescan/cargo-near:0.23.0-rust-1.99.1"
+image_digest = "sha256:8013f039e8005627f10ae66b5519d1a6eeeed7d7aef4b5067d5e9a86c4302fcc"
+passed_env = []
+container_build_command = ["cargo", "near", "build", "non-reproducible-wasm", "--locked"]
 
 [dependencies]
 near-sdk = "5.30.1"
