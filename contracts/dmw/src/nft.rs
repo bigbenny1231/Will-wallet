@@ -41,7 +41,12 @@ trait NonFungibleTokenReceiver {
 
 pub(crate) fn emit_mint(owner: &AccountId, id: u64) {
     let tid = id.to_string();
-    NftMint { owner_id: owner, token_ids: &[tid.as_str()], memo: None }.emit();
+    NftMint {
+        owner_id: owner,
+        token_ids: &[tid.as_str()],
+        memo: None,
+    }
+    .emit();
 }
 
 pub(crate) fn emit_transfer(old: &AccountId, new: &AccountId, id: u64, memo: Option<&str>) {
@@ -57,7 +62,9 @@ pub(crate) fn emit_transfer(old: &AccountId, new: &AccountId, id: u64, memo: Opt
 }
 
 fn parse_id(token_id: &str) -> u64 {
-    token_id.parse().unwrap_or_else(|_| env::panic_str("invalid token_id"))
+    token_id
+        .parse()
+        .unwrap_or_else(|_| env::panic_str("invalid token_id"))
 }
 
 pub fn state_color(s: VaultState) -> &'static str {
@@ -74,8 +81,14 @@ pub fn render_svg(id: u64, v: &Vault, now_ms: u64) -> String {
     let state = v.state_at(now_ms);
     let color = state_color(state);
     let status = match state {
-        VaultState::Alive => format!("next beat in {}s", v.warning_at_ms().saturating_sub(now_ms).div_ceil(1000)),
-        VaultState::Warning => format!("overdue - trigger in {}s", v.trigger_at_ms().saturating_sub(now_ms).div_ceil(1000)),
+        VaultState::Alive => format!(
+            "next beat in {}s",
+            v.warning_at_ms().saturating_sub(now_ms).div_ceil(1000)
+        ),
+        VaultState::Warning => format!(
+            "overdue - trigger in {}s",
+            v.trigger_at_ms().saturating_sub(now_ms).div_ceil(1000)
+        ),
         VaultState::Triggered => format!("settling - step {}/5", v.step.min(5)),
         VaultState::Settled => "settled".to_string(),
     };
@@ -116,7 +129,10 @@ pub fn render_svg(id: u64, v: &Vault, now_ms: u64) -> String {
 }
 
 pub fn media_data_uri(id: u64, v: &Vault, now_ms: u64) -> String {
-    format!("data:image/svg+xml;base64,{}", STANDARD.encode(render_svg(id, v, now_ms)))
+    format!(
+        "data:image/svg+xml;base64,{}",
+        STANDARD.encode(render_svg(id, v, now_ms))
+    )
 }
 
 pub(crate) fn token_view(id: u64, v: &Vault) -> Token {
@@ -180,7 +196,8 @@ impl Contract {
     ) -> PromiseOrValue<bool> {
         assert_one_yocto();
         let id = parse_id(&token_id);
-        let previous_owner_id = self.internal_nft_transfer(id, &receiver_id, approval_id, memo.as_deref());
+        let previous_owner_id =
+            self.internal_nft_transfer(id, &receiver_id, approval_id, memo.as_deref());
         let sender_id = env::predecessor_account_id();
         ext_nft_receiver::ext(receiver_id.clone())
             .with_static_gas(GAS_NFT_ON_TRANSFER)
@@ -211,7 +228,9 @@ impl Contract {
             return true;
         }
         let id = parse_id(&token_id);
-        let Some(mut v) = self.vaults.get(&id) else { return true };
+        let Some(mut v) = self.vaults.get(&id) else {
+            return true;
+        };
         if v.owner_id != receiver_id || v.stored == StoredState::Settled {
             // Receiver already moved it on, or settlement took over: keep.
             return true;
@@ -256,7 +275,12 @@ impl Contract {
     }
 
     pub fn nft_supply_for_owner(&self, account_id: AccountId) -> U128 {
-        U128(self.owner_index.get(&account_id).map(|v| v.len() as u128).unwrap_or(0))
+        U128(
+            self.owner_index
+                .get(&account_id)
+                .map(|v| v.len() as u128)
+                .unwrap_or(0),
+        )
     }
 
     pub fn nft_tokens_for_owner(

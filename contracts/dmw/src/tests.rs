@@ -33,7 +33,13 @@ struct Ctx {
 
 impl Ctx {
     fn new() -> Self {
-        Self { now_ms: T0, pred: owner(), signer: owner(), signer_pk: pk(200), deposit: 0 }
+        Self {
+            now_ms: T0,
+            pred: owner(),
+            signer: owner(),
+            signer_pk: pk(200),
+            deposit: 0,
+        }
     }
     fn builder(&self) -> VMContextBuilder {
         let mut b = VMContextBuilder::new();
@@ -82,8 +88,14 @@ impl Ctx {
 
 fn heirs2() -> Vec<Heir> {
     vec![
-        Heir { account_id: acc("sarah.testnet"), bps: 6000 },
-        Heir { account_id: acc("tom.testnet"), bps: 4000 },
+        Heir {
+            account_id: acc("sarah.testnet"),
+            bps: 6000,
+        },
+        Heir {
+            account_id: acc("tom.testnet"),
+            bps: 4000,
+        },
     ]
 }
 
@@ -106,7 +118,9 @@ fn setup() -> Contract {
 }
 
 fn confirm_key(c: &mut Contract, k: PublicKey, kind: KeyKind) {
-    Ctx::new().by("dmw.testnet").set_with_result(PromiseResult::Successful(vec![]));
+    Ctx::new()
+        .by("dmw.testnet")
+        .set_with_result(PromiseResult::Successful(vec![]));
     assert!(c.on_key_added(1, k, kind, Some(owner())));
 }
 
@@ -139,7 +153,9 @@ fn create_vault_mints_and_sets_balance() {
     assert_eq!(c.nft_total_supply().0, 1);
     assert_eq!(c.nft_supply_for_owner(owner()).0, 1);
     assert_eq!(c.nft_token("1".into()).unwrap().owner_id, owner());
-    assert!(get_logs().iter().any(|l| l.contains("\"standard\":\"nep171\"") && l.contains("nft_mint")));
+    assert!(get_logs()
+        .iter()
+        .any(|l| l.contains("\"standard\":\"nep171\"") && l.contains("nft_mint")));
 }
 
 #[test]
@@ -187,7 +203,9 @@ fn heartbeat_by_owner_resets_clock() {
     let vault = v(&c);
     assert_eq!(vault.last_beat_ms, T0 + 30_000);
     assert_eq!(vault.state_at(T0 + 49_999), VaultState::Alive);
-    assert!(get_logs().iter().any(|l| l.contains("\"standard\":\"dmw\"") && l.contains("\"event\":\"heartbeat\"")));
+    assert!(get_logs()
+        .iter()
+        .any(|l| l.contains("\"standard\":\"dmw\"") && l.contains("\"event\":\"heartbeat\"")));
 }
 
 #[test]
@@ -236,8 +254,13 @@ fn add_key_reserves_allowance_and_failure_refunds() {
     Ctx::new().set();
     let _ = c.add_pulse_key(1.into(), pk(1));
     assert_eq!(v(&c).balance, 10 * NEAR1 - KEY_ALLOWANCE);
-    assert!(v(&c).pulse_keys.is_empty(), "not usable until AddKey confirmed");
-    Ctx::new().by("dmw.testnet").set_with_result(PromiseResult::Failed);
+    assert!(
+        v(&c).pulse_keys.is_empty(),
+        "not usable until AddKey confirmed"
+    );
+    Ctx::new()
+        .by("dmw.testnet")
+        .set_with_result(PromiseResult::Failed);
     assert!(!c.on_key_added(1, pk(1), KeyKind::Pulse, Some(owner())));
     assert_eq!(v(&c).balance, 10 * NEAR1);
     assert!(!c.key_index.contains_key(&pk(1)));
@@ -278,7 +301,12 @@ fn agent_pay_allowed() {
     with_agent_key(&mut c);
     let before = v(&c).balance;
     Ctx::new().key(pk(2)).set();
-    let r = c.agent_pay(1.into(), acc("api.provider.testnet"), U128(NEAR1 / 2), Some("gpu".into()));
+    let r = c.agent_pay(
+        1.into(),
+        acc("api.provider.testnet"),
+        U128(NEAR1 / 2),
+        Some("gpu".into()),
+    );
     assert!(r.allowed);
     assert_eq!(r.reason, None);
     assert_eq!(v(&c).balance, before - NEAR1 / 2);
@@ -310,7 +338,10 @@ fn agent_pay_denied_over_daily_max() {
     let mut c = setup();
     with_agent_key(&mut c);
     Ctx::new().key(pk(2)).set();
-    assert!(c.agent_pay(1.into(), acc("api.provider.testnet"), U128(NEAR1), None).allowed);
+    assert!(
+        c.agent_pay(1.into(), acc("api.provider.testnet"), U128(NEAR1), None)
+            .allowed
+    );
     let r = deny(&mut c, "api.provider.testnet", NEAR1, T0 + 1000);
     assert_eq!(r.reason.as_deref(), Some("over_daily_max"));
 }
@@ -337,7 +368,14 @@ fn agent_pay_denied_insufficient_balance() {
     let mut c = setup();
     with_agent_key(&mut c);
     Ctx::new().set();
-    c.set_policy(1.into(), Policy { per_tx_max: U128(100 * NEAR1), daily_max: U128(100 * NEAR1), allowlist: vec![] });
+    c.set_policy(
+        1.into(),
+        Policy {
+            per_tx_max: U128(100 * NEAR1),
+            daily_max: U128(100 * NEAR1),
+            allowlist: vec![],
+        },
+    );
     let r = deny(&mut c, "anyone.testnet", 20 * NEAR1, T0);
     assert_eq!(r.reason.as_deref(), Some("insufficient_balance"));
 }
@@ -347,7 +385,10 @@ fn agent_pay_daily_window_resets() {
     let mut c = setup();
     with_agent_key(&mut c);
     Ctx::new().key(pk(2)).set();
-    assert!(c.agent_pay(1.into(), acc("api.provider.testnet"), U128(NEAR1), None).allowed);
+    assert!(
+        c.agent_pay(1.into(), acc("api.provider.testnet"), U128(NEAR1), None)
+            .allowed
+    );
     // keep the vault alive across the day
     Ctx::new().at(T0 + DAY_MS - 10).set();
     c.heartbeat(1.into());
@@ -375,9 +416,19 @@ fn failed_agent_transfer_is_recredited() {
     let mut c = setup();
     with_agent_key(&mut c);
     Ctx::new().key(pk(2)).set();
-    assert!(c.agent_pay(1.into(), acc("api.provider.testnet"), U128(NEAR1), None).allowed);
-    Ctx::new().by("dmw.testnet").set_with_result(PromiseResult::Failed);
-    assert!(!c.on_transfer_done(1, acc("api.provider.testnet"), U128(NEAR1), "agent_pay".into()));
+    assert!(
+        c.agent_pay(1.into(), acc("api.provider.testnet"), U128(NEAR1), None)
+            .allowed
+    );
+    Ctx::new()
+        .by("dmw.testnet")
+        .set_with_result(PromiseResult::Failed);
+    assert!(!c.on_transfer_done(
+        1,
+        acc("api.provider.testnet"),
+        U128(NEAR1),
+        "agent_pay".into()
+    ));
     assert_eq!(v(&c).balance, 10 * NEAR1 - KEY_ALLOWANCE);
     assert_eq!(v(&c).daily_spent, 0);
 }
@@ -402,7 +453,9 @@ fn poke_due_pays_bounty_and_triggers() {
     assert_eq!(vault.stored, StoredState::Triggered);
     assert_eq!(vault.step, 1);
     assert_eq!(vault.balance, 10 * NEAR1 - NEAR1 / 100);
-    assert!(get_logs().iter().any(|l| l.contains("\"event\":\"triggered\"") && l.contains("bob.testnet")));
+    assert!(get_logs()
+        .iter()
+        .any(|l| l.contains("\"event\":\"triggered\"") && l.contains("bob.testnet")));
 }
 
 #[test]
@@ -474,10 +527,17 @@ fn step_ordering_1_to_6_with_stub() {
     assert_eq!(s, 4);
     let vault = v(&c);
     assert_eq!(vault.foreign[0].status, ForeignStatus::Signed);
-    assert!(vault.foreign[0].signed_tx.as_deref().unwrap().starts_with("0x02f8"));
+    assert!(vault.foreign[0]
+        .signed_tx
+        .as_deref()
+        .unwrap()
+        .starts_with("0x02f8"));
     assert_eq!(vault.foreign_index, 1);
     assert!(vault.foreign_inflight_since_ms.is_none());
-    assert!(vault.log.iter().any(|l| l.detail.starts_with("#0 signed 0x")));
+    assert!(vault
+        .log
+        .iter()
+        .any(|l| l.detail.starts_with("#0 signed 0x")));
 
     // step 4: no DAO -> skipped
     Ctx::new().by("keeper.testnet").at(T0 + 43_000).set();
@@ -487,7 +547,10 @@ fn step_ordering_1_to_6_with_stub() {
     let vault = v(&c);
     assert_eq!(vault.stored, StoredState::Settled);
     assert_eq!(vault.owner_id, acc("sarah.testnet"));
-    assert_eq!(c.nft_token("1".into()).unwrap().owner_id, acc("sarah.testnet"));
+    assert_eq!(
+        c.nft_token("1".into()).unwrap().owner_id,
+        acc("sarah.testnet")
+    );
     assert_eq!(c.nft_supply_for_owner(owner()).0, 0);
     assert_eq!(c.nft_supply_for_owner(acc("sarah.testnet")).0, 1);
     let events: Vec<_> = vault.log.iter().map(|l| l.event.as_str()).collect();
@@ -528,16 +591,27 @@ fn step3_without_payouts_goes_to_4() {
 fn step3_inflight_timeout_fails_payout_and_ignores_late_callback() {
     let mut c = setup();
     Ctx::new().set();
-    c.set_foreign_payouts(1.into(), vec![ForeignPayout {
-        chain: ForeignChain::Solana, to: "11111111111111111111111111111111".into(), amount: U128(5),
-        from_address: String::new(), status: ForeignStatus::Pending, signed_tx: None, tx_hash: None,
-    }]);
+    c.set_foreign_payouts(
+        1.into(),
+        vec![ForeignPayout {
+            chain: ForeignChain::Solana,
+            to: "11111111111111111111111111111111".into(),
+            amount: U128(5),
+            from_address: String::new(),
+            status: ForeignStatus::Pending,
+            signed_tx: None,
+            tx_hash: None,
+        }],
+    );
     trigger(&mut c);
     Ctx::new().by("keeper.testnet").at(T0 + 41_000).set();
     let _ = c.execute_step(1.into(), None);
     let _ = c.execute_step(1.into(), None);
     let _ = c.execute_step(1.into(), Some(sol_args())); // in flight
-    Ctx::new().by("keeper.testnet").at(T0 + 41_000 + FOREIGN_INFLIGHT_TIMEOUT_MS).set();
+    Ctx::new()
+        .by("keeper.testnet")
+        .at(T0 + 41_000 + FOREIGN_INFLIGHT_TIMEOUT_MS)
+        .set();
     assert_eq!(step_value(c.execute_step(1.into(), None)), 4);
     assert_eq!(v(&c).foreign[0].status, ForeignStatus::Failed);
     // a late callback is ignored
@@ -556,7 +630,10 @@ fn step1_keeps_dao_reserve_and_step4_proposes() {
     Ctx::new().by("keeper.testnet").at(T0 + 41_000).set();
     let _ = c.execute_step(1.into(), None);
     let dist = bal - RESERVE_WITH_DAO;
-    assert_eq!(v(&c).balance, bal - (dist * 6000 / 10_000 + dist * 4000 / 10_000));
+    assert_eq!(
+        v(&c).balance,
+        bal - (dist * 6000 / 10_000 + dist * 4000 / 10_000)
+    );
     assert!(v(&c).balance >= RESERVE_WITH_DAO);
     let _ = c.execute_step(1.into(), None);
     let _ = c.execute_step(1.into(), None); // step 3, no payouts
@@ -641,10 +718,18 @@ fn owner_mutators_rejected_once_triggered() {
 fn mark_broadcast_requires_signed() {
     let mut c = setup();
     Ctx::new().set();
-    c.set_foreign_payouts(1.into(), vec![ForeignPayout {
-        chain: ForeignChain::Base, to: format!("0x{}", "cd".repeat(20)), amount: U128(1),
-        from_address: String::new(), status: ForeignStatus::Pending, signed_tx: None, tx_hash: None,
-    }]);
+    c.set_foreign_payouts(
+        1.into(),
+        vec![ForeignPayout {
+            chain: ForeignChain::Base,
+            to: format!("0x{}", "cd".repeat(20)),
+            amount: U128(1),
+            from_address: String::new(),
+            status: ForeignStatus::Pending,
+            signed_tx: None,
+            tx_hash: None,
+        }],
+    );
     // not signed yet -> rejected
     Ctx::new().by("keeper.testnet").set();
     let r = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
@@ -653,7 +738,12 @@ fn mark_broadcast_requires_signed() {
     assert!(r.is_err(), "pending payout cannot be marked");
     // simulate a signed payout
     let raw = "0x02f8aabbcc";
-    let real = format!("0x{}", hex::encode(foreign::chainsig::keccak256(&hex::decode(&raw[2..]).unwrap())));
+    let real = format!(
+        "0x{}",
+        hex::encode(foreign::chainsig::keccak256(
+            &hex::decode(&raw[2..]).unwrap()
+        ))
+    );
     let mut vault = v(&c);
     vault.foreign[0].status = ForeignStatus::Signed;
     vault.foreign[0].signed_tx = Some(raw.into());
@@ -675,10 +765,36 @@ fn mark_broadcast_requires_signed() {
 fn heir_bps_validation() {
     let bad: Vec<Vec<Heir>> = vec![
         vec![],
-        vec![Heir { account_id: acc("a.testnet"), bps: 9999 }],
-        vec![Heir { account_id: acc("a.testnet"), bps: 10_000 }, Heir { account_id: acc("b.testnet"), bps: 0 }],
-        vec![Heir { account_id: acc("a.testnet"), bps: 5000 }, Heir { account_id: acc("a.testnet"), bps: 5000 }],
-        (0..11).map(|i| Heir { account_id: acc(&format!("h{i}.testnet")), bps: 1 }).collect(),
+        vec![Heir {
+            account_id: acc("a.testnet"),
+            bps: 9999,
+        }],
+        vec![
+            Heir {
+                account_id: acc("a.testnet"),
+                bps: 10_000,
+            },
+            Heir {
+                account_id: acc("b.testnet"),
+                bps: 0,
+            },
+        ],
+        vec![
+            Heir {
+                account_id: acc("a.testnet"),
+                bps: 5000,
+            },
+            Heir {
+                account_id: acc("a.testnet"),
+                bps: 5000,
+            },
+        ],
+        (0..11)
+            .map(|i| Heir {
+                account_id: acc(&format!("h{i}.testnet")),
+                bps: 1,
+            })
+            .collect(),
     ];
     for heirs in bad {
         Ctx::new().set();
@@ -686,18 +802,33 @@ fn heir_bps_validation() {
         assert!(r.is_err(), "should reject {heirs:?}");
     }
     validate_heirs(&heirs2());
-    validate_heirs(&[Heir { account_id: acc("a.testnet"), bps: 10_000 }]);
+    validate_heirs(&[Heir {
+        account_id: acc("a.testnet"),
+        bps: 10_000,
+    }]);
 }
 
 #[test]
 fn primary_heir_highest_bps_first_on_tie() {
     let mut c = setup();
     Ctx::new().set();
-    c.set_heirs(1.into(), vec![
-        Heir { account_id: acc("x.testnet"), bps: 2000 },
-        Heir { account_id: acc("y.testnet"), bps: 4000 },
-        Heir { account_id: acc("z.testnet"), bps: 4000 },
-    ]);
+    c.set_heirs(
+        1.into(),
+        vec![
+            Heir {
+                account_id: acc("x.testnet"),
+                bps: 2000,
+            },
+            Heir {
+                account_id: acc("y.testnet"),
+                bps: 4000,
+            },
+            Heir {
+                account_id: acc("z.testnet"),
+                bps: 4000,
+            },
+        ],
+    );
     assert_eq!(v(&c).primary_heir(), acc("y.testnet"));
 }
 
@@ -749,7 +880,9 @@ fn nft_transfer_call_reverts_when_receiver_returns_true() {
     Ctx::new().dep(1).set();
     let _ = c.nft_transfer_call(acc("market.testnet"), "1".into(), None, None, "".into());
     assert_eq!(v(&c).owner_id, acc("market.testnet"));
-    Ctx::new().by("dmw.testnet").set_with_result(PromiseResult::Successful(b"true".to_vec()));
+    Ctx::new()
+        .by("dmw.testnet")
+        .set_with_result(PromiseResult::Successful(b"true".to_vec()));
     assert!(!c.nft_resolve_transfer(owner(), acc("market.testnet"), "1".into(), None));
     assert_eq!(v(&c).owner_id, owner());
 }
@@ -757,8 +890,16 @@ fn nft_transfer_call_reverts_when_receiver_returns_true() {
 // ---------------------------------------------------------------- media
 
 fn media_svg(c: &Contract) -> String {
-    let media = c.nft_token("1".into()).unwrap().metadata.unwrap().media.unwrap();
-    let b64 = media.strip_prefix("data:image/svg+xml;base64,").expect("data uri");
+    let media = c
+        .nft_token("1".into())
+        .unwrap()
+        .metadata
+        .unwrap()
+        .media
+        .unwrap();
+    let b64 = media
+        .strip_prefix("data:image/svg+xml;base64,")
+        .expect("data uri");
     String::from_utf8(STANDARD.decode(b64).unwrap()).unwrap()
 }
 
@@ -769,7 +910,13 @@ fn svg_media_color_per_state() {
     let svg = media_svg(&c);
     assert!(svg.contains("#2ecc71") && svg.contains(">Alive<") && svg.contains("next beat in 19s"));
     assert!(svg.contains("2 heirs") && svg.contains("WILL #1") && svg.contains("width=\"400\""));
-    let extra = c.nft_token("1".into()).unwrap().metadata.unwrap().extra.unwrap();
+    let extra = c
+        .nft_token("1".into())
+        .unwrap()
+        .metadata
+        .unwrap()
+        .extra
+        .unwrap();
     let extra: serde_json::Value = serde_json::from_str(&extra).unwrap();
     assert_eq!(extra["state"], "Alive");
     assert_eq!(extra["trigger_at_ms"], T0 + 40_000);
@@ -837,7 +984,12 @@ fn base_args() -> StepArgs {
 }
 
 fn sol_args() -> StepArgs {
-    StepArgs { evm: None, solana: Some(SolanaArgs { recent_blockhash: SOL_BH.into() }) }
+    StepArgs {
+        evm: None,
+        solana: Some(SolanaArgs {
+            recent_blockhash: SOL_BH.into(),
+        }),
+    }
 }
 
 fn mpc_secp_response() -> serde_json::Value {
@@ -868,23 +1020,38 @@ fn at_step3(payouts: Vec<ForeignPayout>) -> Contract {
 
 fn sol_payout(amount: u128) -> ForeignPayout {
     ForeignPayout {
-        chain: ForeignChain::Solana, to: SOL_TO.into(), amount: U128(amount),
-        from_address: String::new(), status: ForeignStatus::Pending, signed_tx: None, tx_hash: None,
+        chain: ForeignChain::Solana,
+        to: SOL_TO.into(),
+        amount: U128(amount),
+        from_address: String::new(),
+        status: ForeignStatus::Pending,
+        signed_tx: None,
+        tx_hash: None,
     }
 }
 
 fn base_payout() -> ForeignPayout {
-    ForeignPayout { chain: ForeignChain::Base, to: format!("0x{}", "ab".repeat(20)), ..sol_payout(1_000) }
+    ForeignPayout {
+        chain: ForeignChain::Base,
+        to: format!("0x{}", "ab".repeat(20)),
+        ..sol_payout(1_000)
+    }
 }
 
 #[test]
 fn step3_solana_flow_stores_base64_tx() {
     let mut c = at_step3(vec![sol_payout(1_000_000)]);
-    assert!(matches!(c.execute_step(1.into(), Some(sol_args())), PromiseOrValue::Promise(_)));
+    assert!(matches!(
+        c.execute_step(1.into(), Some(sol_args())),
+        PromiseOrValue::Promise(_)
+    ));
     // signer answered derived_public_key for sol-1 -> sign request scheduled
     Ctx::new().by("dmw.testnet").at(T0 + 41_500).set();
     let key = format!("ed25519:{SOL_FROM}");
-    assert!(matches!(c.on_foreign_sol_key(1, 0, SOL_BH.into(), None, None, Ok(key)), PromiseOrValue::Promise(_)));
+    assert!(matches!(
+        c.on_foreign_sol_key(1, 0, SOL_BH.into(), None, None, Ok(key)),
+        PromiseOrValue::Promise(_)
+    ));
     let s = c.on_foreign_signed(1, 0, Ok(mpc_ed_response(SOL_SIG)));
     assert_eq!(s, 4);
     let p = &v(&c).foreign[0];
@@ -897,14 +1064,24 @@ fn step3_mpc_error_fails_payout_and_advances() {
     let mut c = at_step3(vec![base_payout(), sol_payout(5)]);
     let _ = c.execute_step(1.into(), Some(base_args()));
     Ctx::new().by("dmw.testnet").at(T0 + 41_500).set();
-    assert_eq!(c.on_foreign_signed(1, 0, Err(near_sdk::PromiseError::Failed)), 3);
+    assert_eq!(
+        c.on_foreign_signed(1, 0, Err(near_sdk::PromiseError::Failed)),
+        3
+    );
     assert_eq!(v(&c).foreign[0].status, ForeignStatus::Failed);
     assert_eq!(v(&c).foreign_index, 1);
     // derived key lookup failure on the solana payout also fails + advances
     Ctx::new().by("keeper.testnet").at(T0 + 42_000).set();
     let _ = c.execute_step(1.into(), Some(sol_args()));
     Ctx::new().by("dmw.testnet").at(T0 + 42_500).set();
-    let r = c.on_foreign_sol_key(1, 1, SOL_BH.into(), None, None, Err(near_sdk::PromiseError::Failed));
+    let r = c.on_foreign_sol_key(
+        1,
+        1,
+        SOL_BH.into(),
+        None,
+        None,
+        Err(near_sdk::PromiseError::Failed),
+    );
     assert!(matches!(r, PromiseOrValue::Value(4)));
     assert_eq!(v(&c).foreign[1].status, ForeignStatus::Failed);
 }
@@ -919,9 +1096,15 @@ fn step3_without_chain_args_panics_so_payout_is_not_burned() {
 #[test]
 fn step3_unbuildable_payout_fails_via_self_call() {
     let mut c = at_step3(vec![sol_payout(u128::from(u64::MAX) + 1)]);
-    assert!(matches!(c.execute_step(1.into(), Some(sol_args())), PromiseOrValue::Promise(_)));
+    assert!(matches!(
+        c.execute_step(1.into(), Some(sol_args())),
+        PromiseOrValue::Promise(_)
+    ));
     Ctx::new().by("dmw.testnet").at(T0 + 41_500).set();
-    assert_eq!(c.foreign_fail(1, 0, "amount exceeds u64 lamports".into()), 4);
+    assert_eq!(
+        c.foreign_fail(1, 0, "amount exceeds u64 lamports".into()),
+        4
+    );
     assert_eq!(v(&c).foreign[0].status, ForeignStatus::Failed);
 }
 
@@ -930,17 +1113,30 @@ fn resign_after_failure_stores_new_tx_without_moving_steps() {
     let mut c = at_step3(vec![base_payout()]);
     let _ = c.execute_step(1.into(), Some(base_args()));
     Ctx::new().by("dmw.testnet").at(T0 + 41_500).set();
-    assert_eq!(c.on_foreign_signed(1, 0, Err(near_sdk::PromiseError::Failed)), 4);
+    assert_eq!(
+        c.on_foreign_signed(1, 0, Err(near_sdk::PromiseError::Failed)),
+        4
+    );
     Ctx::new().by("keeper.testnet").at(T0 + 42_000).set();
     let _ = c.resign_foreign(1.into(), 0, base_args());
     // simulate callback: rebuild the same pending tx the contract scheduled
     let payout = v(&c).foreign[0].clone();
     let (t, _) = foreign::evm_transfer_for(&payout, base_args().evm.as_ref().unwrap()).unwrap();
     Ctx::new().by("dmw.testnet").at(T0 + 42_500).set();
-    let st = c.on_foreign_resigned(1, 0, foreign::PendingTx::Evm(t), Some(T0 + 42_000), Ok(mpc_secp_response()));
+    let st = c.on_foreign_resigned(
+        1,
+        0,
+        foreign::PendingTx::Evm(t),
+        Some(T0 + 42_000),
+        Ok(mpc_secp_response()),
+    );
     assert_eq!(st, "signed");
     let vault = v(&c);
-    assert!(vault.foreign[0].signed_tx.as_deref().unwrap().starts_with("0x02f8"));
+    assert!(vault.foreign[0]
+        .signed_tx
+        .as_deref()
+        .unwrap()
+        .starts_with("0x02f8"));
     assert_eq!(vault.step, 4);
     assert_eq!(vault.foreign_index, 1);
 }
@@ -987,9 +1183,9 @@ fn created_calls(method: &str) -> Vec<serde_json::Value> {
         .into_iter()
         .flat_map(|r| r.actions)
         .filter_map(|a| match a {
-            MockAction::FunctionCallWeight { method_name, args, .. } if method_name == method.as_bytes() => {
-                serde_json::from_slice(&args).ok()
-            }
+            MockAction::FunctionCallWeight {
+                method_name, args, ..
+            } if method_name == method.as_bytes() => serde_json::from_slice(&args).ok(),
             _ => None,
         })
         .collect()
@@ -1019,7 +1215,8 @@ fn evm(nonce: u64, max_fee: u128, prio: u128, gas: u128) -> StepArgs {
 }
 
 fn pending_slot(index: usize) -> foreign::PendingTx {
-    let raw = env::storage_read(format!("chainsig:pending:1:{index}").as_bytes()).expect("pending tx");
+    let raw =
+        env::storage_read(format!("chainsig:pending:1:{index}").as_bytes()).expect("pending tx");
     near_sdk::borsh::from_slice(&raw).unwrap()
 }
 
@@ -1050,7 +1247,14 @@ fn sol_signed() -> Contract {
     let mut c = at_step3(vec![sol_payout(1_000_000)]);
     let _ = c.execute_step(1.into(), Some(sol_args()));
     Ctx::new().by("dmw.testnet").at(T0 + 41_500).set();
-    let _ = c.on_foreign_sol_key(1, 0, SOL_BH.into(), None, None, Ok(format!("ed25519:{SOL_FROM}")));
+    let _ = c.on_foreign_sol_key(
+        1,
+        0,
+        SOL_BH.into(),
+        None,
+        None,
+        Ok(format!("ed25519:{SOL_FROM}")),
+    );
     assert_eq!(c.on_foreign_signed(1, 0, Ok(mpc_ed_response(SOL_SIG))), 4);
     c
 }
@@ -1064,7 +1268,11 @@ fn c1_evm_nonce_is_pinned_per_payout_not_caller_chosen() {
         foreign::PendingTx::Evm(t) => assert_eq!(t.nonce, 0),
         _ => panic!("expected evm"),
     }
-    assert_eq!(foreign::evm_nonce_for(&v(&c).foreign, 2), 1, "third payout is the 2nd base payout");
+    assert_eq!(
+        foreign::evm_nonce_for(&v(&c).foreign, 2),
+        1,
+        "third payout is the 2nd base payout"
+    );
 }
 
 #[test]
@@ -1072,7 +1280,9 @@ fn c1_evm_resign_reuses_nonce_and_requires_fee_bump() {
     let mut c = evm_signed();
     // same fees: rejected (no downgrade/same-fee resign of a signed payout)
     Ctx::new().by("mallory.testnet").at(T0 + 42_000).set();
-    let m = panics(|| { let _ = c.resign_foreign(1.into(), 0, base_args()); });
+    let m = panics(|| {
+        let _ = c.resign_foreign(1.into(), 0, base_args());
+    });
     assert!(m.contains("raise both fees"), "{m}");
     // +10% on both fees with a different caller nonce: accepted, nonce still 0
     Ctx::new().by("mallory.testnet").at(T0 + 42_000).set();
@@ -1089,16 +1299,18 @@ fn c1_evm_resign_reuses_nonce_and_requires_fee_bump() {
 #[test]
 fn h2_evm_fee_and_gas_caps() {
     for args in [
-        evm(0, 101_000_000_000, 1, 21_000),   // > 100 gwei
-        evm(0, 1_500_000_000, 1, 20_999),     // below intrinsic gas
-        evm(0, 1_500_000_000, 1, 100_001),    // above cap
-        evm(0, 1_000, 2_000, 21_000),         // priority > max fee
-        evm(0, 0, 0, 21_000),                 // zero fee
+        evm(0, 101_000_000_000, 1, 21_000), // > 100 gwei
+        evm(0, 1_500_000_000, 1, 20_999),   // below intrinsic gas
+        evm(0, 1_500_000_000, 1, 100_001),  // above cap
+        evm(0, 1_000, 2_000, 21_000),       // priority > max fee
+        evm(0, 0, 0, 21_000),               // zero fee
     ] {
         // fresh thread = fresh mocked blockchain per case
         let m = std::thread::spawn(move || {
             let mut c = at_step3(vec![base_payout()]);
-            panics(|| { let _ = c.execute_step(1.into(), Some(args)); })
+            panics(|| {
+                let _ = c.execute_step(1.into(), Some(args));
+            })
         })
         .join()
         .unwrap();
@@ -1112,8 +1324,13 @@ fn h2_evm_fee_and_gas_caps() {
 fn c1_solana_signed_resign_only_by_operator_after_cooldown() {
     let mut c = sol_signed();
     // anyone, even after the cooldown: rejected (a second live signature = second payment)
-    Ctx::new().by("heir.testnet").at(T0 + 41_000 + foreign::RESIGN_COOLDOWN_MS).set();
-    let m = panics(|| { let _ = c.resign_foreign(1.into(), 0, sol_args()); });
+    Ctx::new()
+        .by("heir.testnet")
+        .at(T0 + 41_000 + foreign::RESIGN_COOLDOWN_MS)
+        .set();
+    let m = panics(|| {
+        let _ = c.resign_foreign(1.into(), 0, sol_args());
+    });
     assert!(m.contains("only the contract owner or keeper"), "{m}");
     // contract owner configures a keeper
     Ctx::new().by("deployer.testnet").set();
@@ -1121,7 +1338,9 @@ fn c1_solana_signed_resign_only_by_operator_after_cooldown() {
     assert_eq!(c.get_config()["keeper"], "keeper.testnet");
     // keeper before the cooldown: rejected
     Ctx::new().by("keeper.testnet").at(T0 + 60_000).set();
-    let m = panics(|| { let _ = c.resign_foreign(1.into(), 0, sol_args()); });
+    let m = panics(|| {
+        let _ = c.resign_foreign(1.into(), 0, sol_args());
+    });
     assert!(m.contains("cooldown"), "{m}");
     // keeper after the cooldown: accepted, and a second request while in flight is rejected
     let t = T0 + 41_000 + foreign::RESIGN_COOLDOWN_MS;
@@ -1129,7 +1348,9 @@ fn c1_solana_signed_resign_only_by_operator_after_cooldown() {
     let _ = c.resign_foreign(1.into(), 0, sol_args());
     assert_eq!(created_calls("on_foreign_sol_key")[0]["req_ms"], t);
     Ctx::new().by("keeper.testnet").at(t + 1).set();
-    let m = panics(|| { let _ = c.resign_foreign(1.into(), 0, sol_args()); });
+    let m = panics(|| {
+        let _ = c.resign_foreign(1.into(), 0, sol_args());
+    });
     assert!(m.contains("cooldown") || m.contains("in flight"), "{m}");
 }
 
@@ -1146,12 +1367,27 @@ fn c1_solana_failed_resign_waits_for_cooldown_then_anyone() {
     let mut c = at_step3(vec![sol_payout(1_000_000)]);
     let _ = c.execute_step(1.into(), Some(sol_args()));
     Ctx::new().by("dmw.testnet").at(T0 + 41_500).set();
-    let _ = c.on_foreign_sol_key(1, 0, SOL_BH.into(), None, None, Ok(format!("ed25519:{SOL_FROM}")));
-    assert_eq!(c.on_foreign_signed(1, 0, Err(near_sdk::PromiseError::Failed)), 4);
+    let _ = c.on_foreign_sol_key(
+        1,
+        0,
+        SOL_BH.into(),
+        None,
+        None,
+        Ok(format!("ed25519:{SOL_FROM}")),
+    );
+    assert_eq!(
+        c.on_foreign_signed(1, 0, Err(near_sdk::PromiseError::Failed)),
+        4
+    );
     Ctx::new().by("heir.testnet").at(T0 + 42_000).set();
-    let m = panics(|| { let _ = c.resign_foreign(1.into(), 0, sol_args()); });
+    let m = panics(|| {
+        let _ = c.resign_foreign(1.into(), 0, sol_args());
+    });
     assert!(m.contains("cooldown"), "{m}");
-    Ctx::new().by("heir.testnet").at(T0 + 41_000 + foreign::RESIGN_COOLDOWN_MS).set();
+    Ctx::new()
+        .by("heir.testnet")
+        .at(T0 + 41_000 + foreign::RESIGN_COOLDOWN_MS)
+        .set();
     let _ = c.resign_foreign(1.into(), 0, sol_args());
 }
 
@@ -1161,7 +1397,9 @@ fn c1_inflight_resign_blocks_second_and_stale_callback_ignored() {
     Ctx::new().by("keeper.testnet").at(T0 + 42_000).set();
     let _ = c.resign_foreign(1.into(), 0, evm(0, 2_000_000_000, 2_000_000, 21_000));
     Ctx::new().by("keeper.testnet").at(T0 + 43_000).set();
-    let m = panics(|| { let _ = c.resign_foreign(1.into(), 0, evm(0, 3_000_000_000, 3_000_000, 21_000)); });
+    let m = panics(|| {
+        let _ = c.resign_foreign(1.into(), 0, evm(0, 3_000_000_000, 3_000_000, 21_000));
+    });
     assert!(m.contains("in flight"), "{m}");
     // after the in-flight timeout a new request supersedes the lost one...
     let t2 = T0 + 42_000 + FOREIGN_INFLIGHT_TIMEOUT_MS;
@@ -1172,9 +1410,21 @@ fn c1_inflight_resign_blocks_second_and_stale_callback_ignored() {
     let payout = before.clone();
     let (t, _) = foreign::evm_transfer_for(&payout, base_args().evm.as_ref().unwrap()).unwrap();
     Ctx::new().by("dmw.testnet").at(t2 + 10).set();
-    assert_eq!(c.on_foreign_resigned(1, 0, foreign::PendingTx::Evm(t), Some(T0 + 42_000), Ok(mpc_secp_response())), "signed");
+    assert_eq!(
+        c.on_foreign_resigned(
+            1,
+            0,
+            foreign::PendingTx::Evm(t),
+            Some(T0 + 42_000),
+            Ok(mpc_secp_response())
+        ),
+        "signed"
+    );
     assert_eq!(v(&c).foreign[0], before);
-    assert!(foreign::read_track(1, 0).inflight, "current request still in flight");
+    assert!(
+        foreign::read_track(1, 0).inflight,
+        "current request still in flight"
+    );
 }
 
 #[test]
@@ -1182,7 +1432,10 @@ fn h1_mark_broadcast_rejects_fake_hash_and_resign_still_possible() {
     let mut c = sol_signed();
     let raw = v(&c).foreign[0].signed_tx.clone().unwrap();
     let real = near_sdk::bs58::encode(hex::decode(SOL_SIG).unwrap()).into_string();
-    assert_eq!(foreign::expected_tx_id(ForeignChain::Solana, &raw).unwrap(), real);
+    assert_eq!(
+        foreign::expected_tx_id(ForeignChain::Solana, &raw).unwrap(),
+        real
+    );
     Ctx::new().by("mallory.testnet").at(T0 + 42_000).set();
     let m = panics(|| c.mark_broadcast(1.into(), 0, "5fakeSignature".into()));
     assert!(m.contains("does not match"), "{m}");
@@ -1193,7 +1446,10 @@ fn h1_mark_broadcast_rejects_fake_hash_and_resign_still_possible() {
     // a `broadcast` payout whose tx never landed is not bricked: the keeper can re-sign
     Ctx::new().by("deployer.testnet").set();
     c.set_keeper(Some(acc("keeper.testnet")));
-    Ctx::new().by("keeper.testnet").at(T0 + 41_000 + foreign::RESIGN_COOLDOWN_MS).set();
+    Ctx::new()
+        .by("keeper.testnet")
+        .at(T0 + 41_000 + foreign::RESIGN_COOLDOWN_MS)
+        .set();
     let _ = c.resign_foreign(1.into(), 0, sol_args());
 }
 
@@ -1205,7 +1461,9 @@ fn h1_evm_broadcast_resign_needs_cooldown_and_clears_hash() {
     Ctx::new().by("mallory.testnet").at(T0 + 42_000).set();
     c.mark_broadcast(1.into(), 0, id);
     let bump = evm(0, 2_000_000_000, 2_000_000, 21_000);
-    let m = panics(|| { let _ = c.resign_foreign(1.into(), 0, bump.clone()); });
+    let m = panics(|| {
+        let _ = c.resign_foreign(1.into(), 0, bump.clone());
+    });
     assert!(m.contains("cooldown"), "{m}");
     let t = T0 + 41_000 + foreign::RESIGN_COOLDOWN_MS;
     Ctx::new().by("keeper.testnet").at(t).set();
@@ -1213,7 +1471,16 @@ fn h1_evm_broadcast_resign_needs_cooldown_and_clears_hash() {
     let payout = v(&c).foreign[0].clone();
     let (tx, _) = foreign::evm_transfer_for(&payout, bump.evm.as_ref().unwrap()).unwrap();
     Ctx::new().by("dmw.testnet").at(t + 10).set();
-    assert_eq!(c.on_foreign_resigned(1, 0, foreign::PendingTx::Evm(tx), Some(t), Ok(mpc_secp_response())), "signed");
+    assert_eq!(
+        c.on_foreign_resigned(
+            1,
+            0,
+            foreign::PendingTx::Evm(tx),
+            Some(t),
+            Ok(mpc_secp_response())
+        ),
+        "signed"
+    );
     assert_eq!(v(&c).foreign[0].tx_hash, None);
     assert!(!foreign::read_track(1, 0).inflight);
 }
@@ -1235,7 +1502,14 @@ fn h3_nft_transfer_revokes_previous_owner_keys() {
     assert!(!c.key_index.contains_key(&pk(2)));
     // the seller's agent key can no longer spend the buyer's vault
     Ctx::new().key(pk(2)).at(T0 + 1_000).set();
-    let m = panics(|| { let _ = c.agent_pay(1.into(), acc("api.provider.testnet"), U128(NEAR1 / 10), None); });
+    let m = panics(|| {
+        let _ = c.agent_pay(
+            1.into(),
+            acc("api.provider.testnet"),
+            U128(NEAR1 / 10),
+            None,
+        );
+    });
     assert!(m.contains("unauthorized"), "{m}");
 }
 
@@ -1247,7 +1521,9 @@ fn h3_key_add_landing_after_transfer_is_revoked() {
     Ctx::new().dep(1).set();
     c.nft_transfer(acc("bob.testnet"), "1".into(), None, None);
     // AddKey succeeded, but the requester (alice) no longer owns the vault
-    Ctx::new().by("dmw.testnet").set_with_result(PromiseResult::Successful(vec![]));
+    Ctx::new()
+        .by("dmw.testnet")
+        .set_with_result(PromiseResult::Successful(vec![]));
     assert!(!c.on_key_added(1, pk(3), KeyKind::Agent, Some(owner())));
     assert!(v(&c).agent_keys.is_empty());
     assert!(!c.key_index.contains_key(&pk(3)));
@@ -1285,25 +1561,39 @@ fn m1_storage_of_a_full_vault_vs_flat_fee() {
     let before = env::storage_usage();
     Ctx::new().dep(100 * NEAR1).set();
     let heirs: Vec<Heir> = (0..10)
-        .map(|i| Heir { account_id: acc(&format!("{}{i}.testnet", "h".repeat(54))), bps: 1000 })
+        .map(|i| Heir {
+            account_id: acc(&format!("{}{i}.testnet", "h".repeat(54))),
+            bps: 1000,
+        })
         .collect();
     let pol = Policy {
         per_tx_max: U128(1),
         daily_max: U128(1),
-        allowlist: (0..10).map(|i| acc(&format!("{}{i}.testnet", "a".repeat(54)))).collect(),
+        allowlist: (0..10)
+            .map(|i| acc(&format!("{}{i}.testnet", "a".repeat(54))))
+            .collect(),
     };
     c.create_vault(60, 1, heirs, Some(pol), None);
     let mut vault = c.vaults.get(&1).unwrap();
     vault.foreign = (0..4)
         .map(|_| ForeignPayout {
-            chain: ForeignChain::Solana, to: "x".repeat(64), amount: U128(u128::MAX), from_address: "y".repeat(64),
-            status: ForeignStatus::Signed, signed_tx: Some("z".repeat(300)), tx_hash: Some("t".repeat(128)),
+            chain: ForeignChain::Solana,
+            to: "x".repeat(64),
+            amount: U128(u128::MAX),
+            from_address: "y".repeat(64),
+            status: ForeignStatus::Signed,
+            signed_tx: Some("z".repeat(300)),
+            tx_hash: Some("t".repeat(128)),
         })
         .collect();
     vault.pulse_keys = (0..5).map(|i| pk(10 + i)).collect();
     vault.agent_keys = (0..5).map(|i| pk(20 + i)).collect();
     vault.log = (0..MAX_LOG)
-        .map(|_| LogEntry { ms: 0, event: "agent_pay_denied".into(), detail: "d".repeat(150) })
+        .map(|_| LogEntry {
+            ms: 0,
+            event: "agent_pay_denied".into(),
+            detail: "d".repeat(150),
+        })
         .collect();
     c.vaults.insert(&1, &vault);
     let used = env::storage_usage() - before;

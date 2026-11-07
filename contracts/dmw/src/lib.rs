@@ -78,13 +78,16 @@ enum StorageKey {
 // Contract
 // ---------------------------------------------------------------------------
 
-#[near(contract_state, contract_metadata(
-    standard(standard = "nep171", version = "1.2.0"),
-    standard(standard = "nep177", version = "2.0.0"),
-    standard(standard = "nep181", version = "1.0.0"),
-    standard(standard = "nep297", version = "1.0.0"),
-    standard(standard = "dmw", version = "1.0.0"),
-))]
+#[near(
+    contract_state,
+    contract_metadata(
+        standard(standard = "nep171", version = "1.2.0"),
+        standard(standard = "nep177", version = "2.0.0"),
+        standard(standard = "nep181", version = "1.0.0"),
+        standard(standard = "nep297", version = "1.0.0"),
+        standard(standard = "dmw", version = "1.0.0"),
+    )
+)]
 #[derive(PanicOnDefault)]
 pub struct Contract {
     pub owner_id: AccountId,
@@ -137,7 +140,10 @@ impl Contract {
         bounty: Option<U128>,
     ) -> U128 {
         let deposit = env::attached_deposit().as_yoctonear();
-        require!(deposit >= STORAGE_FEE, "deposit must be >= 0.1 NEAR (storage)");
+        require!(
+            deposit >= STORAGE_FEE,
+            "deposit must be >= 0.1 NEAR (storage)"
+        );
         validate_timing(heartbeat_interval_s, grace_missed);
         validate_heirs(&heirs);
         let policy = policy.unwrap_or_default();
@@ -203,7 +209,10 @@ impl Contract {
         let mut v = self.vault(id);
         let pred = env::predecessor_account_id();
         let via_key = signed_by_own_key(&pred) && v.pulse_keys.contains(&env::signer_account_pk());
-        require!(pred == v.owner_id || via_key, "unauthorized: not owner or pulse key");
+        require!(
+            pred == v.owner_id || via_key,
+            "unauthorized: not owner or pulse key"
+        );
         require!(v.stored == StoredState::Live, "vault_triggered");
         let now = env::block_timestamp_ms();
         let was = v.state_at(now);
@@ -234,12 +243,23 @@ impl Contract {
         let before = v.pulse_keys.len() + v.agent_keys.len();
         v.pulse_keys.retain(|k| k != &public_key);
         v.agent_keys.retain(|k| k != &public_key);
-        require!(v.pulse_keys.len() + v.agent_keys.len() < before, "key not in vault");
+        require!(
+            v.pulse_keys.len() + v.agent_keys.len() < before,
+            "key not in vault"
+        );
         self.key_index.remove(&public_key);
         let pk_str = String::from(&public_key);
-        record(&mut v, id, "key_removed", &pk_str, json!({"token_id": id.to_string(), "public_key": pk_str}));
+        record(
+            &mut v,
+            id,
+            "key_removed",
+            &pk_str,
+            json!({"token_id": id.to_string(), "public_key": pk_str}),
+        );
         self.vaults.insert(&id, &v);
-        Promise::new(env::current_account_id()).delete_key(public_key).detach();
+        Promise::new(env::current_account_id())
+            .delete_key(public_key)
+            .detach();
     }
 
     /// Agent spend under the vault policy. Authorized only for agent keys on the
@@ -254,12 +274,16 @@ impl Contract {
         let id = token_id.id();
         let mut v = self.vault(id);
         require!(
-            signed_by_own_key(&env::predecessor_account_id()) && v.agent_keys.contains(&env::signer_account_pk()),
+            signed_by_own_key(&env::predecessor_account_id())
+                && v.agent_keys.contains(&env::signer_account_pk()),
             "unauthorized: not an agent key of this vault"
         );
         require!(amount.0 > 0, "amount must be > 0");
         // A transfer to the contract itself would move vault NEAR into the unallocated pool.
-        require!(receiver_id != env::current_account_id(), "receiver cannot be the dmw contract");
+        require!(
+            receiver_id != env::current_account_id(),
+            "receiver cannot be the dmw contract"
+        );
         let now = env::block_timestamp_ms();
         if now >= v.daily_window_start_ms.saturating_add(DAY_MS) {
             v.daily_window_start_ms = now;
@@ -270,7 +294,13 @@ impl Contract {
         let res = match reason {
             Some(r) => {
                 let data = json!({"token_id": id.to_string(), "receiver_id": receiver_id, "amount": amount, "reason": r, "memo": memo});
-                record(&mut v, id, "agent_pay_denied", &format!("{r} {receiver_id} {}", amount.0), data);
+                record(
+                    &mut v,
+                    id,
+                    "agent_pay_denied",
+                    &format!("{r} {receiver_id} {}", amount.0),
+                    data,
+                );
                 AgentPayResult {
                     allowed: false,
                     reason: Some(r.to_string()),
@@ -284,7 +314,13 @@ impl Contract {
                 v.balance -= amount.0;
                 v.daily_spent += amount.0;
                 let data = json!({"token_id": id.to_string(), "receiver_id": receiver_id, "amount": amount, "daily_spent": yocto(v.daily_spent), "memo": memo});
-                record(&mut v, id, "agent_pay_allowed", &format!("{receiver_id} {}", amount.0), data);
+                record(
+                    &mut v,
+                    id,
+                    "agent_pay_allowed",
+                    &format!("{receiver_id} {}", amount.0),
+                    data,
+                );
                 self.transfer_with_refund(id, &receiver_id, amount.0, "agent_pay");
                 AgentPayResult {
                     allowed: true,
@@ -328,7 +364,10 @@ impl Contract {
         let id = token_id.id();
         let mut v = self.vault(id);
         self.require_owner_mutable(&v);
-        require!(payouts.len() <= MAX_FOREIGN, "too many foreign payouts (max 4)");
+        require!(
+            payouts.len() <= MAX_FOREIGN,
+            "too many foreign payouts (max 4)"
+        );
         let payouts: Vec<ForeignPayout> = payouts
             .into_iter()
             .map(|mut p| {
@@ -336,7 +375,10 @@ impl Contract {
                 require!(p.from_address.len() <= 64, "invalid foreign `from_address`");
                 require!(p.amount.0 > 0, "foreign amount must be > 0");
                 if p.chain == ForeignChain::Base {
-                    require!(p.to.starts_with("0x") && p.to.len() == 42, "base `to` must be 0x + 40 hex");
+                    require!(
+                        p.to.starts_with("0x") && p.to.len() == 42,
+                        "base `to` must be 0x + 40 hex"
+                    );
                 }
                 p.status = ForeignStatus::Pending;
                 p.signed_tx = None;
@@ -370,7 +412,13 @@ impl Contract {
         v.heartbeat_interval_s = heartbeat_interval_s;
         v.grace_missed = grace_missed;
         let data = json!({"token_id": id.to_string(), "heartbeat_interval_s": heartbeat_interval_s, "grace_missed": grace_missed});
-        record(&mut v, id, "timing_set", &format!("{heartbeat_interval_s}s x{grace_missed}"), data);
+        record(
+            &mut v,
+            id,
+            "timing_set",
+            &format!("{heartbeat_interval_s}s x{grace_missed}"),
+            data,
+        );
         self.vaults.insert(&id, &v);
     }
 
@@ -387,7 +435,13 @@ impl Contract {
         v.balance -= pay;
         let poker = env::predecessor_account_id();
         let data = json!({"token_id": id.to_string(), "by": poker, "bounty": yocto(pay), "trigger_at_ms": v.trigger_at_ms()});
-        record(&mut v, id, "triggered", &format!("by {poker}, bounty {pay}"), data);
+        record(
+            &mut v,
+            id,
+            "triggered",
+            &format!("by {poker}, bounty {pay}"),
+            data,
+        );
         self.vaults.insert(&id, &v);
         if pay > 0 {
             self.transfer_with_refund(id, &poker, pay, "bounty");
@@ -397,7 +451,11 @@ impl Contract {
 
     /// Anyone: run the current settlement step (SPEC §2.4). Returns the new `step`
     /// (directly, or as the result of the step's callback for steps 3 and 4).
-    pub fn execute_step(&mut self, token_id: TokenRef, args: Option<StepArgs>) -> PromiseOrValue<u8> {
+    pub fn execute_step(
+        &mut self,
+        token_id: TokenRef,
+        args: Option<StepArgs>,
+    ) -> PromiseOrValue<u8> {
         let id = token_id.id();
         let mut v = self.vault(id);
         require!(v.stored != StoredState::Settled, "already_settled");
@@ -405,7 +463,11 @@ impl Contract {
         let me = env::current_account_id();
         match v.step {
             1 => {
-                let reserve = if v.dao_id.is_some() { RESERVE_WITH_DAO } else { RESERVE_NO_DAO };
+                let reserve = if v.dao_id.is_some() {
+                    RESERVE_WITH_DAO
+                } else {
+                    RESERVE_NO_DAO
+                };
                 let distributable = v.balance.saturating_sub(reserve);
                 let mut paid_total = 0u128;
                 let mut payouts = vec![];
@@ -441,7 +503,13 @@ impl Contract {
                 v.step = 3;
                 v.foreign_index = 0;
                 let data = json!({"token_id": id.to_string(), "deleted_keys": keys});
-                record(&mut v, id, "step_2", &format!("{} keys deleted", keys.len()), data);
+                record(
+                    &mut v,
+                    id,
+                    "step_2",
+                    &format!("{} keys deleted", keys.len()),
+                    data,
+                );
                 self.vaults.insert(&id, &v);
                 delete_keys(keys);
                 PromiseOrValue::Value(3)
@@ -478,12 +546,24 @@ impl Contract {
             4 => {
                 v.step = 5;
                 let Some(dao) = v.dao_id.clone() else {
-                    record(&mut v, id, "step_4", "no dao; skipped", json!({"token_id": id.to_string(), "dao_id": null}));
+                    record(
+                        &mut v,
+                        id,
+                        "step_4",
+                        "no dao; skipped",
+                        json!({"token_id": id.to_string(), "dao_id": null}),
+                    );
                     self.vaults.insert(&id, &v);
                     return PromiseOrValue::Value(5);
                 };
                 if v.balance < DAO_BOND {
-                    record(&mut v, id, "step_4", "insufficient balance for dao bond; skipped", json!({"token_id": id.to_string(), "dao_id": dao, "skipped": true}));
+                    record(
+                        &mut v,
+                        id,
+                        "step_4",
+                        "insufficient balance for dao bond; skipped",
+                        json!({"token_id": id.to_string(), "dao_id": dao, "skipped": true}),
+                    );
                     self.vaults.insert(&id, &v);
                     return PromiseOrValue::Value(5);
                 }
@@ -496,7 +576,8 @@ impl Contract {
                         .collect::<Vec<_>>()
                         .join(", ")
                 );
-                let inner = json!({"token_id": id, "index": 0, "tx_hash": "dao-ratified"}).to_string();
+                let inner =
+                    json!({"token_id": id, "index": 0, "tx_hash": "dao-ratified"}).to_string();
                 let proposal = json!({"proposal": {
                     "description": description,
                     "kind": {"FunctionCall": {
@@ -509,7 +590,13 @@ impl Contract {
                         }]
                     }}
                 }});
-                record(&mut v, id, "step_4", &format!("add_proposal on {dao}"), json!({"token_id": id.to_string(), "dao_id": dao, "description": description}));
+                record(
+                    &mut v,
+                    id,
+                    "step_4",
+                    &format!("add_proposal on {dao}"),
+                    json!({"token_id": id.to_string(), "dao_id": dao, "description": description}),
+                );
                 self.vaults.insert(&id, &v);
                 PromiseOrValue::Promise(
                     Promise::new(dao)
@@ -519,7 +606,11 @@ impl Contract {
                             NearToken::from_yoctonear(DAO_BOND),
                             GAS_ADD_PROPOSAL,
                         )
-                        .then(Self::ext(me).with_static_gas(GAS_ON_DAO).on_dao_proposal(id)),
+                        .then(
+                            Self::ext(me)
+                                .with_static_gas(GAS_ON_DAO)
+                                .on_dao_proposal(id),
+                        ),
                 )
             }
             5 => {
@@ -529,7 +620,13 @@ impl Contract {
                 v.stored = StoredState::Settled;
                 v.step = 6;
                 let data = json!({"token_id": id.to_string(), "old_owner_id": old, "new_owner_id": heir, "remaining": yocto(v.balance)});
-                record(&mut v, id, "step_5", &format!("will nft -> {heir}"), data.clone());
+                record(
+                    &mut v,
+                    id,
+                    "step_5",
+                    &format!("will nft -> {heir}"),
+                    data.clone(),
+                );
                 record(&mut v, id, "settled", heir.as_ref(), data);
                 self.vaults.insert(&id, &v);
                 self.index_remove(&old, id);
@@ -546,11 +643,23 @@ impl Contract {
     pub fn mark_broadcast(&mut self, token_id: TokenRef, index: u32, tx_hash: String) {
         let id = token_id.id();
         let mut v = self.vault(id);
-        require!(!tx_hash.is_empty() && tx_hash.len() <= 128, "invalid tx_hash");
+        require!(
+            !tx_hash.is_empty() && tx_hash.len() <= 128,
+            "invalid tx_hash"
+        );
         let pred = env::predecessor_account_id();
         if tx_hash == "dao-ratified" {
-            require!(v.dao_id.as_ref() == Some(&pred), "only the vault dao may ratify");
-            record(&mut v, id, "dao_ratified", pred.as_ref(), json!({"token_id": id.to_string(), "dao_id": pred}));
+            require!(
+                v.dao_id.as_ref() == Some(&pred),
+                "only the vault dao may ratify"
+            );
+            record(
+                &mut v,
+                id,
+                "dao_ratified",
+                pred.as_ref(),
+                json!({"token_id": id.to_string(), "dao_id": pred}),
+            );
             self.vaults.insert(&id, &v);
             return;
         }
@@ -564,14 +673,28 @@ impl Contract {
         // The hash must be the id of the stored signed tx (H-1): nobody can record a fake
         // hash. "broadcast" means "relayed", not "confirmed"; the signed tx stays public and
         // relayable, and `resign_foreign` still works from `broadcast` after the cooldown.
-        let signed = p.signed_tx.as_deref().unwrap_or_else(|| env::panic_str("payout has no signed tx"));
-        let expected = foreign::expected_tx_id(p.chain, signed).unwrap_or_else(|e| env::panic_str(&e));
-        let tx_hash = if p.chain == ForeignChain::Base { tx_hash.to_ascii_lowercase() } else { tx_hash };
+        let signed = p
+            .signed_tx
+            .as_deref()
+            .unwrap_or_else(|| env::panic_str("payout has no signed tx"));
+        let expected =
+            foreign::expected_tx_id(p.chain, signed).unwrap_or_else(|e| env::panic_str(&e));
+        let tx_hash = if p.chain == ForeignChain::Base {
+            tx_hash.to_ascii_lowercase()
+        } else {
+            tx_hash
+        };
         require!(tx_hash == expected, "tx_hash does not match the signed tx");
         v.foreign[i].status = ForeignStatus::Broadcast;
         v.foreign[i].tx_hash = Some(tx_hash.clone());
         let data = json!({"token_id": id.to_string(), "index": index, "chain": v.foreign[i].chain, "tx_hash": tx_hash, "by": pred});
-        record(&mut v, id, "foreign_broadcast", &format!("#{index} {tx_hash}"), data);
+        record(
+            &mut v,
+            id,
+            "foreign_broadcast",
+            &format!("#{index} {tx_hash}"),
+            data,
+        );
         self.vaults.insert(&id, &v);
     }
 
@@ -585,7 +708,13 @@ impl Contract {
         let amount = v.balance;
         require!(amount > 0, "nothing to claim");
         v.balance = 0;
-        record(&mut v, id, "claim", &format!("{caller} {amount}"), json!({"token_id": id.to_string(), "account_id": caller, "amount": yocto(amount)}));
+        record(
+            &mut v,
+            id,
+            "claim",
+            &format!("{caller} {amount}"),
+            json!({"token_id": id.to_string(), "account_id": caller, "amount": yocto(amount)}),
+        );
         self.vaults.insert(&id, &v);
         self.transfer_with_refund(id, &caller, amount, "claim");
         U128(amount)
@@ -637,7 +766,10 @@ impl Contract {
     /// only the keeper may re-sign a Solana payout that already has a signature, because
     /// that is only safe after checking off-chain that the old signature never landed.
     pub fn set_keeper(&mut self, account_id: Option<AccountId>) {
-        require!(env::predecessor_account_id() == self.owner_id, "only the contract owner");
+        require!(
+            env::predecessor_account_id() == self.owner_id,
+            "only the contract owner"
+        );
         match &account_id {
             Some(a) => {
                 env::storage_write(KEEPER_SLOT, a.as_bytes());
@@ -663,12 +795,20 @@ impl Contract {
         owner: Option<AccountId>,
     ) -> bool {
         let ok = promise_ok();
-        let Some(mut v) = self.vaults.get(&token_id) else { return false };
+        let Some(mut v) = self.vaults.get(&token_id) else {
+            return false;
+        };
         let pk_str = String::from(&public_key);
         if !ok {
             self.key_index.remove(&public_key);
             v.balance += KEY_ALLOWANCE;
-            record(&mut v, token_id, "key_add_failed", &pk_str, json!({"token_id": token_id.to_string(), "public_key": pk_str, "kind": kind}));
+            record(
+                &mut v,
+                token_id,
+                "key_add_failed",
+                &pk_str,
+                json!({"token_id": token_id.to_string(), "public_key": pk_str, "kind": kind}),
+            );
             self.vaults.insert(&token_id, &v);
             return false;
         }
@@ -677,24 +817,48 @@ impl Contract {
             // Vault triggered, or the Will NFT changed hands, while the key was being
             // added: the requester no longer controls the vault, so delete it right away.
             self.key_index.remove(&public_key);
-            let why = if owner_changed { "owner changed" } else { "vault triggered" };
-            record(&mut v, token_id, "key_add_revoked", &format!("{pk_str} {why}"), json!({"token_id": token_id.to_string(), "public_key": pk_str, "reason": why}));
+            let why = if owner_changed {
+                "owner changed"
+            } else {
+                "vault triggered"
+            };
+            record(
+                &mut v,
+                token_id,
+                "key_add_revoked",
+                &format!("{pk_str} {why}"),
+                json!({"token_id": token_id.to_string(), "public_key": pk_str, "reason": why}),
+            );
             self.vaults.insert(&token_id, &v);
-            Promise::new(env::current_account_id()).delete_key(public_key).detach();
+            Promise::new(env::current_account_id())
+                .delete_key(public_key)
+                .detach();
             return false;
         }
         match kind {
             KeyKind::Pulse => v.pulse_keys.push(public_key),
             KeyKind::Agent => v.agent_keys.push(public_key),
         }
-        record(&mut v, token_id, "key_added", &format!("{} {pk_str}", kind.method()), json!({"token_id": token_id.to_string(), "public_key": pk_str, "kind": kind, "method": kind.method()}));
+        record(
+            &mut v,
+            token_id,
+            "key_added",
+            &format!("{} {pk_str}", kind.method()),
+            json!({"token_id": token_id.to_string(), "public_key": pk_str, "kind": kind, "method": kind.method()}),
+        );
         self.vaults.insert(&token_id, &v);
         true
     }
 
     /// After a NEAR transfer out of a vault: re-credit the vault if it failed.
     #[private]
-    pub fn on_transfer_done(&mut self, token_id: u64, receiver_id: AccountId, amount: U128, kind: String) -> bool {
+    pub fn on_transfer_done(
+        &mut self,
+        token_id: u64,
+        receiver_id: AccountId,
+        amount: U128,
+        kind: String,
+    ) -> bool {
         if promise_ok() {
             return true;
         }
@@ -703,7 +867,13 @@ impl Contract {
             if kind == "agent_pay" {
                 v.daily_spent = v.daily_spent.saturating_sub(amount.0);
             }
-            record(&mut v, token_id, "transfer_failed", &format!("{kind} {receiver_id} {}", amount.0), json!({"token_id": token_id.to_string(), "receiver_id": receiver_id, "amount": amount, "kind": kind}));
+            record(
+                &mut v,
+                token_id,
+                "transfer_failed",
+                &format!("{kind} {receiver_id} {}", amount.0),
+                json!({"token_id": token_id.to_string(), "receiver_id": receiver_id, "amount": amount, "kind": kind}),
+            );
             self.vaults.insert(&token_id, &v);
         }
         false
@@ -711,19 +881,35 @@ impl Contract {
 
     /// After Sputnik `add_proposal`: store the proposal id, or log and continue.
     #[private]
-    pub fn on_dao_proposal(&mut self, token_id: u64, #[callback_result] result: Result<u64, near_sdk::PromiseError>) -> u8 {
+    pub fn on_dao_proposal(
+        &mut self,
+        token_id: u64,
+        #[callback_result] result: Result<u64, near_sdk::PromiseError>,
+    ) -> u8 {
         let mut v = self.vault(token_id);
         match result {
             Ok(pid) => {
                 v.dao_proposal_id = Some(pid);
                 let data = json!({"token_id": token_id.to_string(), "dao_id": v.dao_id, "proposal_id": pid});
-                record(&mut v, token_id, "dao_proposal", &format!("proposal {pid}"), data);
+                record(
+                    &mut v,
+                    token_id,
+                    "dao_proposal",
+                    &format!("proposal {pid}"),
+                    data,
+                );
             }
             Err(_) => {
                 // The bond is refunded to the contract account on failure; give it back to the vault.
                 v.balance += DAO_BOND;
                 let data = json!({"token_id": token_id.to_string(), "dao_id": v.dao_id});
-                record(&mut v, token_id, "dao_proposal_failed", "add_proposal failed; continuing", data);
+                record(
+                    &mut v,
+                    token_id,
+                    "dao_proposal_failed",
+                    "add_proposal failed; continuing",
+                    data,
+                );
             }
         }
         self.vaults.insert(&token_id, &v);
@@ -737,11 +923,16 @@ impl Contract {
 
 impl Contract {
     pub(crate) fn vault(&self, id: u64) -> Vault {
-        self.vaults.get(&id).unwrap_or_else(|| env::panic_str("vault not found"))
+        self.vaults
+            .get(&id)
+            .unwrap_or_else(|| env::panic_str("vault not found"))
     }
 
     fn require_owner_mutable(&self, v: &Vault) {
-        require!(env::predecessor_account_id() == v.owner_id, "only the vault owner");
+        require!(
+            env::predecessor_account_id() == v.owner_id,
+            "only the vault owner"
+        );
         require!(v.stored == StoredState::Live, "vault_triggered");
     }
 
@@ -752,20 +943,40 @@ impl Contract {
             KeyKind::Pulse => &v.pulse_keys,
             KeyKind::Agent => &v.agent_keys,
         };
-        require!(list.len() < MAX_KEYS_PER_KIND, "too many keys of this kind (max 5)");
-        require!(!self.key_index.contains_key(&pk), "public key already registered");
-        require!(v.balance >= KEY_ALLOWANCE, "vault balance must cover the 1 NEAR key gas allowance");
+        require!(
+            list.len() < MAX_KEYS_PER_KIND,
+            "too many keys of this kind (max 5)"
+        );
+        require!(
+            !self.key_index.contains_key(&pk),
+            "public key already registered"
+        );
+        require!(
+            v.balance >= KEY_ALLOWANCE,
+            "vault balance must cover the 1 NEAR key gas allowance"
+        );
         v.balance -= KEY_ALLOWANCE;
         self.key_index.insert(&pk, &id);
         let pk_str = String::from(&pk);
-        record(&mut v, id, "key_add_requested", &format!("{} {pk_str}", kind.method()), json!({"token_id": id.to_string(), "public_key": pk_str, "kind": kind}));
+        record(
+            &mut v,
+            id,
+            "key_add_requested",
+            &format!("{} {pk_str}", kind.method()),
+            json!({"token_id": id.to_string(), "public_key": pk_str, "kind": kind}),
+        );
         self.vaults.insert(&id, &v);
         let me = env::current_account_id();
         let allowance = near_sdk::Allowance::limited(NearToken::from_yoctonear(KEY_ALLOWANCE))
             .unwrap_or_else(|| env::panic_str("zero allowance"));
         Promise::new(me.clone())
             .add_access_key_allowance(pk.clone(), allowance, me.clone(), kind.method())
-            .then(Self::ext(me).with_static_gas(GAS_ON_KEY).on_key_added(id, pk, kind, Some(v.owner_id.clone())))
+            .then(Self::ext(me).with_static_gas(GAS_ON_KEY).on_key_added(
+                id,
+                pk,
+                kind,
+                Some(v.owner_id.clone()),
+            ))
     }
 
     fn transfer_with_refund(&self, id: u64, to: &AccountId, amount: u128, kind: &str) {
@@ -800,7 +1011,11 @@ impl Contract {
         v.foreign[index].signed_tx = signed_tx;
         v.foreign_inflight_since_ms = None;
         v.foreign_index += 1;
-        let event = if status == ForeignStatus::Signed { "foreign_signed" } else { "foreign_failed" };
+        let event = if status == ForeignStatus::Signed {
+            "foreign_signed"
+        } else {
+            "foreign_failed"
+        };
         let data = json!({"token_id": token_id.to_string(), "index": index, "chain": v.foreign[index].chain, "status": status.as_str(), "detail": detail});
         record(&mut v, token_id, event, &format!("#{index} {detail}"), data);
         if v.foreign_index as usize >= v.foreign.len() {
@@ -814,7 +1029,11 @@ impl Contract {
 
     /// Drain both key lists and release them from the global registry.
     fn take_keys(&mut self, v: &mut Vault) -> Vec<PublicKey> {
-        let keys: Vec<PublicKey> = v.pulse_keys.drain(..).chain(v.agent_keys.drain(..)).collect();
+        let keys: Vec<PublicKey> = v
+            .pulse_keys
+            .drain(..)
+            .chain(v.agent_keys.drain(..))
+            .collect();
         for k in &keys {
             self.key_index.remove(k);
         }
@@ -846,11 +1065,27 @@ impl Contract {
     /// Move NFT ownership (used by NEP-171 transfers and their resolution).
     /// While Live, every pulse/agent key is revoked: keys belong to whoever set them up,
     /// and must not keep heartbeat/spend power over a vault the NFT buyer now owns (H-3).
-    pub(crate) fn move_owner(&mut self, id: u64, v: &mut Vault, to: &AccountId, memo: Option<&str>) {
+    pub(crate) fn move_owner(
+        &mut self,
+        id: u64,
+        v: &mut Vault,
+        to: &AccountId,
+        memo: Option<&str>,
+    ) {
         let old = v.owner_id.clone();
         v.owner_id = to.clone();
-        let revoked = if v.stored == StoredState::Live { self.take_keys(v) } else { vec![] };
-        record(v, id, "owner_changed", &format!("{old} -> {to}"), json!({"token_id": id.to_string(), "old_owner_id": old, "new_owner_id": to, "revoked_keys": revoked}));
+        let revoked = if v.stored == StoredState::Live {
+            self.take_keys(v)
+        } else {
+            vec![]
+        };
+        record(
+            v,
+            id,
+            "owner_changed",
+            &format!("{old} -> {to}"),
+            json!({"token_id": id.to_string(), "old_owner_id": old, "new_owner_id": to, "revoked_keys": revoked}),
+        );
         self.vaults.insert(&id, v);
         delete_keys(revoked);
         self.index_remove(&old, id);
@@ -862,7 +1097,9 @@ impl Contract {
 /// One DeleteKey promise per key so a single failure cannot block the others.
 fn delete_keys(keys: Vec<PublicKey>) {
     for k in keys {
-        Promise::new(env::current_account_id()).delete_key(k).detach();
+        Promise::new(env::current_account_id())
+            .delete_key(k)
+            .detach();
     }
 }
 
@@ -873,7 +1110,12 @@ fn signed_by_own_key(pred: &AccountId) -> bool {
 }
 
 /// Order matters: the first failing rule is the reported reason.
-pub(crate) fn policy_check(v: &Vault, now: u64, receiver: &AccountId, amount: u128) -> Option<&'static str> {
+pub(crate) fn policy_check(
+    v: &Vault,
+    now: u64,
+    receiver: &AccountId,
+    amount: u128,
+) -> Option<&'static str> {
     if v.state_at(now) != VaultState::Alive {
         return Some("vault_not_alive");
     }
@@ -934,7 +1176,10 @@ fn promise_ok() -> bool {
 }
 
 pub(crate) fn validate_heirs(heirs: &[Heir]) {
-    require!(!heirs.is_empty() && heirs.len() <= MAX_HEIRS, "1..=10 heirs required");
+    require!(
+        !heirs.is_empty() && heirs.len() <= MAX_HEIRS,
+        "1..=10 heirs required"
+    );
     let mut sum: u32 = 0;
     for (i, h) in heirs.iter().enumerate() {
         require!(h.bps > 0, "heir bps must be > 0");
@@ -948,7 +1193,10 @@ pub(crate) fn validate_heirs(heirs: &[Heir]) {
 }
 
 fn validate_policy(p: &Policy) {
-    require!(p.allowlist.len() <= MAX_ALLOWLIST, "allowlist too long (max 10)");
+    require!(
+        p.allowlist.len() <= MAX_ALLOWLIST,
+        "allowlist too long (max 10)"
+    );
 }
 
 fn validate_timing(interval_s: u64, grace: u32) {

@@ -36,7 +36,9 @@
 //! request and callback so `on_foreign_signed` keeps its original signature.
 
 use near_sdk::json_types::U128;
-use near_sdk::{env, near, require, Gas, GasWeight, NearToken, Promise, PromiseError, PromiseOrValue};
+use near_sdk::{
+    env, near, require, Gas, GasWeight, NearToken, Promise, PromiseError, PromiseOrValue,
+};
 use serde_json::json;
 
 use crate::{record, Contract, ContractExt, StoredState, TokenRef};
@@ -174,7 +176,10 @@ fn pending_key(token_id: u64, index: usize) -> Vec<u8> {
 }
 
 fn write_pending(token_id: u64, index: usize, p: &PendingTx) {
-    env::storage_write(&pending_key(token_id, index), &near_sdk::borsh::to_vec(p).unwrap());
+    env::storage_write(
+        &pending_key(token_id, index),
+        &near_sdk::borsh::to_vec(p).unwrap(),
+    );
 }
 
 fn take_pending(token_id: u64, index: usize) -> Option<PendingTx> {
@@ -209,14 +214,20 @@ pub fn read_track(token_id: u64, index: usize) -> SignTrack {
 }
 
 fn write_track(token_id: u64, index: usize, t: &SignTrack) {
-    env::storage_write(&track_key(token_id, index), &near_sdk::borsh::to_vec(t).unwrap());
+    env::storage_write(
+        &track_key(token_id, index),
+        &near_sdk::borsh::to_vec(t).unwrap(),
+    );
 }
 
 /// The EVM nonce of Base payout `index`: the number of Base payouts before it. The
 /// derived `base-<id>` address can only be signed for by this contract, and only in
 /// settlement, so its nonce starts at 0 and payouts consume nonces in list order.
 pub fn evm_nonce_for(foreign: &[ForeignPayout], index: usize) -> u64 {
-    foreign[..index].iter().filter(|p| p.chain == ForeignChain::Base).count() as u64
+    foreign[..index]
+        .iter()
+        .filter(|p| p.chain == ForeignChain::Base)
+        .count() as u64
 }
 
 /// Reject out-of-range caller-supplied EVM params (panics, so nothing is burned or stored).
@@ -259,7 +270,10 @@ pub fn expected_tx_id(chain: ForeignChain, signed_tx: &str) -> Result<String, St
 }
 
 /// Build the EVM transfer for `payout` from keeper-supplied chain params.
-pub fn evm_transfer_for(payout: &ForeignPayout, a: &EvmArgs) -> Result<(EvmTransfer, [u8; 32]), String> {
+pub fn evm_transfer_for(
+    payout: &ForeignPayout,
+    a: &EvmArgs,
+) -> Result<(EvmTransfer, [u8; 32]), String> {
     let t = EvmTransfer {
         to: payout.to.clone(),
         value: payout.amount,
@@ -279,7 +293,8 @@ pub fn solana_transfer_for(
     from_b58: String,
     recent_blockhash: String,
 ) -> Result<(SolanaTransfer, Vec<u8>), String> {
-    let lamports = u64::try_from(payout.amount.0).map_err(|_| "amount exceeds u64 lamports".to_string())?;
+    let lamports =
+        u64::try_from(payout.amount.0).map_err(|_| "amount exceeds u64 lamports".to_string())?;
     let t = SolanaTransfer {
         from: from_b58,
         to: payout.to.clone(),
@@ -292,15 +307,28 @@ pub fn solana_transfer_for(
 
 /// Turn an MPC `sign` result + the pending unsigned tx into `(raw_signed_tx, tx_id)`.
 /// EVM: `0x` hex + keccak tx hash. Solana: base64 + base58 signature (the tx id).
-pub fn assemble_signed(pending: &PendingTx, response: &serde_json::Value) -> Result<(String, String), String> {
-    let sig: SignatureResponse =
-        serde_json::from_value(response.clone()).map_err(|_| "unexpected signature response".to_string())?;
+pub fn assemble_signed(
+    pending: &PendingTx,
+    response: &serde_json::Value,
+) -> Result<(String, String), String> {
+    let sig: SignatureResponse = serde_json::from_value(response.clone())
+        .map_err(|_| "unexpected signature response".to_string())?;
     match (pending, sig) {
-        (PendingTx::Evm(t), SignatureResponse::Secp256k1 { big_r, s, recovery_id }) => {
+        (
+            PendingTx::Evm(t),
+            SignatureResponse::Secp256k1 {
+                big_r,
+                s,
+                recovery_id,
+            },
+        ) => {
             let tx = evm_tx(t)?;
             let (r, s, v) = evm_rsv(&big_r.affine_point, &s.scalar, recovery_id)?;
             let raw = evm_assemble(&tx, &r, &s, v);
-            Ok((format!("0x{}", hex::encode(&raw)), format!("0x{}", hex::encode(keccak256(&raw)))))
+            Ok((
+                format!("0x{}", hex::encode(&raw)),
+                format!("0x{}", hex::encode(keccak256(&raw))),
+            ))
         }
         (PendingTx::Solana(t), SignatureResponse::Ed25519 { signature }) => {
             let tx = solana_tx(t)?;
@@ -310,12 +338,19 @@ pub fn assemble_signed(pending: &PendingTx, response: &serde_json::Value) -> Res
             let mut sig64 = [0u8; 64];
             sig64.copy_from_slice(&signature);
             let mut pk = [0u8; 32];
-            pk.copy_from_slice(&near_sdk::bs58::decode(&t.from).into_vec().map_err(|e| e.to_string())?);
+            pk.copy_from_slice(
+                &near_sdk::bs58::decode(&t.from)
+                    .into_vec()
+                    .map_err(|e| e.to_string())?,
+            );
             if !env::ed25519_verify(&sig64, solana_message(&tx), &pk) {
                 return Err("ed25519 signature does not verify".into());
             }
             let raw = solana_assemble(&tx, &signature)?;
-            Ok((base64_encode(&raw), near_sdk::bs58::encode(&signature).into_string()))
+            Ok((
+                base64_encode(&raw),
+                near_sdk::bs58::encode(&signature).into_string(),
+            ))
         }
         _ => Err("signature scheme does not match chain".into()),
     }
@@ -379,17 +414,21 @@ impl Contract {
         let now = env::block_timestamp_ms();
         match payout.chain {
             ForeignChain::Base => {
-                let mut a = args
-                    .and_then(|a| a.evm)
-                    .unwrap_or_else(|| env::panic_str("step 3: args.evm is required for a base payout"));
+                let mut a = args.and_then(|a| a.evm).unwrap_or_else(|| {
+                    env::panic_str("step 3: args.evm is required for a base payout")
+                });
                 validate_evm_args(&a);
                 a.nonce = evm_nonce_for(&foreign, index);
-                write_track(token_id, index, &SignTrack {
-                    last_request_ms: now,
-                    inflight: false,
-                    max_fee_per_gas: a.max_fee_per_gas.0,
-                    max_priority_fee_per_gas: a.max_priority_fee_per_gas.0,
-                });
+                write_track(
+                    token_id,
+                    index,
+                    &SignTrack {
+                        last_request_ms: now,
+                        inflight: false,
+                        max_fee_per_gas: a.max_fee_per_gas.0,
+                        max_priority_fee_per_gas: a.max_priority_fee_per_gas.0,
+                    },
+                );
                 match evm_transfer_for(&payout, &a) {
                     Err(e) => self.fail_later(token_id, index, &e),
                     Ok((t, hash)) => {
@@ -404,15 +443,26 @@ impl Contract {
                 }
             }
             ForeignChain::Solana => {
-                let a = args
-                    .and_then(|a| a.solana)
-                    .unwrap_or_else(|| env::panic_str("step 3: args.solana is required for a solana payout"));
+                let a = args.and_then(|a| a.solana).unwrap_or_else(|| {
+                    env::panic_str("step 3: args.solana is required for a solana payout")
+                });
                 require_blockhash(&a);
                 // Validate the payout itself before spending a cross-contract hop.
-                if let Err(e) = solana_transfer_for(&payout, SYSTEM_PROGRAM_B58.into(), a.recent_blockhash.clone()) {
+                if let Err(e) = solana_transfer_for(
+                    &payout,
+                    SYSTEM_PROGRAM_B58.into(),
+                    a.recent_blockhash.clone(),
+                ) {
                     return self.fail_later(token_id, index, &e);
                 }
-                write_track(token_id, index, &SignTrack { last_request_ms: now, ..Default::default() });
+                write_track(
+                    token_id,
+                    index,
+                    &SignTrack {
+                        last_request_ms: now,
+                        ..Default::default()
+                    },
+                );
                 derived_key_call(&path).then(
                     Self::ext(me)
                         .with_static_gas(GAS_ON_SOL_KEY)
@@ -469,11 +519,20 @@ impl Contract {
                 return PromiseOrValue::Value(v.step);
             }
             Err(e) => {
-                return PromiseOrValue::Value(self.finish_foreign(token_id, index, ForeignStatus::Failed, None, &e))
+                return PromiseOrValue::Value(self.finish_foreign(
+                    token_id,
+                    index,
+                    ForeignStatus::Failed,
+                    None,
+                    &e,
+                ))
             }
         };
         if !payout.from_address.is_empty() && payout.from_address != t.from {
-            env::log_str(&format!("note: from_address {} != derived {}", payout.from_address, t.from));
+            env::log_str(&format!(
+                "note: from_address {} != derived {}",
+                payout.from_address, t.from
+            ));
         }
         let path = derivation_path(ForeignChain::Solana, token_id);
         let me = env::current_account_id();
@@ -507,9 +566,13 @@ impl Contract {
             (Ok(value), Some(p)) => assemble_signed(&p, &value),
         };
         match outcome {
-            Ok((raw, txid)) => {
-                self.finish_foreign(token_id, index, ForeignStatus::Signed, Some(raw), &format!("signed {txid}"))
-            }
+            Ok((raw, txid)) => self.finish_foreign(
+                token_id,
+                index,
+                ForeignStatus::Signed,
+                Some(raw),
+                &format!("signed {txid}"),
+            ),
             Err(e) => self.finish_foreign(token_id, index, ForeignStatus::Failed, None, &e),
         }
     }
@@ -527,27 +590,40 @@ impl Contract {
         let i = index as usize;
         require!(v.stored != StoredState::Live, "not_triggered");
         require!(i < v.foreign.len(), "index out of range");
-        require!(v.step > 3 || (v.step == 3 && i < v.foreign_index as usize), "payout not processed yet");
+        require!(
+            v.step > 3 || (v.step == 3 && i < v.foreign_index as usize),
+            "payout not processed yet"
+        );
         let payout = v.foreign[i].clone();
         require!(payout.status != ForeignStatus::Pending, "payout is pending");
         let now = env::block_timestamp_ms();
         let track = read_track(id, i);
         require!(
-            !(track.inflight && now < track.last_request_ms.saturating_add(crate::FOREIGN_INFLIGHT_TIMEOUT_MS)),
+            !(track.inflight
+                && now
+                    < track
+                        .last_request_ms
+                        .saturating_add(crate::FOREIGN_INFLIGHT_TIMEOUT_MS)),
             "a re-sign for this payout is already in flight"
         );
-        let has_sig = matches!(payout.status, ForeignStatus::Signed | ForeignStatus::Broadcast);
+        let has_sig = matches!(
+            payout.status,
+            ForeignStatus::Signed | ForeignStatus::Broadcast
+        );
         let cooled = now >= track.last_request_ms.saturating_add(RESIGN_COOLDOWN_MS);
         let me = env::current_account_id();
         let path = derivation_path(payout.chain, id);
         match payout.chain {
             ForeignChain::Base => {
-                let mut a = args.evm.unwrap_or_else(|| env::panic_str("args.evm is required for a base payout"));
+                let mut a = args
+                    .evm
+                    .unwrap_or_else(|| env::panic_str("args.evm is required for a base payout"));
                 validate_evm_args(&a);
                 if has_sig {
                     require!(
                         a.max_fee_per_gas.0 * 100 >= track.max_fee_per_gas * EVM_FEE_BUMP_PCT
-                            && a.max_priority_fee_per_gas.0 * 100 >= track.max_priority_fee_per_gas * EVM_FEE_BUMP_PCT,
+                            && a.max_priority_fee_per_gas.0 * 100
+                                >= track.max_priority_fee_per_gas * EVM_FEE_BUMP_PCT,
                         "re-sign of a signed evm payout must raise both fees by >= 10%"
                     );
                 }
@@ -555,13 +631,18 @@ impl Contract {
                     require!(cooled, "resign cooldown: wait 5 min after the last request");
                 }
                 a.nonce = evm_nonce_for(&v.foreign, i);
-                let (t, hash) = evm_transfer_for(&payout, &a).unwrap_or_else(|e| env::panic_str(&e));
-                write_track(id, i, &SignTrack {
-                    last_request_ms: now,
-                    inflight: true,
-                    max_fee_per_gas: a.max_fee_per_gas.0,
-                    max_priority_fee_per_gas: a.max_priority_fee_per_gas.0,
-                });
+                let (t, hash) =
+                    evm_transfer_for(&payout, &a).unwrap_or_else(|e| env::panic_str(&e));
+                write_track(
+                    id,
+                    i,
+                    &SignTrack {
+                        last_request_ms: now,
+                        inflight: true,
+                        max_fee_per_gas: a.max_fee_per_gas.0,
+                        max_priority_fee_per_gas: a.max_priority_fee_per_gas.0,
+                    },
+                );
                 sign_call(&sign_args_ecdsa(&path, &hash)).then(
                     Self::ext(me)
                         .with_static_gas(GAS_ON_FOREIGN_SIGNED)
@@ -580,11 +661,25 @@ impl Contract {
                         "only the contract owner or keeper may re-sign a signed solana payout"
                     );
                 }
-                let a = args.solana.unwrap_or_else(|| env::panic_str("args.solana is required for a solana payout"));
+                let a = args.solana.unwrap_or_else(|| {
+                    env::panic_str("args.solana is required for a solana payout")
+                });
                 require_blockhash(&a);
-                solana_transfer_for(&payout, SYSTEM_PROGRAM_B58.into(), a.recent_blockhash.clone())
-                    .unwrap_or_else(|e| env::panic_str(&e));
-                write_track(id, i, &SignTrack { last_request_ms: now, inflight: true, ..Default::default() });
+                solana_transfer_for(
+                    &payout,
+                    SYSTEM_PROGRAM_B58.into(),
+                    a.recent_blockhash.clone(),
+                )
+                .unwrap_or_else(|e| env::panic_str(&e));
+                write_track(
+                    id,
+                    i,
+                    &SignTrack {
+                        last_request_ms: now,
+                        inflight: true,
+                        ..Default::default()
+                    },
+                );
                 derived_key_call(&path).then(
                     Self::ext(me)
                         .with_static_gas(GAS_ON_SOL_KEY)
@@ -621,7 +716,9 @@ impl Contract {
         let mut v = self.vault(token_id);
         let current = v.foreign[index].status;
         // Only the latest request may land (a request that timed out and was superseded is stale).
-        if req_ms.is_some() && read_track(token_id, index).last_request_ms != req_ms.unwrap_or_default() {
+        if req_ms.is_some()
+            && read_track(token_id, index).last_request_ms != req_ms.unwrap_or_default()
+        {
             env::log_str("stale resign result ignored");
             return current.as_str().to_string();
         }
@@ -640,11 +737,23 @@ impl Contract {
                 v.foreign[index].signed_tx = Some(raw);
                 v.foreign[index].tx_hash = None;
                 let data = json!({"token_id": token_id.to_string(), "index": index, "chain": chain, "status": "signed", "detail": format!("resigned {txid}")});
-                record(&mut v, token_id, "foreign_signed", &format!("#{index} resigned {txid}"), data);
+                record(
+                    &mut v,
+                    token_id,
+                    "foreign_signed",
+                    &format!("#{index} resigned {txid}"),
+                    data,
+                );
             }
             Err(e) => {
                 let data = json!({"token_id": token_id.to_string(), "index": index, "chain": chain, "detail": e});
-                record(&mut v, token_id, "foreign_resign_failed", &format!("#{index} {e}"), data);
+                record(
+                    &mut v,
+                    token_id,
+                    "foreign_resign_failed",
+                    &format!("#{index} {e}"),
+                    data,
+                );
             }
         }
         let status = v.foreign[index].status.as_str().to_string();
@@ -712,8 +821,14 @@ pub mod chainsig {
     #[serde(tag = "scheme")]
     #[derive(Debug, Clone, PartialEq, Eq)]
     pub enum SignatureResponse {
-        Secp256k1 { big_r: AffinePoint, s: Scalar, recovery_id: u8 },
-        Ed25519 { signature: Vec<u8> },
+        Secp256k1 {
+            big_r: AffinePoint,
+            s: Scalar,
+            recovery_id: u8,
+        },
+        Ed25519 {
+            signature: Vec<u8>,
+        },
     }
 
     pub fn sign_args_ecdsa(path: &str, hash: &[u8; 32]) -> SignArgs {
@@ -749,7 +864,10 @@ pub mod chainsig {
     }
 
     pub fn parse_evm_address(s: &str) -> Result<[u8; 20], String> {
-        let h = s.strip_prefix("0x").or_else(|| s.strip_prefix("0X")).unwrap_or(s);
+        let h = s
+            .strip_prefix("0x")
+            .or_else(|| s.strip_prefix("0X"))
+            .unwrap_or(s);
         if h.len() != 40 {
             return Err("bad evm address length".into());
         }
@@ -784,7 +902,11 @@ pub mod chainsig {
         b[i..].to_vec()
     }
 
-    pub fn evm_rsv(big_r_hex: &str, s_hex: &str, recovery_id: u8) -> Result<([u8; 32], [u8; 32], u8), String> {
+    pub fn evm_rsv(
+        big_r_hex: &str,
+        s_hex: &str,
+        recovery_id: u8,
+    ) -> Result<([u8; 32], [u8; 32], u8), String> {
         let big_r = hex::decode(big_r_hex).map_err(|_| "big_r hex".to_string())?;
         let s = hex::decode(s_hex).map_err(|_| "s hex".to_string())?;
         if big_r.len() != 33 || s.len() != 32 || recovery_id > 1 {
@@ -817,7 +939,8 @@ pub mod chainsig {
     pub fn solana_tx(t: &SolanaTransfer) -> Result<SolanaTransaction, String> {
         let from = SolanaAddress::from_base58(&t.from).map_err(|e| format!("from: {e}"))?;
         let to = SolanaAddress::from_base58(&t.to).map_err(|e| format!("to: {e}"))?;
-        let bh = Blockhash::from_base58(&t.recent_blockhash).map_err(|e| format!("blockhash: {e}"))?;
+        let bh =
+            Blockhash::from_base58(&t.recent_blockhash).map_err(|e| format!("blockhash: {e}"))?;
         Ok(SolanaTransactionBuilder::new()
             .payer(from)
             .instructions(vec![system_transfer(from, to, t.lamports.0)])
@@ -839,8 +962,12 @@ pub mod chainsig {
     }
 
     pub fn ed25519_key_to_base58(near_pk: &str) -> Result<String, String> {
-        let b58 = near_pk.strip_prefix("ed25519:").ok_or("expected ed25519: key")?;
-        let raw = near_sdk::bs58::decode(b58).into_vec().map_err(|_| "bad base58 key".to_string())?;
+        let b58 = near_pk
+            .strip_prefix("ed25519:")
+            .ok_or("expected ed25519: key")?;
+        let raw = near_sdk::bs58::decode(b58)
+            .into_vec()
+            .map_err(|_| "bad base58 key".to_string())?;
         if raw.len() != 32 {
             return Err("ed25519 key must be 32 bytes".into());
         }
@@ -919,14 +1046,20 @@ mod chainsig_tests {
             let (t, _) = evm_transfer_for(&payout_base(), &evm_args(nonce)).unwrap();
             let (got, txid) = assemble_signed(&PendingTx::Evm(t), &mpc_secp(r, s, y)).unwrap();
             assert_eq!(got, format!("0x{raw}"));
-            assert_eq!(txid, format!("0x{}", hex::encode(keccak256(&hex::decode(raw).unwrap()))));
+            assert_eq!(
+                txid,
+                format!("0x{}", hex::encode(keccak256(&hex::decode(raw).unwrap())))
+            );
         }
     }
 
     #[test]
     fn evm_sign_args_wire_shape() {
         let a = serde_json::to_value(sign_args_ecdsa("base-7", &[0xab; 32])).unwrap();
-        assert_eq!(a, json!({"request":{"path":"base-7","payload_v2":{"Ecdsa":"ab".repeat(32)},"domain_id":0}}));
+        assert_eq!(
+            a,
+            json!({"request":{"path":"base-7","payload_v2":{"Ecdsa":"ab".repeat(32)},"domain_id":0}})
+        );
     }
 
     pub(crate) const SOL_FROM: &str = "GmaDrppBC7P5ARKV8g3djiwP89vz1jLK23V2GBjuAEGB";
@@ -937,44 +1070,69 @@ mod chainsig_tests {
     pub(crate) const SOL_RAW_B64: &str = "ATeKNaZSfowSiNlpVUam/tRbfMiakrXIxZeMPGmkzysh2Q5qn/+y8KoHEk6d8OM3+OZ0FQZ77JwwfJxoD1pR3AABAAED6kpsY+KcUgq+9VB7Ey7F+ZVHdq6+vnuSQh7qaRRG0iwCAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAzEkOkozS44c7s0P8ldozF5ymD02/RsLDbpEpnVXU5rkBAgIAAQwCAAAAQEIPAAAAAAA=";
 
     fn payout_sol(amount: u128) -> ForeignPayout {
-        ForeignPayout { chain: ForeignChain::Solana, to: SOL_TO.into(), amount: U128(amount), ..payout_base() }
+        ForeignPayout {
+            chain: ForeignChain::Solana,
+            to: SOL_TO.into(),
+            amount: U128(amount),
+            ..payout_base()
+        }
     }
 
     #[test]
     fn solana_payload_matches_web3js() {
-        let (_, msg) = solana_transfer_for(&payout_sol(1_000_000), SOL_FROM.into(), SOL_BH.into()).unwrap();
+        let (_, msg) =
+            solana_transfer_for(&payout_sol(1_000_000), SOL_FROM.into(), SOL_BH.into()).unwrap();
         assert_eq!(hex::encode(msg), SOL_MSG);
-        let a = serde_json::to_value(sign_args_eddsa("sol-7", &hex::decode(SOL_MSG).unwrap())).unwrap();
+        let a =
+            serde_json::to_value(sign_args_eddsa("sol-7", &hex::decode(SOL_MSG).unwrap())).unwrap();
         assert_eq!(a["request"]["payload_v2"]["Eddsa"], SOL_MSG);
         assert_eq!(a["request"]["domain_id"], 1);
     }
 
     #[test]
     fn solana_assembly_matches_web3js() {
-        let (t, _) = solana_transfer_for(&payout_sol(1_000_000), SOL_FROM.into(), SOL_BH.into()).unwrap();
+        let (t, _) =
+            solana_transfer_for(&payout_sol(1_000_000), SOL_FROM.into(), SOL_BH.into()).unwrap();
         let resp = json!({"scheme":"Ed25519","signature": hex::decode(SOL_SIG).unwrap()});
         let (raw, txid) = assemble_signed(&PendingTx::Solana(t.clone()), &resp).unwrap();
         assert_eq!(raw, SOL_RAW_B64);
-        assert_eq!(txid, near_sdk::bs58::encode(hex::decode(SOL_SIG).unwrap()).into_string());
+        assert_eq!(
+            txid,
+            near_sdk::bs58::encode(hex::decode(SOL_SIG).unwrap()).into_string()
+        );
         // a signature that does not verify over the message is rejected, not stored
         let mut bad = hex::decode(SOL_SIG).unwrap();
         bad[0] ^= 1;
-        assert!(assemble_signed(&PendingTx::Solana(t), &json!({"scheme":"Ed25519","signature":bad})).is_err());
+        assert!(assemble_signed(
+            &PendingTx::Solana(t),
+            &json!({"scheme":"Ed25519","signature":bad})
+        )
+        .is_err());
     }
 
     #[test]
     fn rejects_mismatched_or_malformed_responses() {
         let (t, _) = evm_transfer_for(&payout_base(), &evm_args(3)).unwrap();
         let p = PendingTx::Evm(t);
-        assert!(assemble_signed(&p, &json!({"scheme":"Ed25519","signature": vec![0u8; 64]})).is_err());
+        assert!(
+            assemble_signed(&p, &json!({"scheme":"Ed25519","signature": vec![0u8; 64]})).is_err()
+        );
         assert!(assemble_signed(&p, &json!({"stub": true})).is_err());
         assert!(assemble_signed(&p, &mpc_secp("00", "11", 0)).is_err());
     }
 
     #[test]
     fn unbuildable_payouts_are_errors() {
-        assert!(solana_transfer_for(&payout_sol(u64::MAX as u128 + 1), SOL_FROM.into(), SOL_BH.into()).is_err());
-        let bad_to = ForeignPayout { to: "0x1234".into(), ..payout_base() };
+        assert!(solana_transfer_for(
+            &payout_sol(u64::MAX as u128 + 1),
+            SOL_FROM.into(),
+            SOL_BH.into()
+        )
+        .is_err());
+        let bad_to = ForeignPayout {
+            to: "0x1234".into(),
+            ..payout_base()
+        };
         assert!(evm_transfer_for(&bad_to, &evm_args(0)).is_err());
     }
 
