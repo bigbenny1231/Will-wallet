@@ -10,3 +10,4 @@ dist/
 *.key
 keys/
 .DS_Store
+keys/
