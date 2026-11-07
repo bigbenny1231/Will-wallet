@@ -7,6 +7,7 @@
 <meta name="description" content="A NEAR contract that carries out the distribution you configure from your will or trust. Proof of life while you are here, settlement when you are not. Testnet build; heirs sign nothing to receive NEAR.">
 <meta name="theme-color" content="#0B0C0F">
 <meta name="color-scheme" content="dark">
+<!-- deadmanswallet.dev is the intended production domain (to be registered); canonical/og URLs assume it. -->
 <link rel="canonical" href="https://deadmanswallet.dev/">
 <meta property="og:type" content="website">
 <meta property="og:title" content="Dead Man's Wallet | Crypto that arrives.">
@@ -46,7 +47,7 @@
         <li><a href="https://github.com/agarretson/deadmans-wallet#readme">Docs</a></li>
       </ul>
     </nav>
-    <a class="link nav-cta" href="#waitlist">Join the waitlist</a>
+    <a class="link nav-cta" href="#waitlist">Follow mainnet</a>
   </div>
 </header>
 
@@ -291,7 +292,7 @@
       <details><summary>Can my heirs see my balance?</summary>
         <p>Yes. The heir page lists every vault that names the heir&#8217;s account, with the share set aside for them, while you are alive. NEAR is a public ledger, so the plan and balances in the contract are visible to anyone who looks up the vault on-chain.</p></details>
       <details><summary>What does it cost?</summary>
-        <p>The hackathon version runs on testnet and is free. Mainnet pricing has not been set; the waitlist hears first.</p></details>
+        <p>The hackathon version runs on testnet and is free. Mainnet pricing has not been set; mainnet pricing will be announced with the release.</p></details>
     </div>
   </div>
 </section>
@@ -299,18 +300,13 @@
 <section class="waitlist" id="waitlist" aria-labelledby="waitlist-h">
   <div class="wrap wait-grid">
     <div>
-      <h2 id="waitlist-h">Join the waitlist</h2>
-      <p>One email when mainnet opens. Nothing else.</p>
+      <h2 id="waitlist-h">Follow mainnet</h2>
+      <p>Mainnet has no date. Releases are where it will be announced.</p>
     </div>
-    <form id="waitlist-form" method="post" action="https://formspree.io/f/PLACEHOLDER" novalidate>
-      <label for="email">Email address</label>
-      <div class="form-row">
-        <input id="email" name="email" type="email" required autocomplete="email" placeholder="you@example.com">
-        <button class="btn" type="submit">Join the waitlist</button>
-      </div>
-      <div class="hp" aria-hidden="true"><label>Leave this empty <input type="text" name="_gotcha" tabindex="-1" autocomplete="off"></label></div>
-      <p id="form-status" class="status" role="status" aria-live="polite"></p>
-    </form>
+    <div class="wait-cta">
+      <a class="btn" href="https://github.com/agarretson/deadmans-wallet/releases" rel="noopener">Watch releases on GitHub</a>
+      <p class="status">There is no mailing list yet. Mainnet will be announced as a GitHub release.</p>
+    </div>
   </div>
 </section>
 </main>

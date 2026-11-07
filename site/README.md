@@ -35,17 +35,25 @@ a CDN or object store and changing the `<source>` is the alternative.
 
 ## Configure
 
-Placeholders live in the `CONFIG` constant at the top of `app.js` (dashboard URL, docs, one-pager,
-GitHub, contact, waitlist endpoint). `index.html` carries the same defaults so links work without JS.
-Replace `https://formspree.io/f/PLACEHOLDER` with a real Formspree-style endpoint.
+`CONFIG` at the top of `app.js` holds the dashboard, docs, one-pager, GitHub and contact links (all plain links;
+the site has no backend and collects nothing). `index.html` carries the same defaults so links work without JS.
+The canonical and Open Graph URLs assume `deadmanswallet.dev`, the intended production domain (not yet
+registered); change them if the domain differs. There is no waitlist form: the page points to GitHub releases
+until a mailing list exists.
 
-## Deploy
+## Content Security Policy hash
 
-Point Vercel at `site/` (see `vercel.json`) or serve it from any static host.
+`vercel.json` allows exactly one inline script, the `<script>document.documentElement.classList.add('js')</script>`
+in `index.html`, by SHA-256 hash (`script-src 'self' 'sha256-...'`). Any edit to that script, even whitespace,
+breaks the page under the CSP until the hash is updated. After editing it, run from the repo root:
 
-## Copy rules
+    python3 design/build_site.py
+    python3 - <<'EOF'
+    import re, hashlib, base64
+    h = open('site/index.html').read()
+    for m in re.finditer(r'<script(?![^>]*\bsrc=)[^>]*>(.*?)</script>', h, re.S):
+        print('sha256-' + base64.b64encode(hashlib.sha256(m.group(1).encode()).digest()).decode())
+    EOF
 
-Say: "executes the distribution your will or trust specifies", "works with your estate attorney",
-"non-custodial", "proof of life". Never imply legal force, guarantees, replacing a will, detecting death,
-or recovering wallets that were not set up. The sample trust clause must stay labelled "review with counsel".
-Voice per DESIGN.md: calm, declarative, short; no exclamation marks, emoji or hype adjectives.
+and paste the printed value into `site/vercel.json`. The same applies to `dashboard/index.html` and
+`dashboard/vercel.json`. Edits outside that one script (seal, copy, links) do not change the hash.

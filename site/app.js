@@ -1,12 +1,13 @@
 // Dead Man's Wallet landing page. Vanilla JS, no dependencies besides assets/pulse.js (design/pulse.js).
+// No backend: every value here is a plain link. app.js only fills [data-link] anchors.
 const CONFIG = {
-  DASHBOARD_URL: 'https://app.deadmanswallet.dev',   // placeholder
-  DOCS_URL: '#docs',                                  // placeholder
-  ONE_PAGER_URL: '#',                                 // placeholder
-  GITHUB_URL: 'https://github.com/PLACEHOLDER/deadmans-wallet', // placeholder
-  CONTACT: 'mailto:hello@deadmanswallet.dev',         // placeholder
-  WAITLIST_ENDPOINT: 'https://formspree.io/f/PLACEHOLDER' // Formspree-style endpoint (placeholder)
+  DASHBOARD_URL: 'https://app.deadmanswallet.dev',   // the dashboard is deployed separately; see dashboard/README.md
+  DOCS_URL: 'https://github.com/agarretson/deadmans-wallet#readme',
+  ONE_PAGER_URL: 'assets/attorney-one-pager.pdf',
+  GITHUB_URL: 'https://github.com/agarretson/deadmans-wallet',
+  CONTACT: 'https://github.com/agarretson/deadmans-wallet/issues'  // no mailbox exists yet; issues are the contact channel
 };
+
 
 (function () {
   var links = {
@@ -41,34 +42,4 @@ const CONFIG = {
       video.focus();
     });
   }
-
-  var form = document.getElementById('waitlist-form');
-  var status = document.getElementById('form-status');
-  if (!form) return;
-  form.setAttribute('action', CONFIG.WAITLIST_ENDPOINT);
-
-  form.addEventListener('submit', function (e) {
-    e.preventDefault();
-    status.className = 'status';
-    var email = form.elements.email.value.trim();
-    if (form.elements._gotcha.value) { status.textContent = 'You are on the list.'; form.reset(); return; }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      status.className = 'status err';
-      status.textContent = 'Enter a full email address, like you@example.com.';
-      return;
-    }
-    status.textContent = 'Sending.';
-    fetch(CONFIG.WAITLIST_ENDPOINT, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-      body: JSON.stringify({ email: email })
-    }).then(function (r) {
-      if (!r.ok) throw new Error('bad status');
-      status.textContent = 'You are on the list. One email when mainnet opens.';
-      form.reset();
-    }).catch(function () {
-      status.className = 'status err';
-      status.textContent = 'That did not go through. Try again, or email ' + CONFIG.CONTACT.replace('mailto:', '') + '.';
-    });
-  });
 })();

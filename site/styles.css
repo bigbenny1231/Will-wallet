@@ -286,7 +286,7 @@ code { color: var(--bone); background: var(--ink-3); padding: .08em .35em; borde
   .waitlist { padding: 128px 0; }
   .wait-grid { grid-template-columns: repeat(12, 1fr); gap: 0 24px; align-items: end; }
   .wait-grid > div { grid-column: 1 / span 5; }
-  #waitlist-form { grid-column: 7 / span 6; }
+  .wait-cta { grid-column: 7 / span 6; }
 }
 
 /* ---------- footer ---------- */
