@@ -965,14 +965,25 @@ impl Contract {
             return false;
         }
         let owner_changed = owner.as_ref().is_some_and(|o| o != &v.owner_id);
-        if v.stored != StoredState::Live || owner_changed {
-            // Vault triggered, or the Will NFT changed hands, while the key was being
-            // added: the requester no longer controls the vault, so delete it right away.
+        let list_len = match kind {
+            KeyKind::Pulse => v.pulse_keys.len(),
+            KeyKind::Agent => v.agent_keys.len(),
+        };
+        // `add_key` checks the cap against confirmed keys only, so concurrent requests could
+        // overshoot it; the cap is enforced again here (final audit L-12).
+        let over_cap = list_len >= MAX_KEYS_PER_KIND;
+        if v.stored != StoredState::Live || owner_changed || over_cap {
+            // Vault triggered, the Will NFT changed hands, or the kind is full, while the key
+            // was being added: delete it right away. It never served the vault, so its
+            // allowance goes back to the vault (final audit L-11).
             self.key_index.remove(&public_key);
+            v.balance += KEY_ALLOWANCE;
             let why = if owner_changed {
                 "owner changed"
-            } else {
+            } else if v.stored != StoredState::Live {
                 "vault triggered"
+            } else {
+                "too many keys of this kind"
             };
             record(
                 &mut v,
@@ -1352,9 +1363,13 @@ pub(crate) fn validate_heirs(heirs: &[Heir]) {
         !heirs.is_empty() && heirs.len() <= MAX_HEIRS,
         "1..=10 heirs required"
     );
+    let me = env::current_account_id();
     let mut sum: u32 = 0;
     for (i, h) in heirs.iter().enumerate() {
         require!(h.bps > 0, "heir bps must be > 0");
+        // A share sent to the contract lands in the unallocated pool, and a Will NFT owned by
+        // the contract can never be claimed (final audit L-10).
+        require!(h.account_id != me, "heir cannot be the dmw contract");
         require!(
             !heirs[..i].iter().any(|o| o.account_id == h.account_id),
             "duplicate heir"

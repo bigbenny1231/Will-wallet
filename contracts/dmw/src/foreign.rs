@@ -63,11 +63,20 @@ const GAS_FOREIGN_FAIL: Gas = Gas::from_tgas(10);
 pub const MAX_EVM_FEE_PER_GAS: u128 = 100_000_000_000;
 /// Monad testnet fee cap (1000 gwei). Monad's base fee floor is 100 gwei, so the Base cap
 /// would reject every honest Monad step. Monad bills the full gas LIMIT, not gas used, so
-/// the worst case per payout is MAX_EVM_GAS_LIMIT x 1000 gwei = 0.1 MON (review 2, M-5).
+/// the worst case per payout is MAX_EVM_GAS_LIMIT x 1000 gwei = 0.1 MON (review 2, M-5); an
+/// honest step at the 50 000 gas floor (H-5) and 202 gwei pays about 0.01 MON.
 pub const MAX_MONAD_FEE_PER_GAS: u128 = 1_000_000_000_000;
 /// Caller-supplied gas limit range for a native transfer.
 pub const MIN_EVM_GAS_LIMIT: u128 = 21_000;
 pub const MAX_EVM_GAS_LIMIT: u128 = 100_000;
+/// Gas limit the contract actually signs with when the caller asks for less (final audit H-5).
+/// 21 000 is exactly the intrinsic cost of a value transfer, so a recipient with ANY code
+/// (Safe, ERC-4337 smart wallet, EIP-7702-delegated EOA, WETH-like contract) runs out of gas.
+/// The tx is still mined, uses the payout's pinned nonce, and the payout can then never be
+/// signed again: its ETH/MON is stuck in the derived address. 50 000 covers a Safe or smart
+/// wallet `receive` (~26-30k) and a fresh WETH deposit (~45k). Base bills gas used, so a
+/// transfer to an EOA still costs 21 000; Monad bills the limit (50 000 x 202 gwei ~ 0.01 MON).
+pub const EVM_GAS_LIMIT_FLOOR: u128 = 50_000;
 /// Re-signing a `signed`/`broadcast` EVM payout needs both fee fields >= 110% of the last request.
 pub const EVM_FEE_BUMP_PCT: u128 = 110;
 /// Minimum age of the last signature request before a `signed`/`broadcast` payout may be
@@ -107,6 +116,8 @@ pub struct EvmChain {
     /// can then never be signed again and its MON is stuck (SECURITY_REVIEW_2 H-4). With
     /// one payout the address only ever sends one tx (nonce 0), which is always emptying.
     pub max_payouts: usize,
+    /// Smallest gas limit the contract signs with (caller values below it are raised).
+    pub min_gas_limit: u128,
 }
 
 pub const BASE_SEPOLIA: EvmChain = EvmChain {
@@ -116,6 +127,7 @@ pub const BASE_SEPOLIA: EvmChain = EvmChain {
     explorer_tx: "https://sepolia.basescan.org/tx/",
     max_fee_per_gas: MAX_EVM_FEE_PER_GAS,
     max_payouts: crate::MAX_FOREIGN,
+    min_gas_limit: EVM_GAS_LIMIT_FLOOR,
 };
 
 pub const MONAD_TESTNET: EvmChain = EvmChain {
@@ -125,6 +137,7 @@ pub const MONAD_TESTNET: EvmChain = EvmChain {
     explorer_tx: "https://testnet.monadexplorer.com/tx/",
     max_fee_per_gas: MAX_MONAD_FEE_PER_GAS,
     max_payouts: 1,
+    min_gas_limit: EVM_GAS_LIMIT_FLOOR,
 };
 
 impl ForeignChain {
@@ -165,6 +178,7 @@ pub fn chain_registry() -> Vec<serde_json::Value> {
                 "rpc": e.rpc, "explorer_tx": e.explorer_tx,
                 "max_fee_per_gas": U128(e.max_fee_per_gas),
                 "max_payouts": e.max_payouts,
+                "min_gas_limit": U128(e.min_gas_limit),
             }),
             None => json!({
                 "chain": c.as_str(), "kind": "solana", "cluster": "devnet",
@@ -347,6 +361,20 @@ pub fn validate_evm_args(a: &EvmArgs, chain: ForeignChain) {
     );
 }
 
+/// Validate caller EVM params and return them with the contract-chosen nonce and the gas
+/// limit raised to the chain floor (H-5). Used by step 3 and `resign_foreign` alike.
+pub fn effective_evm_args(mut a: EvmArgs, foreign: &[ForeignPayout], index: usize) -> EvmArgs {
+    let chain = foreign[index].chain;
+    validate_evm_args(&a, chain);
+    let floor = chain
+        .evm()
+        .unwrap_or_else(|| env::panic_str("not an evm chain"))
+        .min_gas_limit;
+    a.gas_limit = U128(a.gas_limit.0.max(floor));
+    a.nonce = evm_nonce_for(foreign, index);
+    a
+}
+
 /// The chain's transaction id for a stored `signed_tx`: EVM `0x` + keccak256(raw) (lower
 /// hex), Solana base58 of the first signature. `mark_broadcast` only accepts this value.
 pub fn expected_tx_id(chain: ForeignChain, signed_tx: &str) -> Result<String, String> {
@@ -520,11 +548,10 @@ impl Contract {
         let now = env::block_timestamp_ms();
         match payout.chain {
             ForeignChain::Base | ForeignChain::Monad => {
-                let mut a = args.and_then(|a| a.evm).unwrap_or_else(|| {
+                let a = args.and_then(|a| a.evm).unwrap_or_else(|| {
                     env::panic_str("step 3: args.evm is required for an evm payout")
                 });
-                validate_evm_args(&a, payout.chain);
-                a.nonce = evm_nonce_for(&foreign, index);
+                let a = effective_evm_args(a, &foreign, index);
                 write_track(
                     token_id,
                     index,
@@ -721,10 +748,10 @@ impl Contract {
         let path = derivation_path(payout.chain, id);
         match payout.chain {
             ForeignChain::Base | ForeignChain::Monad => {
-                let mut a = args
+                let a = args
                     .evm
                     .unwrap_or_else(|| env::panic_str("args.evm is required for an evm payout"));
-                validate_evm_args(&a, payout.chain);
+                let a = effective_evm_args(a, &v.foreign, i);
                 if has_sig {
                     require!(
                         a.max_fee_per_gas.0 * 100 >= track.max_fee_per_gas * EVM_FEE_BUMP_PCT
@@ -736,7 +763,6 @@ impl Contract {
                 if payout.status == ForeignStatus::Broadcast {
                     require!(cooled, "resign cooldown: wait 5 min after the last request");
                 }
-                a.nonce = evm_nonce_for(&v.foreign, i);
                 let (t, hash) =
                     evm_transfer_for(&payout, &a).unwrap_or_else(|e| env::panic_str(&e));
                 write_track(

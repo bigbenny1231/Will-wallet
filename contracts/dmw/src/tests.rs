@@ -2088,3 +2088,138 @@ fn m6_heartbeat_and_claim_need_no_deposit() {
     Ctx::new().at(T0 + 6_000).set();
     c.heartbeat(1.into());
 }
+
+// ---------------------------------------------------------------- final audit (docs/AUDIT_FINAL_CONTRACT.md)
+
+/// H-5: a 21 000-gas EVM transfer to an address with code (Safe, smart wallet, 7702 EOA) is mined,
+/// runs out of gas and uses the payout's pinned nonce, so the payout is stuck for good. The
+/// contract now signs with at least `EVM_GAS_LIMIT_FLOOR`, whatever the (permissionless) caller asks.
+#[test]
+fn h5_step3_raises_evm_gas_limit_to_floor() {
+    let mut c = at_step3(vec![base_payout(), base_payout()]);
+    // the keeper's (and any griefer's) 21 000 is raised to 50 000
+    let _ = c.execute_step(1.into(), Some(evm(0, 1_500_000_000, 1_000_000, 21_000)));
+    match pending_slot(0) {
+        foreign::PendingTx::Evm(t) => assert_eq!(t.gas_limit.0, foreign::EVM_GAS_LIMIT_FLOOR),
+        _ => panic!("expected evm"),
+    }
+    Ctx::new().by("dmw.testnet").at(T0 + 41_500).set();
+    assert_eq!(c.on_foreign_signed(1, 0, Ok(mpc_secp_response())), 3);
+    let raw = v(&c).foreign[0].signed_tx.clone().unwrap();
+    // RLP gas field: 0x82 c350 (50 000), not 0x82 5208 (21 000)
+    assert!(raw.contains("82c350"), "{raw}");
+    assert!(!raw.contains("825208"), "{raw}");
+    // a caller value above the floor is kept (still capped at 100 000)
+    Ctx::new().by("keeper.testnet").at(T0 + 42_000).set();
+    let _ = c.execute_step(1.into(), Some(evm(0, 1_500_000_000, 1_000_000, 80_000)));
+    match pending_slot(1) {
+        foreign::PendingTx::Evm(t) => assert_eq!(t.gas_limit.0, 80_000),
+        _ => panic!("expected evm"),
+    }
+}
+
+/// H-5 on the re-sign path and for Monad: the same helper pins nonce and raises gas.
+#[test]
+fn h5_resign_and_monad_use_the_gas_floor() {
+    let payouts = vec![base_payout(), monad_payout()];
+    for (i, chain_nonce) in [(0usize, 0u64), (1, 0)] {
+        Ctx::new().set();
+        let a = foreign::effective_evm_args(
+            EvmArgs {
+                nonce: 77,
+                max_fee_per_gas: U128(1_500_000_000),
+                max_priority_fee_per_gas: U128(1_000_000),
+                gas_limit: U128(21_000),
+            },
+            &payouts,
+            i,
+        );
+        assert_eq!(a.gas_limit.0, 50_000);
+        assert_eq!(a.nonce, chain_nonce);
+    }
+    // resign_foreign goes through the same helper: a bumped re-sign with 21 000 is accepted
+    let mut c = evm_signed();
+    Ctx::new().by("mallory.testnet").at(T0 + 42_000).set();
+    let _ = c.resign_foreign(1.into(), 0, evm(0, 2_000_000_000, 2_000_000, 21_000));
+    assert!(foreign::read_track(1, 0).inflight);
+    // the registry shows the floor
+    let reg = foreign::chain_registry();
+    assert_eq!(reg[0]["min_gas_limit"], "50000");
+    assert_eq!(reg[1]["min_gas_limit"], "50000");
+}
+
+/// L-10: the contract cannot be an heir (its share would join the unallocated pool, and a Will NFT
+/// it owns can never be claimed) nor an `nft_transfer` receiver (any pulse key on the contract
+/// account could then heartbeat the vault forever, since `heartbeat` accepts predecessor == owner).
+#[test]
+fn l10_contract_cannot_be_heir_or_nft_receiver() {
+    let mut c = setup();
+    let bad = vec![
+        Heir {
+            account_id: acc("sarah.testnet"),
+            bps: 5000,
+        },
+        Heir {
+            account_id: contract_id(),
+            bps: 5000,
+        },
+    ];
+    Ctx::new().dep(1).set();
+    let m = panics(|| c.set_heirs(1.into(), bad.clone()));
+    assert!(m.contains("heir cannot be the dmw contract"), "{m}");
+    Ctx::new().dep(STORAGE_FEE).set();
+    let m = panics(|| {
+        c.create_vault(20, 1, bad.clone(), None, None);
+    });
+    assert!(m.contains("heir cannot be the dmw contract"), "{m}");
+    Ctx::new().dep(1).set();
+    let m = panics(|| c.nft_transfer(contract_id(), "1".into(), None, None));
+    assert!(m.contains("receiver cannot be the dmw contract"), "{m}");
+    assert_eq!(v(&c).owner_id, owner());
+}
+
+/// L-11: a key that lands after the vault changed hands (or triggered) is deleted at once; it never
+/// served the vault, so the vault gets its 1 NEAR allowance back.
+#[test]
+fn l11_revoked_key_add_refunds_allowance() {
+    let mut c = setup();
+    let start = v(&c).balance;
+    Ctx::new().dep(1).set();
+    let _ = c.add_agent_key(1.into(), pk(3));
+    assert_eq!(v(&c).balance, start - KEY_ALLOWANCE);
+    Ctx::new().dep(1).set();
+    c.nft_transfer(acc("bob.testnet"), "1".into(), None, None);
+    Ctx::new()
+        .by("dmw.testnet")
+        .set_with_result(PromiseResult::Successful(vec![]));
+    assert!(!c.on_key_added(1, pk(3), KeyKind::Agent, Some(owner())));
+    assert_eq!(v(&c).balance, start, "allowance refunded");
+    assert_eq!(deleted_keys(), vec![pk(3)]);
+}
+
+/// L-12: `add_key` counts confirmed keys only, so requests sent together could overshoot the cap of
+/// 5 per kind. The callback enforces it again: the extra key is deleted and its allowance refunded.
+#[test]
+fn l12_key_cap_enforced_when_add_lands() {
+    let mut c = setup();
+    Ctx::new().dep(20 * NEAR1).set();
+    c.deposit(1.into());
+    let start = v(&c).balance;
+    // six requests before any callback lands: all pass the confirmed-count check
+    for n in 1..=6u8 {
+        Ctx::new().dep(1).set();
+        let _ = c.add_pulse_key(1.into(), pk(n));
+    }
+    assert_eq!(v(&c).balance, start - 6 * KEY_ALLOWANCE);
+    for n in 1..=5u8 {
+        confirm_key(&mut c, pk(n), KeyKind::Pulse);
+    }
+    Ctx::new()
+        .by("dmw.testnet")
+        .set_with_result(PromiseResult::Successful(vec![]));
+    assert!(!c.on_key_added(1, pk(6), KeyKind::Pulse, Some(owner())));
+    assert_eq!(v(&c).pulse_keys.len(), MAX_KEYS_PER_KIND);
+    assert!(!c.key_index.contains_key(&pk(6)));
+    assert_eq!(v(&c).balance, start - 5 * KEY_ALLOWANCE);
+    assert_eq!(deleted_keys(), vec![pk(6)]);
+}

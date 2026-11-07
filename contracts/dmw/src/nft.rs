@@ -348,6 +348,12 @@ impl Contract {
             "will nft is locked once triggered"
         );
         require!(receiver_id != &v.owner_id, "receiver is already the owner");
+        // Owned by the contract, the vault could be kept alive by ANY pulse key on the contract
+        // account (`heartbeat` accepts predecessor == owner) and never settle (final audit L-10).
+        require!(
+            receiver_id != &env::current_account_id(),
+            "receiver cannot be the dmw contract"
+        );
         let prev = v.owner_id.clone();
         self.move_owner(id, &mut v, receiver_id, memo);
         prev
