@@ -10,25 +10,36 @@ jobs:
         env: { GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}" }
   contract:
     runs-on: ubuntu-latest
+    defaults: { run: { working-directory: contracts/dmw } }
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
-        with: { targets: wasm32-unknown-unknown }
+        with: { targets: wasm32-unknown-unknown, components: "rustfmt, clippy" }
       - uses: Swatinem/rust-cache@v2
         with: { workspaces: contracts/dmw }
-      - run: cd contracts/dmw && cargo fmt --check && cargo clippy -- -D warnings && cargo test
-      - run: cd contracts/dmw && cargo build --target wasm32-unknown-unknown --release
+      - run: cargo fmt --check
+      # near-sdk 5.x refuses to compile contract code for the host; lint the wasm build.
+      - run: cargo clippy --locked --target wasm32-unknown-unknown --release -- -D warnings
+      - run: cargo test --locked
+      # build.sh uses cargo-near when present, else plain cargo with --cfg near (the CI path).
+      - run: ./build.sh
   keeper:
     runs-on: ubuntu-latest
+    defaults: { run: { working-directory: keeper } }
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with: { node-version: 22 }
-      - run: cd keeper && npm ci && npm test && npm run build
+        with: { node-version: 22, cache: npm, cache-dependency-path: keeper/package-lock.json }
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
   dashboard:
     runs-on: ubuntu-latest
+    defaults: { run: { working-directory: dashboard } }
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with: { node-version: 22 }
-      - run: cd dashboard && npm ci && npm run build
+        with: { node-version: 22, cache: npm, cache-dependency-path: dashboard/package-lock.json }
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
