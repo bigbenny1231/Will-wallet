@@ -238,7 +238,7 @@ items are documented with their mitigations. Full findings: [`docs/SECURITY_REVI
 | `dashboard/` | Vite + React app: create vault, live Will NFT, agent log, keys, guardian, settlement timeline, heir view, phone pulse (`/pulse`) |
 | `site/` | public landing page |
 | `scripts/` | `near-admin.mjs` (faucet/deploy/call without near-cli), `deploy.sh`, `demo.sh`, `kill.sh`, `check.sh` |
-| `docs/` | Chain Signatures notes, security review, diagrams, attorney one-pager, judge dry runs (`JUDGE_DRY_RUN*.md`) |
+| `docs/` | Chain Signatures notes, security review, diagrams, attorney one-pager, judge dry runs (`JUDGE_DRY_RUN.md`, `_2`, `_3`) |
 | `SPEC.md` | the interface every component was built against |
 
 ## Libraries, templates and AI-generated code
