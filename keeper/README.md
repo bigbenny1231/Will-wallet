@@ -6,7 +6,7 @@ Node 22, TypeScript, run through `tsx` (no build step). Spec: [`SPEC.md`](../SPE
 ```bash
 cd keeper && npm install
 cp .env.example .env        # then fill it in; see the table below
-npm test                    # 38 unit tests, no network
+npm test                    # 44 unit tests, no network
 ```
 
 ## Do X, see Y
@@ -14,7 +14,7 @@ npm test                    # 38 unit tests, no network
 | I want to... | Run | You will see |
 | --- | --- | --- |
 | try everything with no contract | `DMW_MOCK=1 npm run mock -- init --interval 20 --grace 1` | a local vault 1 that is Triggered after 40 s without a beat |
-| keep a vault alive | `npm run pulse -- --token 1 --key ed25519:<pulse key> --interval 10` | `alive · next beat in 7s` every second, `♥ heartbeat sent <nearblocks link>` on each beat |
+| keep a vault alive | `npm run pulse -- --token 1 --key ed25519:<pulse key> --interval 10` | in a terminal, a live `alive · next beat in 7s` countdown; `♥ heartbeat sent <nearblocks link>` on each beat (redirected to a file: only the beat lines, each with the next-beat time) |
 | make the owner disappear | press Ctrl-C in the pulse terminal | `pulse stopped — this is the moment the owner disappears` |
 | run the keeper | `npm run keeper -- --poll 5 [--token 5,6]` | one line per action: `poke`, `step 1/5` ... `step 5/5`, `relay`, `mark`, each with an explorer link |
 | look at a vault | `npm run dmw -- status --token 1` | state, countdown, step, heirs, payouts and the last log lines |

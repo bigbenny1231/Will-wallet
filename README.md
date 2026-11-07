@@ -1,10 +1,11 @@
 # Dead Man's Wallet
 
 **A NEAR contract that executes your estate plan — for humans and for AI agents.**
-While you're alive, a key on your phone sends a heartbeat. If the heartbeats stop, the contract
+While you're alive, a pulse key sends a heartbeat. If the heartbeats stop, the contract
 pays your heirs on NEAR, deletes your AI agent's spending key, has NEAR's MPC network sign payouts
-on Base and Solana, files a proposal in your estate DAO, and hands the Will NFT (which holds the
-funds) to your primary heir. Heirs never touch a seed phrase.
+on Base and Solana (signed; relay pending funding of the derived addresses), files a proposal in your
+estate DAO, and hands the Will NFT (which holds the funds) to your primary heir. Heirs never touch a
+seed phrase.
 
 Built at NEAR Hackathon, Nov 1–14 2026. Tracks: `security` (06 AI Security & Defense), `nfts` (10), `open` (13).
 Testnet only. Not a will, not a custodian, not audited. MIT license.
@@ -12,7 +13,7 @@ Testnet only. Not a will, not a custodian, not audited. MIT license.
 Live contract: [`dmw-x8cx.testnet`](https://testnet.nearblocks.io/address/dmw-x8cx.testnet) ·
 Live keeper run (alive → settled, both foreign payouts signed): [`keeper/LIVE_RUN.md`](keeper/LIVE_RUN.md) ·
 Showcase vault for the demo video: [`keeper/SHOWCASE.md`](keeper/SHOWCASE.md) ·
-Smoke run with 22 explorer links: [`contracts/TESTNET_SMOKE.md`](contracts/TESTNET_SMOKE.md) ·
+Smoke run with 21 transaction links, plus the live Sputnik run: [`contracts/TESTNET_SMOKE.md`](contracts/TESTNET_SMOKE.md) ·
 Chain Signatures proof: [`docs/chainsig-notes.md`](docs/chainsig-notes.md) ·
 Security review: [`docs/SECURITY_REVIEW.md`](docs/SECURITY_REVIEW.md)
 
@@ -23,63 +24,127 @@ incapacitated, the agent keeps spending until it runs dry and anything it held o
 Existing dead-man's switches move a key or a file on one chain. None can disarm an agent or settle an
 estate across chains from one contract.
 
-## Run it in 5 minutes (testnet)
+## Run it in about 10 minutes (testnet)
 
-Prerequisites: Rust (stable) with the `wasm32-unknown-unknown` target, Node 22, and either
-`near-cli-rs` or nothing at all (the scripts fall back to a bundled Node tool). Everything else is
-installed by the scripts. `make check` prints the exact fix for anything missing.
+Prerequisites (`make check` verifies them and prints the fix for anything missing):
+
+- **Required:** git, make, Rust stable with the `wasm32-unknown-unknown` target, Node 22 or newer (with npm),
+  `openssl`, `curl`, and internet access to NEAR testnet and its faucet.
+- **Optional:** `cargo-near` (`cargo install cargo-near --locked`; without it `make build` falls back to plain
+  `cargo build` with `--cfg near`), Docker (only for `make build-reproducible`), near-cli-rs (the scripts do
+  not use it; they sign with `scripts/near-admin.mjs`).
+
+No `.env`, keys or near-cli credentials are needed beforehand. `make deploy` creates them.
 
 ```bash
-git clone <repo> deadmans-wallet && cd deadmans-wallet
-make check          # do: verify toolchain       -> see: "All good."
-make build          # do: build the contract      -> see: contracts/dmw/target/wasm32-unknown-unknown/release/dmw.wasm
-make test           # do: run unit tests          -> see: "test result: ok. 76 passed" (contract) and "38 passed" (keeper)
-make deploy         # do: faucet account + deploy -> see: "deployed dmw-xxxx.testnet", written to .env
-make demo           # do: full live demo          -> see below
+git clone https://github.com/agarretson/deadmans-wallet deadmans-wallet && cd deadmans-wallet
+make check     # verify toolchain   -> "All good." (optional tools only warn)
+make build     # build the contract -> contracts/dmw/target/near/dmw.wasm and its code hash (about 1 min)
+make test      # unit tests         -> contract "76 passed", keeper "44 passed", dashboard "32 passed" (runs npm ci first)
+make deploy    # faucet accounts    -> creates dmw-<rand>.testnet + dmw-keeper-<rand>.testnet, deploys, inits,
+               #                       calls set_keeper, writes .env, ends with "deployed dmw-xxxxxx.testnet"
+make demo      # live demo          -> see below (about 1.5 min)
+make kill      # owner disappears   -> follows the keeper until Settled (about 4 min)
+make stop      # stop the background pulse and keeper
+make status TOKEN=1                 # print a vault at any time
 ```
 
 `make demo` creates faucet accounts (owner, two heirs, an API provider), creates a vault with a 60-second
 heartbeat and grace of 1, adds a **pulse key** (can only call `heartbeat`) and an **agent key** (can only
-call `agent_pay`), runs the agent demo (one payment allowed, one denied with its reason), then starts the
-pulse daemon and the keeper in the background. You will see:
+call `agent_pay`), sets one Base and one Solana payout, runs the agent demo (one payment allowed, one denied
+with its reason), then starts the pulse (one beat every 20 s) and the keeper in the background. Real output
+from a fresh clone (Nov 7 2026):
 
 ```
-vault #N created   https://testnet.nearblocks.io/txns/...
-pulse key added    (scoped to heartbeat)    agent key added (scoped to agent_pay)
-agent_pay ALLOWED  0.3 NEAR -> dmw-api-....testnet
-agent_pay DENIED   over_per_tx_max
-pulse: alive · next beat in 60s
-dashboard: http://localhost:5173/vault/N      (cd dashboard && npm run dev)
+== accounts
+created dmw-demo-sarah-0f54.testnet  key saved to keys/dmw-demo-sarah-0f54.testnet.json
+created dmw-demo-ben-0f54.testnet  key saved to keys/dmw-demo-ben-0f54.testnet.json
+created dmw-demo-api-0f54.testnet  key saved to keys/dmw-demo-api-0f54.testnet.json
+created dmw-demo-owner-6b9c7d.testnet  key saved to keys/dmw-demo-owner-6b9c7d.testnet.json
+== create vault (4 NEAR, 60 s interval, grace 1)
+tx https://testnet.nearblocks.io/txns/8LUGgYnZSA86SUNsdtefh3s3m62AGtFRi4BBV77QVMv8
+  result: "1"
+== keys
+tx https://testnet.nearblocks.io/txns/4yqfrozKfctypAw7DMavhCTuPUAyxhmmA9GgRS1eSCof
+  result: true
+tx https://testnet.nearblocks.io/txns/FkwJKE8RBi95BBUVFxmkvZJsWYUVK17qo4Zms9mJ4LwC
+  result: true
+== pulse started (pid 19765, beats every 20 s) -> .demo/pulse.log
+== foreign payouts (Base 0.0005 ETH, Solana 0.01 SOL)
+tx https://testnet.nearblocks.io/txns/G2fgepEAr4pvMHGyFjAD5AGwxoquMDqNqFjrKWPEDSFo
+  result: (empty)
+  base source   0xB63A674d6a2e83ddfd4D00277Db21A1a4B83B737
+  solana source 2d318Buqm4ESqZxEcSFmc8iyAD4D4tcKnx4EHhgcoAwp
+== agent-demo: one allowed, one denied
+policy: per_tx_max 0.5000 NEAR · daily_max 1.0000 NEAR · allowlist [dmw-demo-api-0f54.testnet]
+
+agent_pay ALLOWED  (small, allowlisted)  0.0500 NEAR → dmw-demo-api-0f54.testnet
+  result {"allowed":true,"reason":null,...}  https://testnet.nearblocks.io/txns/BKkdFwQxbx8beSXGee7ngedZooqtX74f2V1AAaRM4kGV
+  event agent_pay_allowed  to dmw-demo-api-0f54.testnet · 0.0500 NEAR
+
+agent_pay DENIED   (unknown receiver, over per_tx_max)  1.0000 NEAR → stranger-d294ada7.testnet
+  result {"allowed":false,"reason":"receiver_not_allowlisted",...}  https://testnet.nearblocks.io/txns/2HaoNGawdxervRwF9i1kShccL3JZrqKXwdCbcWDzAKrt
+  event agent_pay_denied  to stranger-d294ada7.testnet · 1.0000 NEAR · reason=receiver_not_allowlisted
+== keeper started (pid 19967) -> .demo/keeper.log
+
+  vault id      1   (owner dmw-demo-owner-6b9c7d.testnet, heirs dmw-demo-sarah-0f54.testnet / dmw-demo-ben-0f54.testnet)
+  dashboard     http://localhost:5173/vault/1   (cd dashboard && npm ci && npm run dev; dashboard/.env.local points it at dmw-c17cf5.testnet)
+  explorer      https://testnet.nearblocks.io/address/dmw-c17cf5.testnet
+  watch         tail -f .demo/pulse.log   |   tail -f .demo/keeper.log   |   make status
+
+  Vault is alive and beating. When you are ready:   make kill    (afterwards: make stop)
 ```
 
-Then:
+(The two `result {...}` lines are shortened here; the script prints the whole object.) The denied payment
+is a successful transaction that returns `allowed: false` and logs the reason. `.demo/pulse.log` gets one line
+per beat: `♥ heartbeat sent https://testnet.nearblocks.io/txns/... · alive · next beat in 8s`.
 
-```bash
-make kill           # do: stop the pulse = the owner disappears
-```
-
-and watch the keeper log (`.demo/keeper.log`) go:
+`make kill` stops the pulse and follows `.demo/keeper.log`. Poke becomes legal 120 s after the last beat:
 
 ```
-poke        vault N -> Triggered, bounty paid      https://testnet.nearblocks.io/txns/...
-step 1      heirs paid: dmw-sarah 1.29 NEAR, dmw-ben 0.86 NEAR
-step 2      pulse + agent keys deleted from dmw-xxxx.testnet
-step 3      Base Sepolia tx signed by v1.signer-prod.testnet  (relay needs the derived address funded)
-step 3      Solana devnet tx signed by v1.signer-prod.testnet
-step 4      Sputnik proposal #id   (skipped if no DAO set)
-step 5      Will NFT -> primary heir, state Settled
+owner is gone — watch the keeper
+vault 1: last beat just landed; poke becomes legal after 2 missed intervals (~2 min)
+
+11:20:01 state     vault 1: Alive → Warning
+11:21:12 poke      vault 1 → Triggered  https://testnet.nearblocks.io/txns/665iNvYyvxyxjyW1vqp6YeTpdWYiWTaRpp2MAbjLsPud
+11:21:15 state     vault 1: Warning → Triggered
+11:21:28 step      vault 1 step 1/5  https://testnet.nearblocks.io/txns/Fb9V1jYPKMSdQ9APanhEWConLSi7ygdFwuufAktGDaXS
+11:21:43 step      vault 1 step 2/5  https://testnet.nearblocks.io/txns/F5KprVfTy8ZLktHWSJsDnaJyNW8Nbf5Qp6SVMk7WV3Pe
+11:22:02 step      vault 1 step 3/5 (base #0)  https://testnet.nearblocks.io/txns/F2uMDcg5fAyRbsdU8yMwuULwqFcEgYFvg4QxfAtTFtoi
+11:22:05 relay     vault 1 payout #0 base NOT broadcast: source 0xB63A674d6a2e83ddfd4D00277Db21A1a4B83B737 is unfunded (eth_sendRawTransaction: insufficient funds for gas * price + value: have 0 want 500231000000000 (-32003)). Status stays signed; fund it and the keeper will relay. Retry in 60s
+11:22:22 step      vault 1 step 3/5 (solana #1)  https://testnet.nearblocks.io/txns/nT3ENivoC1kVkUpugp4HUwXueBu4rKGQYGenuQWbUcV
+11:22:28 relay     vault 1 payout #1 solana NOT broadcast: source 2d318Buqm4ESqZxEcSFmc8iyAD4D4tcKnx4EHhgcoAwp is unfunded (sendTransaction: Transaction simulation failed: Attempt to debit an account but found no record of a prior credit. "AccountNotFound"). Status stays signed; fund it and the keeper will relay. Retry in 60s
+11:22:40 step      vault 1 step 4/5  https://testnet.nearblocks.io/txns/6jwJ8MQcimuWgKRT35Wc1xXfciseGrzXweGvPyjuLpdG
+11:22:55 step      vault 1 step 5/5  https://testnet.nearblocks.io/txns/ciBauL3NNSRRW68UbNn1eex48y38RyVu6oAaZwWykp4
+11:22:58 state     vault 1: Triggered → Settled
+
+Settled. The keeper keeps running to retry any unfunded relay: stop it with  make stop
+vault 1  Settled
+  owner dmw-demo-sarah-0f54.testnet · interval 60s grace 1 · balance 0.1000 NEAR · step 5/5 · keys 0 pulse, 0 agent
+  heirs dmw-demo-sarah-0f54.testnet 60%, dmw-demo-ben-0f54.testnet 40%
+  payout #0 base 500000000000000 → 0xcA024adC7cac111339Fe077C739F8085aE705F2F · signed
+  payout #1 solana 10000000 → CFdWXa1ean7bBoewSv2SZESrDpWSxeoN1hfLrqaqZQUr · signed
+  ...
+  11:22:39 step_4 no dao; skipped
+  11:22:54 step_5 will nft -> dmw-demo-sarah-0f54.testnet
+  11:22:54 settled dmw-demo-sarah-0f54.testnet
 ```
 
-`make status TOKEN=N` prints the vault at any time. No wallet extension is needed for any of this.
+Step 1 paid the heirs 60/40 (1.08 / 0.72 NEAR here), step 2 deleted the pulse and agent keys, step 3 had
+`v1.signer-prod.testnet` sign both foreign transactions (they stay `signed` until someone funds the derived
+source addresses; the faucets need a human login), and step 4 is skipped because this vault has no DAO
+(see below for a vault that has one). Keeper times are UTC. No wallet extension is needed for any of this.
 
 ## What you can check without running anything
 
 | Claim | Where to look |
 | --- | --- |
-| The pulse key can only call `heartbeat`, the agent key only `agent_pay` | `view_access_key_list dmw-x8cx.testnet` — `FunctionCall` permission, `method_names` |
+| The pulse key can only call `heartbeat`, the agent key only `agent_pay` | your own `make demo` contract: `node scripts/near-admin.mjs keys <contract>` shows `FunctionCall` keys with `method_names` `["heartbeat"]` / `["agent_pay"]`. On `dmw-x8cx.testnet` every vault is settled or keyless now, so it holds only the deployer's FullAccess key |
 | Denied agent payments are logged, not reverted | `agent_pay` returns `{allowed:false, reason}`; the tx succeeds; see TESTNET_SMOKE.md item 5 |
 | Settlement deletes the keys | TESTNET_SMOKE.md item 8, key list before/after |
-| The contract itself requests MPC signatures | `docs/chainsig-notes.md`: NEAR txs where `dmw` calls `v1.signer-prod.testnet.sign`, with `ecrecover` matching the derived Base address |
+| The contract itself requests MPC signatures | `docs/chainsig-notes.md`: NEAR txs where `dmw` calls `v1.signer-prod.testnet.sign`. The probe contract `ecrecover`s the Base signature on-chain to the derived address; for `dmw` the signed Base tx recovers off-chain (viem) to the derived address |
+| Step 4 files and ratifies a Sputnik proposal | TESTNET_SMOKE.md, last section: vault 10 on `dmw-x8cx.testnet`, [`add_proposal` from the contract](https://testnet.nearblocks.io/txns/FAzezve68HDjUDsNzsb8qV7KnE6SNE8kVap6S5Hmkd6e), proposal 0 on `estate-82bd1f.sputnik-v2.testnet`, [approved and executed](https://testnet.nearblocks.io/txns/5y9hspPGwhmzfU2ivNggFQhPrTaHtznqpaB5dNcfBgeB) |
+| The live contract is this source | `contract_source_metadata` on `dmw-x8cx.testnet` returns `link` and `build_info`; `git checkout 88cd83b && make build-reproducible` (Docker) prints code hash `G6eiYJj6gkVt4QaJPHYBQz4eov4fU5ihwsUFqSog25hM`, the same as `view_account`. A plain `make build` uses your local toolchain, so its hash differs |
 | The Will NFT holds funds and redraws itself | `nft_token {"token_id":"4"}` → `media` is an on-chain SVG data URI (grey, Settled) |
 
 ## How NEAR fits (and why this can't be built elsewhere)
@@ -95,7 +160,8 @@ step 5      Will NFT -> primary heir, state Settled
   with `omni-transaction`.
 - **NEP-171 + on-chain SVG.** The will is a token the contract owns the balance of; its image is
   computed from state (green / amber / red / grey) at read time.
-- **Sputnik DAO.** Step 4 files a `FunctionCall` proposal in the estate's DAO so a council can ratify.
+- **Sputnik DAO.** Step 4 files a `FunctionCall` proposal in the estate's DAO so a council can ratify. Run live
+  once on testnet (vault 10, proposal 0 on `estate-82bd1f.sputnik-v2.testnet`). Ratifying only records an event.
 - **Permissionless keepers.** `poke` and `execute_step` are callable by anyone and pay a bounty; the
   keeper only supplies nonce/gas/blockhash for foreign chains, never destinations or amounts.
 
@@ -109,6 +175,10 @@ step 5      Will NFT -> primary heir, state Settled
 | Anyone / keeper | `poke` after the deadline, `execute_step`, relay signed foreign txs, `mark_broadcast` | change heirs, amounts, destinations; block settlement |
 | Estate DAO | execute the ratification call the proposal names | anything else on the vault |
 | Contract | hold the plan, request MPC signatures, delete its own keys | sign for a foreign chain before `Triggered` |
+| Contract FullAccess key (deployer) | redeploy the code, and so move any vault's funds | — this is a testnet trust assumption ([SECURITY_REVIEW](docs/SECURITY_REVIEW.md) I-1). Mainnet: remove the key or gate upgrades behind a DAO |
+
+"Neither can touch the plan" in the section above holds for pulse and agent keys. It does not hold against the
+deployer key until that key is removed.
 
 An independent review (a separate agent that had not seen the code) found 1 Critical, 3 High, 4 Medium, 6 Low: a
 double-payout path on foreign chains via caller-chosen nonces, fake `mark_broadcast` hashes, unbounded EVM gas, and
@@ -124,8 +194,8 @@ items are documented with their mitigations. Full findings: [`docs/SECURITY_REVI
 | `keeper/` | TypeScript CLI: `pulse`, `keeper`, `agent-demo`, `derive`, `dao create`; `src/chains/` for Base/Solana |
 | `dashboard/` | Vite + React app: create vault, live Will NFT, agent log, keys, settlement timeline, heir view |
 | `site/` | public landing page |
-| `scripts/` | `near-admin.mjs` (faucet/deploy/call without near-cli), `demo.sh`, `kill.sh`, `deploy.sh` |
-| `docs/` | Chain Signatures notes, security review |
+| `scripts/` | `near-admin.mjs` (faucet/deploy/call without near-cli), `deploy.sh`, `demo.sh`, `kill.sh`, `check.sh` |
+| `docs/` | Chain Signatures notes, security review, judge dry runs (`JUDGE_DRY_RUN.md`, `JUDGE_DRY_RUN_2.md`) |
 | `SPEC.md` | the interface every component was built against |
 
 ## Libraries, templates and AI-generated code
@@ -133,17 +203,20 @@ items are documented with their mitigations. Full findings: [`docs/SECURITY_REVI
 near-sdk-rs 5, near-contract-standards, omni-transaction 0.5, near-api-js 6, chainsig.js (derivation
 reference), wallet-selector 10, Vite, React, Tailwind, vitest. No template was used.
 Most of the code was written by Claude (Anthropic) under the direction of Andrew Garretson, who set the
-product, architecture decisions and reviews; all of it was written in the hackathon window
-(repo created Nov 7 2026). Baseline code: none. Tag `hackathon-submission` marks the submitted tree.
+product, architecture decisions and reviews; all of it was written in the hackathon window. The work was
+done in a scratch workspace during the hackathon and committed to this repo in sequence on Nov 7 2026, which
+is why the history is short. Baseline code: none. We will mark the submitted tree with the tag
+`hackathon-submission`.
 The author leads no other hackathon project.
 
 ## Limits and what's next
 
-- Testnet only; two foreign chains; relaying needs the derived addresses funded (faucets require a human).
+- Testnet only; two foreign chains. Foreign payouts are signed by the MPC network, but none has been relayed yet:
+  relaying needs the derived source addresses funded, and the faucets require a human login.
 - Not a legal instrument. The product configures alongside a will or trust; see the FAQ on the site.
 - Next: guardian pause, owner notifications at `Warning`, trust-owned vaults, heir sign-in with NEAR Auth
   (Google), Shade Agent attestation for the heartbeat, audit, mainnet.
 
 ## License
 
-MIT — see `LICENSE`. Security contact: see `SECURITY.md`.
+MIT — see `LICENSE`. Security contact: security@deadmanswallet.dev or GitHub issues on this repo (details in `SECURITY.md`).
