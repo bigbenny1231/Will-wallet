@@ -941,3 +941,27 @@ fn resign_rejects_unprocessed_payout() {
     let mut c = at_step3(vec![base_payout()]);
     let _ = c.resign_foreign(1.into(), 0, base_args());
 }
+
+#[test]
+fn constants_are_in_yocto() {
+    assert_eq!(STORAGE_FEE, 100_000_000_000_000_000_000_000); // 0.1 NEAR
+    assert_eq!(KEY_ALLOWANCE, 1_000_000_000_000_000_000_000_000); // 1 NEAR
+    assert_eq!(DEFAULT_BOUNTY, 10_000_000_000_000_000_000_000); // 0.01 NEAR
+    assert_eq!(RESERVE_NO_DAO, 100_000_000_000_000_000_000_000);
+    assert_eq!(RESERVE_WITH_DAO, 1_500_000_000_000_000_000_000_000);
+    assert_eq!(DAO_BOND, NEAR1);
+}
+
+#[test]
+fn step1_detail_lists_heir_amounts() {
+    assert_eq!(fmt_near(NEAR1), "1");
+    assert_eq!(fmt_near(5_340_000_000_000_000_000_000_000), "5.34");
+    assert_eq!(fmt_near(1), "0.000000000000000000000001");
+    let mut c = setup();
+    trigger(&mut c);
+    Ctx::new().by("keeper.testnet").at(T0 + 41_000).set();
+    let _ = c.execute_step(1.into(), None);
+    // balance 10 - 0.01 bounty = 9.99; minus 0.1 reserve = 9.89 distributable
+    let d = v(&c).log.last().unwrap().detail.clone();
+    assert_eq!(d, "sarah.testnet 5.934 NEAR, tom.testnet 3.956 NEAR");
+}

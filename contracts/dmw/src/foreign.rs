@@ -214,7 +214,7 @@ pub fn assemble_signed(pending: &PendingTx, response: &serde_json::Value) -> Res
             sig64.copy_from_slice(&signature);
             let mut pk = [0u8; 32];
             pk.copy_from_slice(&near_sdk::bs58::decode(&t.from).into_vec().map_err(|e| e.to_string())?);
-            if !env::ed25519_verify(&sig64, &solana_message(&tx), &pk) {
+            if !env::ed25519_verify(&sig64, solana_message(&tx), &pk) {
                 return Err("ed25519 signature does not verify".into());
             }
             let raw = solana_assemble(&tx, &signature)?;

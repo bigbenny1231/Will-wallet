@@ -23,8 +23,9 @@ pub use types::*;
 // Constants
 // ---------------------------------------------------------------------------
 
+/// `milli` thousandths of a NEAR, in yoctoNEAR (1 milliNEAR = 10^21 yocto).
 const fn near(milli: u128) -> u128 {
-    milli * 1_000_000_000_000_000_000_000 / 1000
+    milli * 1_000_000_000_000_000_000_000
 }
 
 /// Flat storage fee taken from the `create_vault` deposit (SPEC §2.3).
@@ -32,7 +33,7 @@ pub const STORAGE_FEE: u128 = near(100); // 0.1 NEAR
 /// Default poke bounty when `create_vault` omits it.
 pub const DEFAULT_BOUNTY: u128 = near(10); // 0.01 NEAR
 /// Gas allowance of every pulse/agent function-call key (paid by the contract account).
-pub const KEY_ALLOWANCE: u128 = near(250); // 0.25 NEAR
+pub const KEY_ALLOWANCE: u128 = near(1000); // 1 NEAR (~90 heartbeats at 10 TGas)
 /// Step-1 reserve kept in the vault when a DAO is set (1 NEAR bond + gas).
 pub const RESERVE_WITH_DAO: u128 = near(1500);
 /// Step-1 reserve kept in the vault without a DAO.
@@ -45,7 +46,7 @@ pub const MAX_KEYS_PER_KIND: usize = 5;
 pub const MAX_FOREIGN: usize = 4;
 pub const MAX_ALLOWLIST: usize = 10;
 pub const MAX_LOG: usize = 40;
-pub const MAX_DETAIL: usize = 120;
+pub const MAX_DETAIL: usize = 400;
 pub const MIN_INTERVAL_S: u64 = 10;
 pub const MAX_INTERVAL_S: u64 = 10 * 365 * 24 * 3600;
 pub const MAX_GRACE: u32 = 1000;
@@ -419,7 +420,13 @@ impl Contract {
                     "payouts": payouts.iter().map(|(a, amt)| json!({"account_id": a, "amount": yocto(*amt)})).collect::<Vec<_>>(),
                     "reserve": yocto(v.balance),
                 });
-                record(&mut v, id, "step_1", &format!("{} heirs paid {paid_total}", payouts.len()), data);
+                // Dashboard heir page parses "<account> <amount> NEAR" items.
+                let detail = payouts
+                    .iter()
+                    .map(|(a, amt)| format!("{a} {} NEAR", fmt_near(*amt)))
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                record(&mut v, id, "step_1", &detail, data);
                 self.vaults.insert(&id, &v);
                 for (acc, amt) in payouts {
                     self.transfer_with_refund(id, &acc, amt, "heir");
@@ -713,7 +720,7 @@ impl Contract {
         };
         require!(list.len() < MAX_KEYS_PER_KIND, "too many keys of this kind (max 5)");
         require!(!self.key_index.contains_key(&pk), "public key already registered");
-        require!(v.balance >= KEY_ALLOWANCE, "vault balance must cover the 0.25 NEAR key gas allowance");
+        require!(v.balance >= KEY_ALLOWANCE, "vault balance must cover the 1 NEAR key gas allowance");
         v.balance -= KEY_ALLOWANCE;
         self.key_index.insert(&pk, &id);
         let pk_str = String::from(&pk);
@@ -833,6 +840,18 @@ pub(crate) fn record(v: &mut Vault, _id: u64, event: &str, detail: &str, data: s
         v.log.drain(..excess);
     }
     emit(event, data);
+}
+
+/// Exact decimal NEAR string from yoctoNEAR, trailing zeros trimmed ("5.34", "1").
+pub(crate) fn fmt_near(yocto: u128) -> String {
+    const ONE: u128 = 1_000_000_000_000_000_000_000_000;
+    let whole = yocto / ONE;
+    let frac = yocto % ONE;
+    if frac == 0 {
+        return whole.to_string();
+    }
+    let f = format!("{frac:024}");
+    format!("{whole}.{}", f.trim_end_matches('0'))
 }
 
 fn truncate(s: &str, max: usize) -> String {
