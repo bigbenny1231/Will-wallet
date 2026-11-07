@@ -1,7 +1,8 @@
 # Shared helpers for scripts/*.sh (sourced, not run). Expects the cwd to be the repo root.
 
-say() { printf '\033[1m== %s\033[0m\n' "$*"; }
-die() { printf '\033[31merror: %s\033[0m\n' "$*" >&2; exit 1; }
+if [ -t 1 ]; then B=$'\033[1m' R=$'\033[31m' N=$'\033[0m'; else B='' R='' N=''; fi
+say() { printf '%s== %s%s\n' "$B" "$*" "$N"; }
+die() { printf '%serror: %s%s\n' "$R" "$*" "$N" >&2; exit 1; }
 
 load_env() { if [ -f .env ]; then set -a; . ./.env; set +a; fi; }
 

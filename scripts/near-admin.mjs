@@ -57,13 +57,13 @@ try {
     const acc = account(a[0]);
     const r = await acc.deployContract(readFileSync(a[1]));
     show(r);
-    if (a[2]) show(await acc.callFunction({ contractId: a[0], methodName: 'new', args: JSON.parse(a[2]), gas: tgas(100) }));
+    if (a[2]) show(await acc.callFunctionRaw({ contractId: a[0], methodName: 'new', args: JSON.parse(a[2]), gas: tgas(100) }));
   } else if (cmd === 'call') {
     const acc = account(a[0]);
-    show(await acc.callFunction({ contractId: a[1], methodName: a[2], args: JSON.parse(a[3] || '{}'), gas: tgas(a[4] || 100), deposit: a[5] ? toYocto(a[5]) : 0n }));
+    show(await acc.callFunctionRaw({ contractId: a[1], methodName: a[2], args: JSON.parse(a[3] || '{}'), gas: tgas(a[4] || 100), deposit: a[5] ? toYocto(a[5]) : 0n }));
   } else if (cmd === 'call-with-key') {
     const acc = account(a[0], a[1]);
-    show(await acc.callFunction({ contractId: a[2], methodName: a[3], args: JSON.parse(a[4] || '{}'), gas: tgas(a[5] || 100) }));
+    show(await acc.callFunctionRaw({ contractId: a[2], methodName: a[3], args: JSON.parse(a[4] || '{}'), gas: tgas(a[5] || 100) }));
   } else if (cmd === 'view') {
     const r = await provider.callFunction(a[0], a[1], JSON.parse(a[2] || '{}'));
     console.log(JSON.stringify(r, null, 2));

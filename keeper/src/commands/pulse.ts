@@ -1,6 +1,6 @@
 import pc from 'picocolors';
 import type { Backend } from '../backend.js';
-import { nextBeatAt, pulseLine, toMs } from '../machine.js';
+import { nextBeatAt, pulseLine } from '../machine.js';
 import { errMsg, nearTxLink } from '../util.js';
 
 export const PULSE_STOPPED = 'pulse stopped — this is the moment the owner disappears';
@@ -80,7 +80,7 @@ export function startPulse(o: PulseOpts): { stop: () => void; done: Promise<void
 
 export async function pulseCommand(o: PulseOpts & { signalTarget?: NodeJS.Process }): Promise<void> {
   const proc = o.signalTarget ?? process;
-  const header = `pulse · vault ${o.tokenId} · beat every ${o.intervalS}s (${toMs(o.intervalS) / 1000}s) · backend ${o.backend.label}`;
+  const header = `pulse · vault ${o.tokenId} · beat every ${o.intervalS}s · backend ${o.backend.label}`;
   (o.out ?? process.stdout).write(pc.dim(header) + '\n');
   const p = startPulse(o);
   proc.once('SIGINT', p.stop);
