@@ -125,7 +125,24 @@ Probe account: **`dmw-sig-4e3b1c65.testnet`**. Deploy tx `BLpNeyhZfu8MBkXsSeZx34
      prepaid-gas '300 Tgas' attached-deposit '0 NEAR' sign-as <you>.testnet network-config testnet sign-with-keychain send
    # then sendTransaction(result.raw_tx_base64, {encoding:"base64"}) within ~60 s of the blockhash
    ```
-   Or, with keeper deps installed: `npx tsx keeper/src/chains/demo-broadcast.ts` (see keeper/src/chains/README.md).
+   Relay helpers: `broadcastEvm` / `broadcastSolana` in keeper/src/chains (see its README).
+
+## 5. Integrated `dmw` step 3, live on testnet
+
+Fresh account **`dmw-sig-e2e-682b6f.testnet`** running the dmw wasm from commit 754f2a7 (deploy
+`EDarUoRCeBo5LbPDfnb3hWEBQ6h4E24wYEmvWBFoo6mB`). Vault 1: 10 s interval, one Base and one Solana payout.
+
+| Step | NEAR tx | Result |
+| --- | --- | --- |
+| create_vault | `GRuTaUFY8LAnWJFJ2Q11GaXE53yG8Ntuij4jQdPwqHFc` | token 1 |
+| set_foreign_payouts | `CZJpfVAc9svKQbKkHnKMpX2PJtcesn8cHvpM7tMX2ZfG` | base 1e12 wei → 0x…dEaD, solana 1e6 lamports → 8opHz… |
+| poke | `BNGWEhWrkdYDSDb9mWj3xW2B5Xr47NjNjn2UdBVYBHdc` | Triggered |
+| step 1 / 2 | `NJVPmbQY6GB2ysEDzH2W8sgbXjdEi3tS2791oMJB1nA` / `2bZek3xLdaVVwe3gYFPTW8pGCVYtgj56QaS1Tx7Bw8p3` | 2 → 3 |
+| step 3 (base) | [`B8zjGvUPVqG9C1U8KCy6EHnHFAtLQK5m876Xzz71Mqrh`](https://testnet.nearblocks.io/txns/B8zjGvUPVqG9C1U8KCy6EHnHFAtLQK5m876Xzz71Mqrh) | signed, tx hash `0x50d5516f…affba0`; viem recovers `0xc05C89fED9b63D5f660bDa663bdcbcB076b00c66` = derived `base-1` |
+| step 3 (solana) | [`AMM8psyeUa6iwJcic19uLYaNAUSbC5Ndrcig7YhzZYJe`](https://testnet.nearblocks.io/txns/AMM8psyeUa6iwJcic19uLYaNAUSbC5Ndrcig7YhzZYJe) | signed (contract ed25519-verified), sig `5UspfruU…18BAV` from `F3aZH8hbAoUUeZYVJjSWK8iT9inscvPjKMPQ9L9xsqCQ` |
+| step 4 / 5 | `3tUAXfhvXBFnARSBcbpRnoU5t6h3B6Zc3Dp3Sbmjsuuj` / `FTXuMgoDbhge3pwtSkGjkpHTjvXvMCTBvvhxiD2SYE52` | Settled |
+
+Base relay → `insufficient funds … have 0 want 1231000000000`: the signature is valid and the source is unfunded.
 
 Explorers: https://sepolia.basescan.org/address/0xcA024adC7cac111339Fe077C739F8085aE705F2F ·
 https://explorer.solana.com/address/CFdWXa1ean7bBoewSv2SZESrDpWSxeoN1hfLrqaqZQUr?cluster=devnet
