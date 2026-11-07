@@ -1,0 +1,151 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 780" width="1000" height="780" role="img" aria-labelledby="t d">
+<title id="t">Dead Man's Wallet architecture</title>
+<desc id="d">Pulse key, agent key, owner and keeper act on the dmw contract (vault, policy, step machine, Will NFT). Five settlement steps produce NEAR payouts to heirs, key deletion, MPC signatures for Base, Solana and Monad, a Sputnik DAO proposal and the Will NFT going to the primary heir.</desc>
+<style>/*STYLE*/</style>
+<defs>
+<marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 1 L9 5 L0 9" fill="none" stroke="#C8A96A" stroke-width="1.5"/></marker>
+<marker id="ahg" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 1 L9 5 L0 9" fill="none" stroke="#A9A399" stroke-width="1.5"/></marker>
+</defs>
+<rect width="1000" height="780" fill="#0B0C0F"/>
+
+<text x="30" y="58" class="title">Architecture, <tspan class="it">one contract</tspan></text>
+<text x="30" y="84" class="b2">Keys with narrow powers on the left. A resumable five-step settlement on the right. No key for the foreign chains exists until the trigger.</text>
+<line x1="30" y1="100" x2="970" y2="100" class="hair"/>
+
+<text x="30" y="126" class="lab">WHO CAN ACT</text>
+<text x="330" y="126" class="lab">CONTRACT  dmw-x8cx.testnet</text>
+<text x="760" y="126" class="lab">WHAT IT SETTLES</text>
+
+<!-- actors -->
+<g>
+ <rect x="30" y="172" width="220" height="96" class="panel" rx="4"/><rect x="30" y="172" width="3" height="96" fill="#C8A96A"/>
+ <text x="48" y="200" class="h">Owner</text>
+ <text x="48" y="222" class="m mb">NFT holder</text>
+ <text x="48" y="245" class="sm">edits plan, keys and timing</text>
+ <text x="48" y="262" class="sm">while Alive or Warning</text>
+
+ <rect x="30" y="282" width="220" height="96" class="panel" rx="4"/><rect x="30" y="282" width="3" height="96" fill="#F5B942"/>
+ <text x="48" y="310" class="h">Agent key</text>
+ <text x="48" y="332" class="m mb">agent_pay only</text>
+ <text x="48" y="355" class="sm">inside per-tx cap, daily cap,</text>
+ <text x="48" y="372" class="sm">allowlist. Alive only</text>
+
+ <rect x="30" y="392" width="220" height="88" class="panel" rx="4"/><rect x="30" y="392" width="3" height="88" fill="#3DDC84"/>
+ <text x="48" y="420" class="h">Pulse key</text>
+ <text x="48" y="442" class="m mb">heartbeat only</text>
+ <text x="48" y="465" class="sm">phone or agent loop, 10 TGas</text>
+
+ <rect x="30" y="494" width="220" height="96" class="panel" rx="4"/><rect x="30" y="494" width="3" height="96" fill="#A9A399"/>
+ <text x="48" y="522" class="h">Keeper, or anyone</text>
+ <text x="48" y="544" class="m mb">poke · execute_step</text>
+ <text x="48" y="567" class="sm">relays signed txs and hashes.</text>
+ <text x="48" y="584" class="sm">Bounty only. Cannot pick payees</text>
+</g>
+
+<!-- contract container -->
+<rect x="330" y="142" width="360" height="520" class="hairb" rx="4"/>
+<g>
+ <rect x="350" y="172" width="320" height="96" class="panel" rx="4"/>
+ <text x="366" y="200" class="h">Vault</text>
+ <text x="366" y="224" class="sm">heirs in basis points, foreign payouts,</text>
+ <text x="366" y="242" class="sm">balance, bounty, pulse and agent keys</text>
+ <text x="654" y="200" class="m mg" text-anchor="end">token_id</text>
+
+ <rect x="350" y="282" width="320" height="96" class="panel" rx="4"/>
+ <text x="366" y="310" class="h">Policy</text>
+ <text x="366" y="334" class="sm">per_tx_max · daily_max · allowlist.</text>
+ <text x="366" y="352" class="sm">A denial returns a reason and is logged,</text>
+ <text x="366" y="369" class="sm">it does not revert</text>
+
+ <rect x="350" y="392" width="320" height="150" class="panel" rx="4"/>
+ <text x="366" y="420" class="h">State and step machine</text>
+ <g class="m">
+  <circle cx="374" cy="446" r="4.5" class="c-life"/><text x="384" y="450" class="mg">Alive</text>
+  <circle cx="434" cy="446" r="4.5" class="c-warn"/><text x="444" y="450" class="mg">Warning</text>
+  <circle cx="510" cy="446" r="4.5" class="c-dead"/><text x="520" y="450" class="mg">Triggered</text>
+  <circle cx="602" cy="446" r="4.5" class="c-still"/><text x="612" y="450" class="mg">Settled</text>
+ </g>
+ <text x="366" y="474" class="sm">Triggered by poke, Settled after step V.</text>
+ <text x="366" y="491" class="sm">Every execute_step call does one unit of work.</text>
+ <g>
+  <line x1="378" y1="518" x2="642" y2="518" class="hair"/>
+  <g class="m">
+   <circle cx="378" cy="518" r="11" fill="#0B0C0F" stroke="#C8A96A"/><text x="378" y="522" text-anchor="middle" class="mb">I</text>
+   <circle cx="444" cy="518" r="11" fill="#0B0C0F" stroke="#C8A96A"/><text x="444" y="522" text-anchor="middle" class="mb">II</text>
+   <circle cx="510" cy="518" r="11" fill="#0B0C0F" stroke="#C8A96A"/><text x="510" y="522" text-anchor="middle" class="mb">III</text>
+   <circle cx="576" cy="518" r="11" fill="#0B0C0F" stroke="#C8A96A"/><text x="576" y="522" text-anchor="middle" class="mb">IV</text>
+   <circle cx="642" cy="518" r="11" fill="#0B0C0F" stroke="#C8A96A"/><text x="642" y="522" text-anchor="middle" class="mb">V</text>
+  </g>
+ </g>
+
+ <rect x="350" y="556" width="320" height="86" class="panel" rx="4"/>
+ <text x="366" y="584" class="h">Will NFT <tspan class="it">(NEP-171)</tspan></text>
+ <text x="366" y="608" class="sm">owns the vault balance. Its image is an</text>
+ <text x="366" y="625" class="sm">on-chain SVG seal, redrawn from state</text>
+</g>
+
+<!-- left arrows into the contract -->
+<g class="arrow" marker-end="url(#ah)">
+ <path d="M250 220 H348" marker-end="url(#ah)"/>
+ <path d="M250 330 H348" marker-end="url(#ah)"/>
+ <path d="M250 436 H348" marker-end="url(#ah)"/>
+ <path d="M250 520 H348" marker-end="url(#ah)"/>
+</g>
+
+<!-- right: outputs -->
+<g>
+ <rect x="760" y="156" width="220" height="70" class="panel" rx="4"/>
+ <text x="776" y="184" class="h">NEAR heirs</text>
+ <text x="776" y="206" class="sm">balance split by basis points</text>
+
+ <rect x="760" y="238" width="220" height="70" class="panel" rx="4"/>
+ <text x="776" y="266" class="h">Delete keys</text>
+ <text x="776" y="288" class="sm">every pulse and agent key</text>
+
+ <rect x="760" y="320" width="220" height="176" class="panel" rx="4"/>
+ <text x="776" y="348" class="h">MPC signer</text>
+ <text x="776" y="368" class="m mb">v1.signer-prod.testnet</text>
+ <g class="m">
+  <rect x="776" y="382" width="188" height="28" rx="2" class="panel2"/><circle cx="790" cy="396" r="4" class="c-life"/><text x="802" y="400">Base Sepolia</text><text x="954" y="400" text-anchor="end" class="mg">signed</text>
+  <rect x="776" y="418" width="188" height="28" rx="2" class="panel2"/><circle cx="790" cy="432" r="4" class="c-life"/><text x="802" y="436">Solana devnet</text><text x="954" y="436" text-anchor="end" class="mg">signed</text>
+  <rect x="776" y="454" width="188" height="28" rx="2" fill="#0B0C0F" stroke="#C8A96A" stroke-dasharray="4 3"/><circle cx="790" cy="468" r="4" fill="none" stroke="#C8A96A"/><text x="802" y="472" class="mb">Monad</text><text x="954" y="472" text-anchor="end" class="mb">adding now</text>
+ </g>
+
+ <rect x="760" y="508" width="220" height="70" class="panel" rx="4"/>
+ <text x="776" y="536" class="h">Sputnik DAO</text>
+ <text x="776" y="556" class="sm">FunctionCall proposal to ratify</text><text x="776" y="572" class="sm">1 NEAR bond, from the vault</text>
+
+ <rect x="760" y="590" width="220" height="70" class="panel" rx="4"/>
+ <text x="776" y="618" class="h">NFT to primary heir</text>
+ <text x="776" y="640" class="sm">top share. Vault becomes Settled</text>
+</g>
+
+<!-- bus from step machine to outputs -->
+<g class="arrow">
+ <path d="M690 466 H725"/>
+ <path d="M725 191 V625"/>
+ <path d="M725 191 H758" marker-end="url(#ah)"/>
+ <path d="M725 273 H758" marker-end="url(#ah)"/>
+ <path d="M725 408 H758" marker-end="url(#ah)"/>
+ <path d="M725 543 H758" marker-end="url(#ah)"/>
+ <path d="M725 625 H758" marker-end="url(#ah)"/>
+</g>
+<g class="m mb">
+ <circle cx="725" cy="191" r="10" fill="#0B0C0F" stroke="#C8A96A"/><text x="725" y="195" text-anchor="middle">I</text>
+ <circle cx="725" cy="273" r="10" fill="#0B0C0F" stroke="#C8A96A"/><text x="725" y="277" text-anchor="middle">II</text>
+ <circle cx="725" cy="408" r="10" fill="#0B0C0F" stroke="#C8A96A"/><text x="725" y="412" text-anchor="middle" font-size="11">III</text>
+ <circle cx="725" cy="543" r="10" fill="#0B0C0F" stroke="#C8A96A"/><text x="725" y="547" text-anchor="middle" font-size="11">IV</text>
+ <circle cx="725" cy="625" r="10" fill="#0B0C0F" stroke="#C8A96A"/><text x="725" y="629" text-anchor="middle">V</text>
+</g>
+
+<!-- keeper relay -->
+<line x1="30" y1="690" x2="970" y2="690" class="hair"/>
+<text x="30" y="718" class="lab">AFTER STEP III</text>
+<text x="170" y="718" class="b">The keeper relays each signed transaction to its chain, then calls</text>
+<text x="170" y="740" class="b"><tspan class="m mb">mark_broadcast(hash)</tspan>. The contract accepts only the id of the transaction it stored.</text>
+<g>
+ <line x1="690" y1="760" x2="720" y2="760" class="arrow"/><text x="728" y="764" class="sm">live on testnet</text>
+ <line x1="830" y1="760" x2="860" y2="760" stroke="#C8A96A" stroke-width="1.5" stroke-dasharray="4 3"/><text x="868" y="764" class="sm">in progress</text>
+</g>
+<text x="30" y="764" class="sm">Testnet only. Not a will. Not audited. dmw: near-sdk 5, v1.signer-prod.testnet.</text>
+</svg>

@@ -1,0 +1,98 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 720" width="1000" height="720" role="img" aria-labelledby="t d">
+<title id="t">Vault state machine</title>
+<desc id="d">Alive moves to Warning when a heartbeat is missed, back to Alive on a heartbeat, to Triggered when anyone pokes after the grace period, then five settlement steps lead to Settled. A guardian pause is planned.</desc>
+<style>/*STYLE*/</style>
+<defs>
+<marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 1 L9 5 L0 9" fill="none" stroke="#C8A96A" stroke-width="1.5"/></marker>
+<marker id="ahs" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 1 L9 5 L0 9" fill="none" stroke="#A9A399" stroke-width="1.5"/></marker>
+</defs>
+<rect width="1000" height="720" fill="#0B0C0F"/>
+<text x="30" y="58" class="title">Four states, <tspan class="it">one way forward</tspan></text>
+<text x="30" y="84" class="b2">Alive and Warning are derived from the clock. Triggered and Settled are stored. Once Triggered, nothing the owner holds can undo it.</text>
+<line x1="30" y1="100" x2="970" y2="100" class="hair"/>
+
+<g transform="translate(118 290)">
+ <circle r="56" fill="#121419" stroke="#3DDC84" stroke-width="1.5"/><circle r="50" fill="none" stroke="#3DDC84" stroke-opacity=".35"/>
+ <text y="2" text-anchor="middle" class="h" style="font-size:28px">Alive</text>
+ <path transform="translate(0 26)" d="M-26 0 H-12 L-8 -8 L-2 10 L3 -16 L8 6 L11 0 H26" fill="none" stroke="#3DDC84" stroke-width="1.6" />
+</g>
+<g transform="translate(372 290)">
+ <circle r="56" fill="#121419" stroke="#F5B942" stroke-width="1.5"/><circle r="50" fill="none" stroke="#F5B942" stroke-opacity=".35"/>
+ <text y="2" text-anchor="middle" class="h" style="font-size:28px">Warning</text>
+ <path transform="translate(0 26)" d="M-26 0 H-8 L-4 -5 L0 5 L3 0 H10 L13 -4 L16 0 H26" fill="none" stroke="#F5B942" stroke-width="1.2" stroke-dasharray="3 2"/>
+</g>
+<g transform="translate(628 290)">
+ <circle r="56" fill="#121419" stroke="#FF4D4D" stroke-width="1.5"/><circle r="50" fill="none" stroke="#FF4D4D" stroke-opacity=".35"/>
+ <text y="2" text-anchor="middle" class="h" style="font-size:28px">Triggered</text>
+ <path transform="translate(0 26)" d="M-26 0 H26" fill="none" stroke="#FF4D4D" stroke-width="1.6" />
+</g>
+<g transform="translate(882 290)">
+ <circle r="56" fill="#121419" stroke="#7A7F87" stroke-width="1.5"/><circle r="50" fill="none" stroke="#7A7F87" stroke-opacity=".35"/>
+ <text y="2" text-anchor="middle" class="h" style="font-size:28px">Settled</text>
+ <path transform="translate(0 26)" d="M-26 0 H26" fill="none" stroke="#7A7F87" stroke-width="1.6" />
+</g>
+
+<!-- self loops -->
+<path d="M90 242 C 70 172, 166 172, 146 242" class="arrow" marker-end="url(#ah)"/>
+<text x="118" y="166" text-anchor="middle" class="m mb">heartbeat()</text>
+<text x="118" y="148" text-anchor="middle" class="sm">resets the clock</text>
+<path d="M600 242 C 580 172, 676 172, 656 242" class="arrow" marker-end="url(#ah)"/>
+<text x="628" y="166" text-anchor="middle" class="m mb">execute_step()</text>
+<text x="628" y="148" text-anchor="middle" class="sm">steps I to V, one per call</text>
+
+<!-- A to W -->
+<path d="M176 290 H314" class="arrow" marker-end="url(#ah)"/>
+<text x="245" y="258" text-anchor="middle" class="sm">no beat for</text>
+<text x="245" y="274" text-anchor="middle" class="sm">one interval</text>
+<text x="245" y="316" text-anchor="middle" class="m mg">derived</text>
+<!-- W to A -->
+<path d="M342 340 C 322 408, 168 408, 148 340" class="arrow" marker-end="url(#ah)"/>
+<text x="245" y="364" text-anchor="middle" class="m mb">heartbeat()</text>
+<text x="245" y="382" text-anchor="middle" class="sm">back to Alive</text>
+<!-- W to T -->
+<path d="M430 290 H570" class="arrow" marker-end="url(#ah)"/>
+<text x="500" y="250" text-anchor="middle" class="sm">anyone, after</text>
+<text x="500" y="266" text-anchor="middle" class="sm">the grace</text>
+<text x="500" y="283" text-anchor="middle" class="m mb" opacity="0"> </text>
+<text x="500" y="318" text-anchor="middle" class="m mb">poke()</text>
+<text x="500" y="336" text-anchor="middle" class="sm">bounty to caller</text>
+<!-- T to S -->
+<path d="M686 290 H824" class="arrow" marker-end="url(#ah)"/>
+<text x="755" y="266" text-anchor="middle" class="sm">step V done</text>
+<text x="755" y="316" text-anchor="middle" class="sm">NFT to heir</text>
+
+<!-- guardian pause -->
+<rect x="60" y="452" width="380" height="50" rx="4" fill="none" stroke="#C8A96A" stroke-dasharray="5 4"/>
+<text x="250" y="474" text-anchor="middle" class="hs">Paused by a guardian</text>
+<text x="250" y="492" text-anchor="middle" class="sm">planned, not in the hackathon build</text>
+<path d="M92 342 V450" stroke="#A9A399" stroke-width="1.5" stroke-dasharray="4 3" fill="none" marker-end="url(#ahs)" marker-start="url(#ahs)"/>
+<path d="M400 342 V450" stroke="#A9A399" stroke-width="1.5" stroke-dasharray="4 3" fill="none" marker-end="url(#ahs)" marker-start="url(#ahs)"/>
+<text x="104" y="400" class="m mg">pause</text>
+<text x="104" y="418" class="m mg">resume</text>
+
+<!-- rules -->
+<g>
+<text x="480" y="440" class="lab">CLOCK</text>
+<text x="480" y="462" class="b2"><tspan class="m mg">Alive</tspan>    now &lt; last_beat + interval</text>
+<text x="480" y="484" class="b2"><tspan class="m mg">Warning</tspan>  until last_beat + interval × (grace + 1)</text>
+<text x="480" y="506" class="b2"><tspan class="m mg">Triggered</tspan> stored by poke, never reversed</text>
+</g>
+
+<!-- timeline -->
+<line x1="30" y1="536" x2="970" y2="536" class="hair"/>
+<text x="30" y="566" class="lab">TRIGGERED, THE FLATLINE BECOMES THE TIMELINE</text>
+<line x1="30" y1="612" x2="970" y2="612" stroke="#FF4D4D" stroke-opacity=".6" stroke-width="1.5"/>
+<g class="m mb">
+<circle cx="110" cy="612" r="13" fill="#0B0C0F" stroke="#C8A96A" stroke-width="1.5"/><text x="110" y="616" text-anchor="middle" style="fill:#C8A96A">I</text>
+<circle cx="310" cy="612" r="13" fill="#0B0C0F" stroke="#C8A96A" stroke-width="1.5"/><text x="310" y="616" text-anchor="middle" style="fill:#C8A96A">II</text>
+<circle cx="510" cy="612" r="13" fill="#0B0C0F" stroke="#C8A96A" stroke-width="1.5"/><text x="510" y="616" text-anchor="middle" style="fill:#C8A96A">III</text>
+<circle cx="710" cy="612" r="13" fill="#0B0C0F" stroke="#C8A96A" stroke-width="1.5"/><text x="710" y="616" text-anchor="middle" style="fill:#C8A96A">IV</text>
+<circle cx="890" cy="612" r="13" fill="#0B0C0F" stroke="#7A7F87" stroke-width="1.5"/><text x="890" y="616" text-anchor="middle" style="fill:#7A7F87">V</text>
+</g>
+<text x="110" y="652" text-anchor="middle" class="hs">Pay the heirs</text><text x="110" y="672" text-anchor="middle" class="sm">by basis points</text>
+<text x="310" y="652" text-anchor="middle" class="hs">Delete the keys</text><text x="310" y="672" text-anchor="middle" class="sm">pulse and agent</text>
+<text x="510" y="652" text-anchor="middle" class="hs">Request signatures</text><text x="510" y="672" text-anchor="middle" class="sm">one payout per call</text>
+<text x="710" y="652" text-anchor="middle" class="hs">File the proposal</text><text x="710" y="672" text-anchor="middle" class="sm">Sputnik DAO, if set</text>
+<text x="890" y="652" text-anchor="middle" class="hs">Hand over the NFT</text><text x="890" y="672" text-anchor="middle" class="sm">state becomes Settled</text>
+<text x="30" y="706" class="sm">Heartbeat and owner edits are rejected once Triggered. Agent payments are denied from Warning. A failed MPC call never blocks settlement.</text>
+</svg>

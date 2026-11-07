@@ -1,0 +1,21 @@
+:root{}
+text{font-family:'Inter Tight',system-ui,sans-serif;fill:#EDE7DC}
+.title{font-family:'Instrument Serif',Georgia,serif;font-size:44px}
+.title i,.it{font-style:italic}
+.h{font-family:'Instrument Serif',Georgia,serif;font-size:25px}
+.hs{font-family:'Instrument Serif',Georgia,serif;font-size:21px}
+.lab{font-weight:600;font-size:13px;letter-spacing:.12em;fill:#C8A96A}
+.labd{font-weight:600;font-size:13px;letter-spacing:.12em;fill:#A9A399}
+.b{font-weight:400;font-size:15px}
+.b2{font-weight:400;font-size:15px;fill:#A9A399}
+.sm{font-weight:400;font-size:13.5px;fill:#A9A399}
+.m{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:13px}
+.mb{fill:#C8A96A}
+.mg{fill:#A9A399}
+.c-life{fill:#3DDC84}.c-warn{fill:#F5B942}.c-dead{fill:#FF4D4D}.c-still{fill:#7A7F87}
+.panel{fill:#121419;stroke:rgba(237,231,220,.22);stroke-width:1}
+.panel2{fill:#0B0C0F;stroke:rgba(237,231,220,.22);stroke-width:1}
+.hair{stroke:rgba(237,231,220,.22);stroke-width:1;fill:none}
+.hairb{stroke:#8C7446;stroke-width:1;fill:none}
+.arrow{stroke:#C8A96A;stroke-width:1.5;fill:none}
+.arrowg{stroke:#A9A399;stroke-width:1.5;fill:none}

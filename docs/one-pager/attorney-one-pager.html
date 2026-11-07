@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<title>Dead Man's Wallet: information for estate planning counsel</title>
+<style>
+@font-face{font-family:'Instrument Serif';font-weight:400;font-style:normal;src:url(../../site/fonts/instrument-serif-latin-400-normal.woff2) format('woff2')}
+@font-face{font-family:'Instrument Serif';font-weight:400;font-style:italic;src:url(../../site/fonts/instrument-serif-latin-400-italic.woff2) format('woff2')}
+@font-face{font-family:'Inter Tight';font-weight:400;src:url(../../site/fonts/inter-tight-latin-400-normal.woff2) format('woff2')}
+@font-face{font-family:'Inter Tight';font-weight:600;src:url(../../site/fonts/inter-tight-latin-600-normal.woff2) format('woff2')}
+@font-face{font-family:'JetBrains Mono';font-weight:400;src:url(../../site/fonts/jetbrains-mono-latin-400-normal.woff2) format('woff2')}
+@page{size:8.5in 11in;margin:0}
+*{box-sizing:border-box}
+html,body{margin:0;background:#fff}
+:root{--paper:#F4EFE5;--ink:#0B0C0F;--ink2:#4A4740;--brass:#8C7446;--rule:rgba(11,12,15,.28)}
+.page{width:8.5in;height:11in;padding:.55in .7in .45in;background:var(--paper);color:var(--ink);font-family:'Instrument Serif',Georgia,serif;font-size:12.6pt;line-height:1.28;display:flex;flex-direction:column;overflow:hidden}
+header{display:flex;justify-content:space-between;align-items:baseline;border-bottom:1.5px solid var(--ink);padding-bottom:7pt}
+.sc{font-family:'Inter Tight',sans-serif;font-weight:600;font-size:7.4pt;letter-spacing:.14em;text-transform:uppercase;color:var(--brass)}
+h1{font-weight:400;font-size:30pt;line-height:1;margin:0}
+h1 i{font-style:italic}
+.sub{font-family:'Inter Tight',sans-serif;font-size:8.6pt;color:var(--ink2);margin:5pt 0 0}
+.title{padding:11pt 0 9pt;border-bottom:.5pt solid var(--rule)}
+section{display:grid;grid-template-columns:1.35in 1fr;gap:0 .2in;padding:8pt 0;border-bottom:.5pt solid var(--rule)}
+section>.sc{padding-top:2.5pt}
+section p{margin:0 0 4pt}
+section p:last-child{margin-bottom:0}
+.clause{margin:3pt 0 0;padding:2pt 0 2pt 11pt;border-left:1.5px solid var(--brass)}
+.clause p{font-style:italic;font-size:11.8pt;line-height:1.27}
+.clause b{font-weight:400;font-style:normal;font-variant:small-caps;letter-spacing:.04em}
+.tag{display:block;font-family:'Inter Tight',sans-serif;font-style:normal;font-weight:600;font-size:7pt;letter-spacing:.14em;text-transform:uppercase;color:var(--brass);margin-bottom:3pt}
+ol{margin:0;padding:0;list-style:none;counter-reset:n}
+ol li{counter-increment:n;position:relative;padding-left:15pt;margin-bottom:2.2pt}
+ol li::before{content:counter(n) ".";position:absolute;left:0;font-family:'JetBrains Mono',monospace;font-size:8pt;color:var(--brass);top:2pt}
+code{font-family:'JetBrains Mono',monospace;font-size:8.4pt}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:0 .25in}
+footer{margin-top:auto;padding-top:7pt;border-top:1.5px solid var(--ink);display:flex;justify-content:space-between;font-family:'Inter Tight',sans-serif;font-size:7.2pt;color:var(--ink2);line-height:1.4}
+.ph{border-bottom:.5pt dotted var(--ink2);padding:0 .5em;color:var(--ink2)}
+</style></head>
+<body><div class="page">
+<header><span class="sc">Dead Man&#8217;s Wallet</span><span class="sc">Information for estate planning counsel</span></header>
+<div class="title"><h1>An online tool your client configures, <i>and the instrument controls.</i></h1>
+<p class="sub">One page. Prototype on NEAR testnet, November 2026. Not legal advice.</p></div>
+
+<section><span class="sc">What it is</span><div>
+<p>A RUFADAA-style online tool that the client configures. The client names heirs and shares, chooses the chains, and sets the proof-of-life interval, working from the distribution the will or trust specifies. The contract executes that configuration when the client stops sending heartbeats. It does not interpret or amend the governing document.</p>
+<p>It is non-custodial. No party, including the developers, holds the client&#8217;s keys or can move assets outside the configured plan. The plan is public on-chain, so a fiduciary can read exactly what was configured.</p></div></section>
+
+<section><span class="sc">What it is not</span><div>
+<p>Not a will, trust, codicil or beneficiary designation, and it has no legal effect of its own. Not a custodian, escrow agent or fiduciary. It does not detect death: it acts on the absence of heartbeats, so the interval and grace period should suit the client&#8217;s circumstances. Assets must sit at the vault&#8217;s derived addresses to be included. Testnet only today; not yet audited.</p></div></section>
+
+<section><span class="sc">Referencing it in a trust</span><div>
+<aside class="clause"><span class="tag">Sample. Review with counsel.</span>
+<p><b>Digital asset distribution tool.</b> The Settlor may configure an online tool known as Dead Man&#8217;s Wallet (the &#8220;Vault&#8221;) to hold or distribute digital assets. The Trustee is authorized to rely on the distribution configured in the Vault as of the date of the Settlor&#8217;s incapacity or death, to the extent it is consistent with this instrument, and to access, manage, and transfer on-chain assets associated with the Vault as necessary to administer the trust. In the event of any inconsistency between the Vault&#8217;s configuration and this instrument, this instrument controls, and the Trustee may take such steps as are needed to give effect to it.</p></aside></div></section>
+
+<section><span class="sc">Security model</span><div>
+<ol>
+<li>Two narrow keys: the <em>pulse key</em> can only send a heartbeat, the <em>agent key</em> can only pay inside a stated policy. Neither can change heirs, amounts or destinations.</li>
+<li>Nothing executes while heartbeats arrive. Settlement opens only after the interval and the grace period have both passed.</li>
+<li>Anyone may run settlement, and no one may redirect it: the contract builds every transaction from the stored plan.</li>
+<li>Keys for other chains do not exist until the trigger; NEAR&#8217;s MPC network signs at settlement. The pulse and agent keys are deleted during settlement.</li>
+<li>An independent code review found 1 Critical and 3 High issues, all fixed with regression tests. On testnet the deployer can still redeploy the contract; a mainnet release would remove that.</li>
+</ol></div></section>
+
+<section style="border-bottom:0"><span class="sc">Contact</span><div>
+<p>For a briefing or a sample configuration: <span class="ph">[name, title]</span> <span class="ph">[email address]</span> <span class="ph">[telephone]</span></p></div></section>
+
+<footer><span>deadmanswallet.dev &middot; Source and security review in the repository (docs/SECURITY_REVIEW.md)</span><span>Draft for review with counsel &middot; 2026-11-07</span></footer>
+</div></body></html>

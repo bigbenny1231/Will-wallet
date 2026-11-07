@@ -1,0 +1,138 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1052" width="1000" height="1052" role="img" aria-labelledby="t d">
+<title id="t">Threat model</title>
+<desc id="d">Five attackers, what each can and cannot do, and the mitigations from the security review, with the deployer key as residual trust.</desc>
+<style>/*STYLE*/</style>
+<rect width="1000" height="1052" fill="#0B0C0F"/>
+<text x="30" y="58" class="title">Threat model, <tspan class="it">by who holds what</tspan></text>
+<text x="30" y="84" class="b2">Ids refer to findings in docs/SECURITY_REVIEW.md. Every Critical and High item is fixed with a regression test.</text>
+<line x1="30" y1="100" x2="970" y2="100" class="hair"/>
+<text x="222" y="126" class="lab" style="fill:#F5B942">CAN</text><text x="482" y="126" class="lab" style="fill:#3DDC84">CANNOT</text><text x="742" y="126" class="lab">WHAT STOPS IT</text><text x="30" y="126" class="lab">ATTACKER</text>
+<line x1="30" y1="138" x2="970" y2="138" stroke="#C8A96A" stroke-width="1"/>
+<text x="30" y="180" class="h">Thief with the phone</text><text x="30" y="202" class="m mb" style="font-size:12.5px">holds the pulse key</text>
+<circle cx="225" cy="174" r="2" fill="#8C7446"/>
+<text x="238" y="178" class="sm" style="fill:#EDE7DC">send heartbeat, 10 TGas, up to 1</text>
+<text x="238" y="196" class="sm" style="fill:#EDE7DC">NEAR of allowance</text>
+<circle cx="225" cy="210" r="2" fill="#8C7446"/>
+<text x="238" y="214" class="sm" style="fill:#EDE7DC">keep the vault Alive while the key</text>
+<text x="238" y="232" class="sm" style="fill:#EDE7DC">lives</text>
+<circle cx="485" cy="174" r="2" fill="#8C7446"/>
+<text x="498" y="178" class="sm" style="fill:#EDE7DC">move funds or change the plan</text>
+<circle cx="485" cy="192" r="2" fill="#8C7446"/>
+<text x="498" y="196" class="sm" style="fill:#EDE7DC">add keys or call agent_pay</text>
+<circle cx="485" cy="210" r="2" fill="#8C7446"/>
+<text x="498" y="214" class="sm" style="fill:#EDE7DC">act on any other contract</text>
+<circle cx="745" cy="174" r="2" fill="#8C7446"/>
+<text x="758" y="178" class="sm" style="fill:#EDE7DC">function-call key scoped to</text>
+<text x="758" y="196" class="sm" style="fill:#EDE7DC">heartbeat</text>
+<circle cx="745" cy="210" r="2" fill="#8C7446"/>
+<text x="758" y="214" class="sm" style="fill:#EDE7DC">owner removes it with remove_key</text>
+<circle cx="745" cy="228" r="2" fill="#8C7446"/>
+<text x="758" y="232" class="sm" style="fill:#EDE7DC">owner change revokes every key</text>
+<text x="758" y="250" class="sm" style="fill:#EDE7DC">(H-3)</text>
+<circle cx="745" cy="264" r="2" fill="#8C7446"/>
+<text x="758" y="268" class="sm" style="fill:#EDE7DC">residual: delays settlement</text>
+<text x="758" y="286" class="sm" style="fill:#EDE7DC">until removed</text>
+<line x1="30" y1="302" x2="970" y2="302" class="hair"/>
+<text x="30" y="344" class="h">Compromised agent</text><text x="30" y="366" class="m mb" style="font-size:12.5px">holds the agent key</text>
+<circle cx="225" cy="338" r="2" fill="#8C7446"/>
+<text x="238" y="342" class="sm" style="fill:#EDE7DC">agent_pay inside per-tx cap, daily</text>
+<text x="238" y="360" class="sm" style="fill:#EDE7DC">cap and allowlist, while Alive</text>
+<circle cx="485" cy="338" r="2" fill="#8C7446"/>
+<text x="498" y="342" class="sm" style="fill:#EDE7DC">exceed policy or pay the contract</text>
+<text x="498" y="360" class="sm" style="fill:#EDE7DC">itself (L-5)</text>
+<circle cx="485" cy="374" r="2" fill="#8C7446"/>
+<text x="498" y="378" class="sm" style="fill:#EDE7DC">pay once a beat is missed</text>
+<circle cx="485" cy="392" r="2" fill="#8C7446"/>
+<text x="498" y="396" class="sm" style="fill:#EDE7DC">heartbeat, or change the plan</text>
+<circle cx="745" cy="338" r="2" fill="#8C7446"/>
+<text x="758" y="342" class="sm" style="fill:#EDE7DC">denials return a reason and are</text>
+<text x="758" y="360" class="sm" style="fill:#EDE7DC">logged</text>
+<circle cx="745" cy="374" r="2" fill="#8C7446"/>
+<text x="758" y="378" class="sm" style="fill:#EDE7DC">agent is disarmed at Warning</text>
+<circle cx="745" cy="392" r="2" fill="#8C7446"/>
+<text x="758" y="396" class="sm" style="fill:#EDE7DC">key deleted in step II</text>
+<circle cx="745" cy="410" r="2" fill="#8C7446"/>
+<text x="758" y="414" class="sm" style="fill:#EDE7DC">residual: spend up to the daily</text>
+<text x="758" y="432" class="sm" style="fill:#EDE7DC">cap</text>
+<line x1="30" y1="448" x2="970" y2="448" class="hair"/>
+<text x="30" y="490" class="h">Malicious keeper</text><text x="30" y="512" class="m mb" style="font-size:12.5px">runs the keeper CLI</text>
+<circle cx="225" cy="484" r="2" fill="#8C7446"/>
+<text x="238" y="488" class="sm" style="fill:#EDE7DC">choose when to poke and step</text>
+<circle cx="225" cy="502" r="2" fill="#8C7446"/>
+<text x="238" y="506" class="sm" style="fill:#EDE7DC">relay late, or not at all</text>
+<circle cx="225" cy="520" r="2" fill="#8C7446"/>
+<text x="238" y="524" class="sm" style="fill:#EDE7DC">front-run step III with poor chain</text>
+<text x="238" y="542" class="sm" style="fill:#EDE7DC">params (M-2)</text>
+<circle cx="485" cy="484" r="2" fill="#8C7446"/>
+<text x="498" y="488" class="sm" style="fill:#EDE7DC">pick destination, amount or chain</text>
+<circle cx="485" cy="502" r="2" fill="#8C7446"/>
+<text x="498" y="506" class="sm" style="fill:#EDE7DC">pick the EVM nonce (C-1) or exceed</text>
+<text x="498" y="524" class="sm" style="fill:#EDE7DC">fee and gas caps (H-2)</text>
+<circle cx="485" cy="538" r="2" fill="#8C7446"/>
+<text x="498" y="542" class="sm" style="fill:#EDE7DC">record a fake broadcast hash (H-1)</text>
+<circle cx="745" cy="484" r="2" fill="#8C7446"/>
+<text x="758" y="488" class="sm" style="fill:#EDE7DC">contract builds the tx; nonce is</text>
+<text x="758" y="506" class="sm" style="fill:#EDE7DC">pinned</text>
+<circle cx="745" cy="520" r="2" fill="#8C7446"/>
+<text x="758" y="524" class="sm" style="fill:#EDE7DC">gas 21000 to 100000, fee at most</text>
+<text x="758" y="542" class="sm" style="fill:#EDE7DC">100 gwei</text>
+<circle cx="745" cy="556" r="2" fill="#8C7446"/>
+<text x="758" y="560" class="sm" style="fill:#EDE7DC">hash recomputed from stored tx</text>
+<circle cx="745" cy="574" r="2" fill="#8C7446"/>
+<text x="758" y="578" class="sm" style="fill:#EDE7DC">anyone can relay; re-sign after</text>
+<text x="758" y="596" class="sm" style="fill:#EDE7DC">cooldown</text>
+<line x1="30" y1="612" x2="970" y2="612" class="hair"/>
+<text x="30" y="654" class="h">NFT buyer</text><text x="30" y="676" class="m mb" style="font-size:12.5px">buys the Will NFT</text>
+<circle cx="225" cy="648" r="2" fill="#8C7446"/>
+<text x="238" y="652" class="sm" style="fill:#EDE7DC">edit the plan, as owner, while</text>
+<text x="238" y="670" class="sm" style="fill:#EDE7DC">Alive or Warning</text>
+<circle cx="225" cy="684" r="2" fill="#8C7446"/>
+<text x="238" y="688" class="sm" style="fill:#EDE7DC">claim the remainder once Settled</text>
+<circle cx="485" cy="648" r="2" fill="#8C7446"/>
+<text x="498" y="652" class="sm" style="fill:#EDE7DC">use the seller&#x27;s pulse or agent</text>
+<text x="498" y="670" class="sm" style="fill:#EDE7DC">keys</text>
+<circle cx="485" cy="684" r="2" fill="#8C7446"/>
+<text x="498" y="688" class="sm" style="fill:#EDE7DC">act after Triggered</text>
+<circle cx="485" cy="702" r="2" fill="#8C7446"/>
+<text x="498" y="706" class="sm" style="fill:#EDE7DC">transfer the NFT after Triggered</text>
+<circle cx="745" cy="648" r="2" fill="#8C7446"/>
+<text x="758" y="652" class="sm" style="fill:#EDE7DC">owner change revokes every key</text>
+<text x="758" y="670" class="sm" style="fill:#EDE7DC">(H-3)</text>
+<circle cx="745" cy="684" r="2" fill="#8C7446"/>
+<text x="758" y="688" class="sm" style="fill:#EDE7DC">a key whose AddKey lands late is</text>
+<text x="758" y="706" class="sm" style="fill:#EDE7DC">deleted</text>
+<circle cx="745" cy="720" r="2" fill="#8C7446"/>
+<text x="758" y="724" class="sm" style="fill:#EDE7DC">heirs should re-check the plan</text>
+<text x="758" y="742" class="sm" style="fill:#EDE7DC">after a transfer</text>
+<line x1="30" y1="758" x2="970" y2="758" class="hair"/>
+<text x="30" y="800" class="h">Anyone</text><text x="30" y="822" class="m mb" style="font-size:12.5px">no key, no role</text>
+<circle cx="225" cy="794" r="2" fill="#8C7446"/>
+<text x="238" y="798" class="sm" style="fill:#EDE7DC">poke after the deadline, earn the</text>
+<text x="238" y="816" class="sm" style="fill:#EDE7DC">bounty</text>
+<circle cx="225" cy="830" r="2" fill="#8C7446"/>
+<text x="238" y="834" class="sm" style="fill:#EDE7DC">execute_step, relay, mark_broadcast</text>
+<text x="238" y="852" class="sm" style="fill:#EDE7DC">with the right hash</text>
+<circle cx="225" cy="866" r="2" fill="#8C7446"/>
+<text x="238" y="870" class="sm" style="fill:#EDE7DC">deposit</text>
+<circle cx="485" cy="794" r="2" fill="#8C7446"/>
+<text x="498" y="798" class="sm" style="fill:#EDE7DC">poke early (it panics not_due)</text>
+<circle cx="485" cy="812" r="2" fill="#8C7446"/>
+<text x="498" y="816" class="sm" style="fill:#EDE7DC">change heirs, amounts or</text>
+<text x="498" y="834" class="sm" style="fill:#EDE7DC">destinations</text>
+<circle cx="485" cy="848" r="2" fill="#8C7446"/>
+<text x="498" y="852" class="sm" style="fill:#EDE7DC">block settlement, or obtain a</text>
+<text x="498" y="870" class="sm" style="fill:#EDE7DC">second signature for a payout (C-1)</text>
+<circle cx="745" cy="794" r="2" fill="#8C7446"/>
+<text x="758" y="798" class="sm" style="fill:#EDE7DC">permissionless on purpose</text>
+<circle cx="745" cy="812" r="2" fill="#8C7446"/>
+<text x="758" y="816" class="sm" style="fill:#EDE7DC">one re-sign in flight per payout</text>
+<circle cx="745" cy="830" r="2" fill="#8C7446"/>
+<text x="758" y="834" class="sm" style="fill:#EDE7DC">residual: deposit spam can flush</text>
+<text x="758" y="852" class="sm" style="fill:#EDE7DC">the 40-entry log (L-3)</text>
+<line x1="30" y1="886" x2="970" y2="886" class="hair"/>
+<rect x="30" y="908" width="940" height="74" class="panel" rx="4"/><rect x="30" y="908" width="3" height="74" fill="#FF4D4D"/>
+<text x="50" y="936" class="lab" style="fill:#FF4D4D">RESIDUAL TRUST, TESTNET</text>
+<text x="50" y="958" class="b" style="font-size:14.5px">The deployer FullAccess key can redeploy the contract and so move any vault (I-1). Mainnet: remove the key or gate upgrades behind a DAO.</text>
+<text x="50" y="975" class="sm" style="font-size:13px">Also: a Solana payout already signed can only be re-signed by the owner or keeper (M-3). Not audited.</text>
+<text x="30" y="1038" class="sm">Each key is a NEAR function-call access key on the contract's own account, scoped to one method.</text>
+</svg>

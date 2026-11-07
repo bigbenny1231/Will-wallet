@@ -165,6 +165,21 @@ source addresses; the faucets need a human login), and step 4 is skipped because
 - **Permissionless keepers.** `poke` and `execute_step` are callable by anyone and pay a bounty; the
   keeper only supplies nonce/gas/blockhash for foreign chains, never destinations or amounts.
 
+## Diagrams
+
+Source SVGs (fonts embedded) and PNG exports live in [`docs/diagrams/`](docs/diagrams/); `node docs/diagrams/build.mjs` regenerates them.
+Monad is being added as a third signing target and is drawn dashed.
+
+![Architecture: keys, contract and settlement outputs](docs/diagrams/architecture.png)
+
+![State machine: Alive, Warning, Triggered, Settled](docs/diagrams/state-machine.png)
+
+![Step III sequence: execute_step, MPC signature, relay, mark_broadcast](docs/diagrams/settlement-sequence.png)
+
+![Threat model by attacker](docs/diagrams/threat-model.png)
+
+For estate attorneys: [one-page PDF](docs/one-pager/attorney-one-pager.pdf) (source: [HTML](docs/one-pager/attorney-one-pager.html)).
+
 ## Security model
 
 | Party | Can | Cannot |
