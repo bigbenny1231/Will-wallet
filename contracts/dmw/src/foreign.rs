@@ -62,7 +62,8 @@ const GAS_FOREIGN_FAIL: Gas = Gas::from_tgas(10);
 /// its own cap (`EvmChain::max_fee_per_gas`).
 pub const MAX_EVM_FEE_PER_GAS: u128 = 100_000_000_000;
 /// Monad testnet fee cap (1000 gwei). Monad's base fee floor is 100 gwei, so the Base cap
-/// would reject every honest Monad step. 21000 gas x 1000 gwei = 0.021 MON worst case.
+/// would reject every honest Monad step. Monad bills the full gas LIMIT, not gas used, so
+/// the worst case per payout is MAX_EVM_GAS_LIMIT x 1000 gwei = 0.1 MON (review 2, M-5).
 pub const MAX_MONAD_FEE_PER_GAS: u128 = 1_000_000_000_000;
 /// Caller-supplied gas limit range for a native transfer.
 pub const MIN_EVM_GAS_LIMIT: u128 = 21_000;
@@ -98,6 +99,14 @@ pub struct EvmChain {
     pub explorer_tx: &'static str,
     /// Upper bound on caller-supplied `max_fee_per_gas` (wei).
     pub max_fee_per_gas: u128,
+    /// Most payouts of this chain one vault may hold (they all leave one derived address).
+    /// Monad: 1. Its reserve-balance rule reverts a value transfer that leaves an EOA below
+    /// 10 MON unless it is an "emptying" tx (no other tx from the sender in the last 3
+    /// blocks). A second payout from `monad-<id>` can be relayed right behind the first by
+    /// anyone (both signed txs are public), reverts, and burns its pinned nonce: the payout
+    /// can then never be signed again and its MON is stuck (SECURITY_REVIEW_2 H-4). With
+    /// one payout the address only ever sends one tx (nonce 0), which is always emptying.
+    pub max_payouts: usize,
 }
 
 pub const BASE_SEPOLIA: EvmChain = EvmChain {
@@ -106,6 +115,7 @@ pub const BASE_SEPOLIA: EvmChain = EvmChain {
     rpc: "https://sepolia.base.org",
     explorer_tx: "https://sepolia.basescan.org/tx/",
     max_fee_per_gas: MAX_EVM_FEE_PER_GAS,
+    max_payouts: crate::MAX_FOREIGN,
 };
 
 pub const MONAD_TESTNET: EvmChain = EvmChain {
@@ -114,6 +124,7 @@ pub const MONAD_TESTNET: EvmChain = EvmChain {
     rpc: "https://testnet-rpc.monad.xyz",
     explorer_tx: "https://testnet.monadexplorer.com/tx/",
     max_fee_per_gas: MAX_MONAD_FEE_PER_GAS,
+    max_payouts: 1,
 };
 
 impl ForeignChain {
@@ -153,6 +164,7 @@ pub fn chain_registry() -> Vec<serde_json::Value> {
                 "path": format!("{}-<token_id>", e.path_prefix), "domain_id": DOMAIN_ECDSA,
                 "rpc": e.rpc, "explorer_tx": e.explorer_tx,
                 "max_fee_per_gas": U128(e.max_fee_per_gas),
+                "max_payouts": e.max_payouts,
             }),
             None => json!({
                 "chain": c.as_str(), "kind": "solana", "cluster": "devnet",

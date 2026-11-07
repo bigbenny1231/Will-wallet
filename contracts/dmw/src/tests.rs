@@ -1880,13 +1880,9 @@ fn monad_payout_validation() {
 
 #[test]
 fn step3_monad_signs_with_monad_path_chain_id_and_own_nonce() {
-    // [base, monad, base, monad]: each EVM chain has its own derived address and nonce.
-    let mut c = at_step3(vec![
-        base_payout(),
-        monad_payout(),
-        base_payout(),
-        monad_payout(),
-    ]);
+    // [base, monad, base]: each EVM chain has its own derived address and nonce.
+    // (At most one monad payout per vault, review 2 H-4.)
+    let mut c = at_step3(vec![base_payout(), monad_payout(), base_payout()]);
     let _ = c.execute_step(1.into(), Some(base_args()));
     Ctx::new().by("dmw.testnet").at(T0 + 41_500).set();
     assert_eq!(c.on_foreign_signed(1, 0, Ok(mpc_secp_response())), 3);
@@ -1914,7 +1910,6 @@ fn step3_monad_signs_with_monad_path_chain_id_and_own_nonce() {
     let raw = p.signed_tx.unwrap();
     assert!(raw.contains("82279f"), "chain id 10143 in the RLP");
     assert_eq!(foreign::evm_nonce_for(&v(&c).foreign, 2), 1);
-    assert_eq!(foreign::evm_nonce_for(&v(&c).foreign, 3), 1);
     // mark_broadcast accepts the keccak id (case-insensitive, like base)
     let id = foreign::expected_tx_id(ForeignChain::Monad, &raw).unwrap();
     Ctx::new().by("keeper.testnet").at(T0 + 43_000).set();
@@ -1970,4 +1965,53 @@ fn config_lists_chain_registry() {
     assert_eq!(monad["rpc"], "https://testnet-rpc.monad.xyz");
     let base = chains.iter().find(|x| x["chain"] == "base").unwrap();
     assert_eq!(base["chain_id"], 84532);
+}
+
+// ---------------------------------------------------------------- review 2 regressions
+
+#[test]
+fn h4_at_most_one_monad_payout_per_vault() {
+    let mut c = setup();
+    Ctx::new().set();
+    // Two payouts from monad-<id>: the second could be relayed right behind the first,
+    // revert under Monad's reserve-balance rule and burn its pinned nonce.
+    let m = panics(|| c.set_foreign_payouts(1.into(), vec![monad_payout(), monad_payout()]));
+    assert!(
+        m.contains("too many monad payouts (max 1 per vault)"),
+        "{m}"
+    );
+    let m = panics(|| {
+        c.set_foreign_payouts(
+            1.into(),
+            vec![monad_payout(), base_payout(), monad_payout()],
+        )
+    });
+    assert!(m.contains("too many monad payouts"), "{m}");
+    // One monad payout alongside base/solana is fine, and base keeps its limit of 4.
+    c.set_foreign_payouts(
+        1.into(),
+        vec![
+            base_payout(),
+            monad_payout(),
+            base_payout(),
+            sol_payout(1_000),
+        ],
+    );
+    assert_eq!(v(&c).foreign.len(), 4);
+    c.set_foreign_payouts(1.into(), vec![base_payout(); 4]);
+    assert_eq!(v(&c).foreign.len(), 4);
+    // The only monad payout always signs with nonce 0 (an "emptying" tx on Monad).
+    let cfg = c.get_config();
+    let chains = cfg["chains"].as_array().unwrap();
+    let monad = chains.iter().find(|x| x["chain"] == "monad").unwrap();
+    assert_eq!(monad["max_payouts"], 1);
+    let base = chains.iter().find(|x| x["chain"] == "base").unwrap();
+    assert_eq!(base["max_payouts"], 4);
+}
+
+#[test]
+fn h4_single_monad_payout_signs_nonce_zero_after_base() {
+    let c = at_step3(vec![base_payout(), base_payout(), monad_payout()]);
+    assert_eq!(foreign::evm_nonce_for(&v(&c).foreign, 2), 0);
+    assert_eq!(foreign::evm_nonce_for(&v(&c).foreign, 1), 1);
 }

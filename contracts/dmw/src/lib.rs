@@ -418,6 +418,20 @@ impl Contract {
                 p
             })
             .collect();
+        // Per-chain payout limit (Monad: 1, review 2 H-4).
+        for c in ForeignChain::ALL {
+            if let Some(e) = c.evm() {
+                let n = payouts.iter().filter(|p| p.chain == c).count();
+                require!(
+                    n <= e.max_payouts,
+                    &format!(
+                        "too many {} payouts (max {} per vault)",
+                        c.as_str(),
+                        e.max_payouts
+                    )
+                );
+            }
+        }
         let data = json!({"token_id": id.to_string(), "foreign": payouts});
         v.foreign = payouts;
         let detail = format!("{} payouts", v.foreign.len());
