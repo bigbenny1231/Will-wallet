@@ -431,3 +431,15 @@ value 10^15 wei, **from `0x360d02320ebff8439fe0d804e68dfc6976230e13`** (the deri
 it to `https://testnet-rpc.monad.xyz` returns `Signer had insufficient balance`, as expected for an unfunded
 address. Once `monad-14` holds about 0.005 MON, the same raw tx can be relayed. It would then appear at
 `https://testnet.monadexplorer.com/tx/0xbb3d639bddb0d6519c642d0349f6349aa263b3524f13fd06762e6f296d13df19`.
+
+## Nov 7: 1 yocto on owner mutators and `pause` (review 2 M-6)
+
+Contract redeployed (no init, state kept; no storage layout change):
+[deploy](https://testnet.nearblocks.io/txns/81DnDj5PrzPdpaA1aWiAw4NpLtzQ2nRebmuaC8gPNhAV), code hash
+`13ug5kLS5oCUSHBjJ7P5sEJ7gANxaATHtHtfdDUZfsqU` (460,419 B, `cargo near build non-reproducible-wasm`). `get_vault` for
+vaults 6 (Alive), 12 and 17 (Settled) reads as before. On vault 6, with its current values (86400 s, grace 1):
+
+| Call | Deposit | Result |
+| --- | --- | --- |
+| [set_timing](https://testnet.nearblocks.io/txns/G4iRKxcv5NuUT7SSVmjhwJttZ6GmavyHBwTLkWi7WKe) | 0 | rejected: `Requires attached deposit of exactly 1 yoctoNEAR` |
+| [set_timing](https://testnet.nearblocks.io/txns/ESq3TpLRoFsKjgKdf6ogRU79KB7A52RE4SumeqTgamYF) | 1 yocto | `timing_set` (values unchanged) |

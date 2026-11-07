@@ -96,7 +96,7 @@ ev('guardian_scene');
 // pause right after a beat lands, so the pause is visible until the next beat clears it
 let bb = lastBeats; await waitBeats(bb + 1); await sleep(2500);
 ev('pause_send');
-await run('node', ['contracts/tools/tx.mjs', 'call', GUARD, C, 'pause', JSON.stringify({ token_id: TOKEN }), '50'], S + '/pause.out');
+await run('node', ['contracts/tools/tx.mjs', 'call', GUARD, C, 'pause', JSON.stringify({ token_id: TOKEN }), '50', '1y'], S + '/pause.out');
 ev('pause_done', { out: fs.readFileSync(S + '/pause.out', 'utf8').slice(-300) });
 for (let i = 0; i < 40; i++) { if (/Paused\./.test(await dtext())) break; await sleep(250); }
 ev('dash_paused');

@@ -53,8 +53,8 @@ say "keys"
 $ADMIN genkey > $D/pulse.key.json; $ADMIN genkey > $D/agent.key.json; chmod 600 $D/*.key.json
 jqk() { node -e "console.log(JSON.parse(require('fs').readFileSync('$1','utf8')).$2)"; }
 PULSE_PUB=$(jqk $D/pulse.key.json public_key); AGENT_PUB=$(jqk $D/agent.key.json public_key)
-$TX call $OWNER $C add_pulse_key "{\"token_id\":\"$TOKEN\",\"public_key\":\"$PULSE_PUB\"}" 50 | grep -E '^tx |result'
-$TX call $OWNER $C add_agent_key "{\"token_id\":\"$TOKEN\",\"public_key\":\"$AGENT_PUB\"}" 50 | grep -E '^tx |result'
+$TX call $OWNER $C add_pulse_key "{\"token_id\":\"$TOKEN\",\"public_key\":\"$PULSE_PUB\"}" 50 1y | grep -E '^tx |result'
+$TX call $OWNER $C add_agent_key "{\"token_id\":\"$TOKEN\",\"public_key\":\"$AGENT_PUB\"}" 50 1y | grep -E '^tx |result'
 
 # 5. start the pulse now (keeps the vault Alive while we set up payouts and show the agent)
 (cd keeper; DMW_PULSE_KEY=$(jqk ../$D/pulse.key.json private_key) nohup ./node_modules/.bin/tsx src/cli.ts pulse --token $TOKEN --interval 20 > ../$D/pulse.log 2>&1 & echo $! > ../$D/pulse.pid)
@@ -65,7 +65,7 @@ say "foreign payouts (Base 0.0005 ETH, Solana 0.01 SOL)"
 DER=$(cd keeper && npx tsx src/cli.ts derive --token $TOKEN --json)
 BASE_FROM=$(echo "$DER" | node -e "console.log(JSON.parse(require('fs').readFileSync(0,'utf8')).base.address)")
 SOL_FROM=$(echo "$DER" | node -e "console.log(JSON.parse(require('fs').readFileSync(0,'utf8')).solana.address)")
-$TX call $OWNER $C set_foreign_payouts "{\"token_id\":\"$TOKEN\",\"payouts\":[{\"chain\":\"base\",\"to\":\"0xcA024adC7cac111339Fe077C739F8085aE705F2F\",\"amount\":\"500000000000000\",\"from_address\":\"$BASE_FROM\"},{\"chain\":\"solana\",\"to\":\"CFdWXa1ean7bBoewSv2SZESrDpWSxeoN1hfLrqaqZQUr\",\"amount\":\"10000000\",\"from_address\":\"$SOL_FROM\"}]}" 50 | grep -E '^tx |result'
+$TX call $OWNER $C set_foreign_payouts "{\"token_id\":\"$TOKEN\",\"payouts\":[{\"chain\":\"base\",\"to\":\"0xcA024adC7cac111339Fe077C739F8085aE705F2F\",\"amount\":\"500000000000000\",\"from_address\":\"$BASE_FROM\"},{\"chain\":\"solana\",\"to\":\"CFdWXa1ean7bBoewSv2SZESrDpWSxeoN1hfLrqaqZQUr\",\"amount\":\"10000000\",\"from_address\":\"$SOL_FROM\"}]}" 50 1y | grep -E '^tx |result'
 echo "  base source   $BASE_FROM"; echo "  solana source $SOL_FROM"
 
 # 7. the agent guard rails: one allowed, one denied

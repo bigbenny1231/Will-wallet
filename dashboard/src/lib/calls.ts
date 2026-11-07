@@ -39,6 +39,8 @@ export const KEY_ALLOWANCE_YOCTO = 10n ** 24n;
 /** create_vault keeps this flat fee out of the deposit for storage. */
 export const STORAGE_FEE_YOCTO = 10n ** 23n;
 
+/** Owner mutators, `pause` and `nft_transfer` require exactly 1 yoctoNEAR (SPEC §2.3, review 2 M-6): a
+ *  function-call access key cannot attach a deposit, so these always go through a wallet prompt. */
 const ONE_YOCTO = "1";
 
 export function createVaultCall(d: CreateDraft): CallArgs {
@@ -66,36 +68,42 @@ export const addPulseKeyCall = (tokenId: string, publicKey: string): CallArgs =>
   method: "add_pulse_key",
   args: { token_id: tokenId, public_key: publicKey },
   gas: GAS.addKey,
+  deposit: ONE_YOCTO,
 });
 
 export const addAgentKeyCall = (tokenId: string, publicKey: string): CallArgs => ({
   method: "add_agent_key",
   args: { token_id: tokenId, public_key: publicKey },
   gas: GAS.addKey,
+  deposit: ONE_YOCTO,
 });
 
 export const removeKeyCall = (tokenId: string, publicKey: string): CallArgs => ({
   method: "remove_key",
   args: { token_id: tokenId, public_key: publicKey },
   gas: GAS.other,
+  deposit: ONE_YOCTO,
 });
 
 export const setHeirsCall = (tokenId: string, heirs: Heir[]): CallArgs => ({
   method: "set_heirs",
   args: { token_id: tokenId, heirs: heirs.map((h) => ({ account_id: h.account_id, bps: h.bps })) },
   gas: GAS.other,
+  deposit: ONE_YOCTO,
 });
 
 export const setPolicyCall = (tokenId: string, policy: Policy): CallArgs => ({
   method: "set_policy",
   args: { token_id: tokenId, policy: { per_tx_max: policy.per_tx_max, daily_max: policy.daily_max, allowlist: policy.allowlist } },
   gas: GAS.other,
+  deposit: ONE_YOCTO,
 });
 
 export const setForeignPayoutsCall = (tokenId: string, payouts: ForeignPayout[]): CallArgs => ({
   method: "set_foreign_payouts",
   args: { token_id: tokenId, payouts },
   gas: GAS.other,
+  deposit: ONE_YOCTO,
 });
 
 /** dao_id null clears the DAO. */
@@ -103,12 +111,14 @@ export const setDaoCall = (tokenId: string, daoId: string | null): CallArgs => (
   method: "set_dao",
   args: { token_id: tokenId, dao_id: daoId },
   gas: GAS.other,
+  deposit: ONE_YOCTO,
 });
 
 export const setTimingCall = (tokenId: string, heartbeatIntervalS: number, graceMissed: number): CallArgs => ({
   method: "set_timing",
   args: { token_id: tokenId, heartbeat_interval_s: heartbeatIntervalS, grace_missed: graceMissed },
   gas: GAS.other,
+  deposit: ONE_YOCTO,
 });
 
 /** Appoint a guardian who may pause the trigger once per heartbeat cycle; guardian_id null clears it. */
@@ -116,10 +126,11 @@ export const setGuardianCall = (tokenId: string, guardianId: string | null, maxP
   method: "set_guardian",
   args: guardianId ? { token_id: tokenId, guardian_id: guardianId, max_pause_s: maxPauseS } : { token_id: tokenId, guardian_id: null },
   gas: GAS.other,
+  deposit: ONE_YOCTO,
 });
 
 /** Guardian or owner: hold off the trigger until now + max_pause_s. */
-export const pauseCall = (tokenId: string): CallArgs => ({ method: "pause", args: { token_id: tokenId }, gas: GAS.other });
+export const pauseCall = (tokenId: string): CallArgs => ({ method: "pause", args: { token_id: tokenId }, deposit: ONE_YOCTO, gas: GAS.other });
 
 /** Contract range for max_pause_s (lib.rs MIN_PAUSE_S..MAX_PAUSE_S). */
 export const PAUSE_RANGE_S = { min: 10, max: 90 * 24 * 3600 } as const;

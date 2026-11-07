@@ -2,7 +2,7 @@
 // Minimal NEAR testnet admin tool (no near-cli needed). Uses keeper/node_modules/near-api-js.
 //   node scripts/near-admin.mjs create <name>.testnet            -> creates via faucet, saves key to keys/<name>.json
 //   node scripts/near-admin.mjs deploy <acct> <wasm> [initJson]   -> deploys + calls new(initJson) if given
-//   node scripts/near-admin.mjs call <signer> <contract> <method> '<json>' [gasTgas] [depositNear]
+//   node scripts/near-admin.mjs call <signer> <contract> <method> '<json>' [gasTgas] [deposit: NEAR, or 1y = 1 yocto]
 //   node scripts/near-admin.mjs view <contract> <method> '<json>'
 //   node scripts/near-admin.mjs call-with-key <signerAcct> <ed25519:key> <contract> <method> '<json>' [gasTgas]
 //   node scripts/near-admin.mjs send <from> <to> <near>
@@ -20,6 +20,9 @@ const KEYS = join(here, '..', 'keys');
 const provider = new JsonRpcProvider({ url: RPC });
 const NEAR = 10n ** 24n;
 const toYocto = (n) => BigInt(Math.round(Number(n) * 1e6)) * (NEAR / 1_000_000n);
+// Deposit: NEAR as a decimal ("0.5") or yoctoNEAR with a `y` suffix ("1y": the 1 yocto that owner
+// methods and `pause` require, SPEC §2.3).
+const toDeposit = (d) => (/^\d+y$/.test(d) ? BigInt(d.slice(0, -1)) : toYocto(d));
 const tgas = (n) => BigInt(n) * 10n ** 12n;
 
 function loadKey(acct) {
@@ -60,7 +63,7 @@ try {
     if (a[2]) show(await acc.callFunctionRaw({ contractId: a[0], methodName: 'new', args: JSON.parse(a[2]), gas: tgas(100) }));
   } else if (cmd === 'call') {
     const acc = account(a[0]);
-    show(await acc.callFunctionRaw({ contractId: a[1], methodName: a[2], args: JSON.parse(a[3] || '{}'), gas: tgas(a[4] || 100), deposit: a[5] ? toYocto(a[5]) : 0n }));
+    show(await acc.callFunctionRaw({ contractId: a[1], methodName: a[2], args: JSON.parse(a[3] || '{}'), gas: tgas(a[4] || 100), deposit: a[5] ? toDeposit(a[5]) : 0n }));
   } else if (cmd === 'call-with-key') {
     const acc = account(a[0], a[1]);
     show(await acc.callFunctionRaw({ contractId: a[2], methodName: a[3], args: JSON.parse(a[4] || '{}'), gas: tgas(a[5] || 100) }));

@@ -116,22 +116,35 @@ for them exists anywhere; the contract requests signatures at settlement time.
 | `create_vault({heartbeat_interval_s, grace_missed, heirs, policy?, bounty?})` → `token_id` | anyone | ≥ 0.1 NEAR (storage) + vault balance | mints Will NFT to caller; `last_beat = now`; `balance = deposit − storage` |
 | `deposit({token_id})` | anyone | > 0 | adds to vault balance |
 | `heartbeat({token_id})` | owner, or pulse key (predecessor == contract && signer_pk ∈ pulse_keys) | — | `last_beat = now`; event |
-| `add_pulse_key({token_id, public_key})` | owner | — | stores pk; `Promise::new(current).add_access_key_allowance(pk, 1 NEAR, current, "heartbeat")` (see §2.7) |
-| `add_agent_key({token_id, public_key})` | owner | — | stores pk; FC key scoped to `agent_pay` |
-| `remove_key({token_id, public_key})` | owner | — | removes from vault + `delete_key` |
+| `add_pulse_key({token_id, public_key})` | owner | exactly 1 yocto | stores pk; `Promise::new(current).add_access_key_allowance(pk, 1 NEAR, current, "heartbeat")` (see §2.7) |
+| `add_agent_key({token_id, public_key})` | owner | exactly 1 yocto | stores pk; FC key scoped to `agent_pay` |
+| `remove_key({token_id, public_key})` | owner | exactly 1 yocto | removes from vault + `delete_key` |
 | `agent_pay({token_id, receiver_id, amount, memo?})` | agent key only | — | policy check; on allow: `balance -= amount`, `Promise::new(receiver).transfer(amount)`; event `agent_pay_allowed` / `agent_pay_denied` with `reason` in {`over_per_tx_max`, `over_daily_max`, `receiver_not_allowlisted`, `vault_not_alive`, `insufficient_balance`}. Denied calls **do not panic** (so the log entry persists) |
-| `set_heirs`, `set_policy`, `set_foreign_payouts`, `set_dao({token_id, dao_id})`, `set_timing({token_id, heartbeat_interval_s, grace_missed})` | owner, while not Triggered | — | update |
-| `set_guardian({token_id, guardian_id, max_pause_s})` | owner, while not Triggered | — | appoint (`guardian_id: null` clears) the guardian; `max_pause_s` 10 s..90 d (§2.8) |
-| `pause({token_id})` → `trigger_at_ms` | guardian or owner, while Live and before the deadline | — | `paused_until = now + max_pause_s`, once per heartbeat cycle; event `paused` (§2.8) |
+| `set_heirs`, `set_policy`, `set_foreign_payouts`, `set_dao({token_id, dao_id})`, `set_timing({token_id, heartbeat_interval_s, grace_missed})` | owner, while not Triggered | exactly 1 yocto | update |
+| `set_guardian({token_id, guardian_id, max_pause_s})` | owner, while not Triggered | exactly 1 yocto | appoint (`guardian_id: null` clears) the guardian; `max_pause_s` 10 s..90 d (§2.8) |
+| `pause({token_id})` → `trigger_at_ms` | guardian or owner, while Live and before the deadline | exactly 1 yocto (from either) | `paused_until = now + max_pause_s`, once per heartbeat cycle; event `paused` (§2.8) |
 | `poke({token_id})` | anyone | — | if deadline passed: state=Triggered, step=1, pay `bounty` to predecessor from balance, event `triggered`. Else panic `not_due` |
 | `execute_step({token_id, args?})` | anyone | — | runs the current step (see §2.4), advances `step`; idempotent on re-entry; panics if not Triggered or already Settled |
 | `mark_broadcast({token_id, index, tx_hash})` | anyone | — | sets foreign[index].status=broadcast, tx_hash (must equal the stored signed tx's id; §2.7) |
-| `claim({token_id})` | current NFT owner, only when Settled | — | transfers remaining balance to caller |
+| `claim({token_id})` | current NFT owner, only when Settled | — (deliberately) | transfers remaining balance to caller |
 | `get_vault({token_id})` → VaultView | view | | |
 | `get_vaults({from_index, limit})` → [VaultView] | view | | for keeper polling |
 | `get_vaults_for_owner({account_id})` | view | | |
-| `nft_token`, `nft_transfer`, `nft_transfer_call`, `nft_metadata`, `nft_total_supply`, `nft_tokens`, `nft_tokens_for_owner`, `nft_supply_for_owner` | NEP-171 / NEP-177 / NEP-181 | | `nft_transfer` by owner only while Alive/Warning (transfers ownership of the vault); `media` is an on-chain SVG data URI |
+| `nft_token`, `nft_transfer`, `nft_transfer_call`, `nft_metadata`, `nft_total_supply`, `nft_tokens`, `nft_tokens_for_owner`, `nft_supply_for_owner` | NEP-171 / NEP-177 / NEP-181 | exactly 1 yocto on `nft_transfer` / `nft_transfer_call` | `nft_transfer` by owner only while Alive/Warning (transfers ownership of the vault); `media` is an on-chain SVG data URI |
 | `contract_source_metadata` | NEP-330 | | |
+
+**Deposits (security review 2, M-6).** "exactly 1 yocto" means the call panics with `Requires attached deposit of
+exactly 1 yoctoNEAR` on 0 or on any other amount. A function-call access key cannot attach a deposit, so these methods can
+only be called with a full-access key, i.e. through a wallet confirmation: a dApp "sign in" key on the owner's account
+cannot redirect heirs, swap keys, change timing or appoint a guardian. `pause` asks the same of the guardian as of the
+owner, because a pause disarms the agent and holds off settlement; a guardian with only a function-call key cannot
+pause. The yocto stays in the contract account and is not added to the vault balance. `create_vault` (≥ 0.1 NEAR) and
+`deposit` (> 0) already need a non-zero deposit, so a function-call key cannot call them either. The deposit-free
+methods stay deposit-free on purpose: `heartbeat` must work from a pulse key, `agent_pay` from an agent key, and
+`poke` / `execute_step` / `mark_broadcast` / `resign_foreign` from any keeper. `claim` stays free so an heir who signed
+in to the dashboard with a function-call key can still collect; it only moves the remaining balance to the NFT owner
+after Settled, which a function-call key holder cannot redirect. `set_keeper` (contract owner, not a vault owner)
+is unchanged.
 
 Events are NEP-297: `EVENT_JSON:{"standard":"dmw","version":"1.0.0","event":"<name>","data":{...}}`.
 

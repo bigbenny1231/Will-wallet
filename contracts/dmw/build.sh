@@ -15,7 +15,8 @@ cd "$(dirname "$0")"
 code_hash() { node -e '
   const b=require("crypto").createHash("sha256").update(require("fs").readFileSync(process.argv[1])).digest();
   const A="123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"; let n=BigInt("0x"+b.toString("hex")), s="";
-  while (n > 0n) { s = A[Number(n % 58n)] + s; n /= 58n; } console.log(s);' "$1" 2>/dev/null || echo "?"; }
+  while (n > 0n) { s = A[Number(n % 58n)] + s; n /= 58n; }
+  for (const x of b) { if (x !== 0) break; s = "1" + s; } console.log(s);' "$1" 2>/dev/null || echo "?"; }
 
 if [ "${REPRODUCIBLE:-0}" = 1 ]; then
   command -v cargo-near >/dev/null 2>&1 || { echo "REPRODUCIBLE=1 needs cargo-near: cargo install cargo-near --locked" >&2; exit 1; }

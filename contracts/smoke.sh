@@ -25,8 +25,8 @@ AGENT_SK=$(echo "$AGENT" | python3 -c "import json,sys;print(json.load(sys.stdin
 echo "pulse key $PULSE_PK, agent key $AGENT_PK (private keys not recorded)"
 
 echo; echo "## add pulse + agent keys (function-call keys on $C)"
-run $TX call "$OWNER" "$C" add_pulse_key "{\"token_id\":\"$TOKEN\",\"public_key\":\"$PULSE_PK\"}" 50
-run $TX call "$OWNER" "$C" add_agent_key "{\"token_id\":\"$TOKEN\",\"public_key\":\"$AGENT_PK\"}" 50
+run $TX call "$OWNER" "$C" add_pulse_key "{\"token_id\":\"$TOKEN\",\"public_key\":\"$PULSE_PK\"}" 50 1y
+run $TX call "$OWNER" "$C" add_agent_key "{\"token_id\":\"$TOKEN\",\"public_key\":\"$AGENT_PK\"}" 50 1y
 echo; echo "\$ $NA keys $C   # filtered to the two new keys"
 $NA keys "$C" | python3 -c "
 import json,sys
@@ -53,7 +53,7 @@ for args in \
 done
 
 echo; echo "## set_timing to 20 s / grace 1, then one last pulse-key heartbeat"
-run $TX call "$OWNER" "$C" set_timing "{\"token_id\":\"$TOKEN\",\"heartbeat_interval_s\":20,\"grace_missed\":1}" 30
+run $TX call "$OWNER" "$C" set_timing "{\"token_id\":\"$TOKEN\",\"heartbeat_interval_s\":20,\"grace_missed\":1}" 30 1y
 echo "\$ $TX call-with-key $C <pulse-private-key> $C heartbeat '{\"token_id\":\"$TOKEN\"}' 10"
 $TX call-with-key "$C" "$PULSE_SK" "$C" heartbeat "{\"token_id\":\"$TOKEN\"}" 10
 

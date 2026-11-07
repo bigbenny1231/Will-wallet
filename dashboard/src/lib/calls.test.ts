@@ -100,14 +100,14 @@ describe("simple calls", () => {
   const cases: [string, ReturnType<typeof C.heartbeatCall>, { args: Record<string, unknown>; gas: string; deposit?: string }][] = [
     ["deposit", C.depositCall("4", "1000"), { args: { token_id: "4" }, gas: gas(30), deposit: "1000" }],
     ["heartbeat", C.heartbeatCall("4"), { args: { token_id: "4" }, gas: gas(10) }],
-    ["add_pulse_key", C.addPulseKeyCall("4", PK), { args: { token_id: "4", public_key: PK }, gas: gas(50) }],
-    ["add_agent_key", C.addAgentKeyCall("4", PK), { args: { token_id: "4", public_key: PK }, gas: gas(50) }],
-    ["remove_key", C.removeKeyCall("4", PK), { args: { token_id: "4", public_key: PK }, gas: gas(30) }],
-    ["set_heirs", C.setHeirsCall("4", heirs), { args: { token_id: "4", heirs }, gas: gas(30) }],
-    ["set_policy", C.setPolicyCall("4", policy), { args: { token_id: "4", policy }, gas: gas(30) }],
-    ["set_foreign_payouts", C.setForeignPayoutsCall("4", [payout]), { args: { token_id: "4", payouts: [payout] }, gas: gas(30) }],
-    ["set_dao", C.setDaoCall("4", "estate-4.sputnik-v2.testnet"), { args: { token_id: "4", dao_id: "estate-4.sputnik-v2.testnet" }, gas: gas(30) }],
-    ["set_timing", C.setTimingCall("4", 20, 1), { args: { token_id: "4", heartbeat_interval_s: 20, grace_missed: 1 }, gas: gas(30) }],
+    ["add_pulse_key", C.addPulseKeyCall("4", PK), { args: { token_id: "4", public_key: PK }, gas: gas(50), deposit: "1" }],
+    ["add_agent_key", C.addAgentKeyCall("4", PK), { args: { token_id: "4", public_key: PK }, gas: gas(50), deposit: "1" }],
+    ["remove_key", C.removeKeyCall("4", PK), { args: { token_id: "4", public_key: PK }, gas: gas(30), deposit: "1" }],
+    ["set_heirs", C.setHeirsCall("4", heirs), { args: { token_id: "4", heirs }, gas: gas(30), deposit: "1" }],
+    ["set_policy", C.setPolicyCall("4", policy), { args: { token_id: "4", policy }, gas: gas(30), deposit: "1" }],
+    ["set_foreign_payouts", C.setForeignPayoutsCall("4", [payout]), { args: { token_id: "4", payouts: [payout] }, gas: gas(30), deposit: "1" }],
+    ["set_dao", C.setDaoCall("4", "estate-4.sputnik-v2.testnet"), { args: { token_id: "4", dao_id: "estate-4.sputnik-v2.testnet" }, gas: gas(30), deposit: "1" }],
+    ["set_timing", C.setTimingCall("4", 20, 1), { args: { token_id: "4", heartbeat_interval_s: 20, grace_missed: 1 }, gas: gas(30), deposit: "1" }],
     ["poke", C.pokeCall("4"), { args: { token_id: "4" }, gas: gas(30) }],
     ["execute_step", C.executeStepCall("4"), { args: { token_id: "4" }, gas: gas(300) }],
     ["mark_broadcast", C.markBroadcastCall("4", 0, "0xabc"), { args: { token_id: "4", index: 0, tx_hash: "0xabc" }, gas: gas(30) }],
@@ -122,6 +122,14 @@ describe("simple calls", () => {
       expectMatchesContract(call);
     });
   }
+  it("1 yocto exactly where lib.rs asserts it (review 2 M-6): owner mutators and pause, not heartbeat/claim", () => {
+    const owner = ["add_pulse_key", "add_agent_key", "remove_key", "set_heirs", "set_policy", "set_foreign_payouts", "set_dao", "set_timing", "set_guardian", "pause"];
+    for (const m of owner) expect(LIB).toMatch(new RegExp(`#\\[payable\\]\\s+pub fn ${m}\\(`));
+    expect(LIB).toMatch(/fn require_owner_mutable\(&self, v: &Vault\) \{\s+assert_one_yocto\(\);/);
+    expect(LIB).toMatch(/pub fn pause\(&mut self, token_id: TokenRef\) -> u64 \{\s+(\/\/.*\s+)*assert_one_yocto\(\);/);
+    for (const m of ["heartbeat", "poke", "execute_step", "mark_broadcast", "claim"]) expect(LIB).not.toMatch(new RegExp(`#\\[payable\\]\\s+pub fn ${m}\\(`));
+    expect(C.setGuardianCall("4", null).deposit).toBe("1");
+  });
   it("set_dao null clears the DAO", () => {
     expect(C.setDaoCall("4", null).args).toEqual({ token_id: "4", dao_id: null });
   });
@@ -172,10 +180,10 @@ describe("create follow-ups", () => {
       tx_hash: null,
     });
   });
-  it("followUpCalls: set_foreign_payouts then set_dao, 30 TGas each, nothing when empty", () => {
+  it("followUpCalls: set_foreign_payouts then set_dao, 30 TGas and 1 yocto each, nothing when empty", () => {
     const calls = C.followUpCalls("7", [payout], "estate-7.sputnik-v2.testnet");
     expect(calls.map((c) => c.method)).toEqual(["set_foreign_payouts", "set_dao"]);
-    expect(calls.every((c) => c.gas === gas(30) && c.deposit === undefined)).toBe(true);
+    expect(calls.every((c) => c.gas === gas(30) && c.deposit === "1")).toBe(true);
     expect(C.followUpCalls("7", [], null)).toEqual([]);
   });
 });
@@ -229,7 +237,7 @@ describe("step 3 current payout", () => {
 describe("guardian calls (SPEC 2.8)", () => {
   it("set_guardian names a guardian with a pause length", () => {
     const c = C.setGuardianCall("4", "ana.testnet", 3600);
-    expect(c).toEqual({ method: "set_guardian", args: { token_id: "4", guardian_id: "ana.testnet", max_pause_s: 3600 }, gas: gas(30) });
+    expect(c).toEqual({ method: "set_guardian", args: { token_id: "4", guardian_id: "ana.testnet", max_pause_s: 3600 }, deposit: "1", gas: gas(30) });
     expectMatchesContract(c);
   });
   it("set_guardian with null clears it and sends no pause length", () => {
@@ -239,7 +247,7 @@ describe("guardian calls (SPEC 2.8)", () => {
   });
   it("pause takes only the token", () => {
     const c = C.pauseCall("4");
-    expect(c).toEqual({ method: "pause", args: { token_id: "4" }, gas: gas(30) });
+    expect(c).toEqual({ method: "pause", args: { token_id: "4" }, deposit: "1", gas: gas(30) });
     expectMatchesContract(c);
   });
   it("pause range matches the contract constants", () => {

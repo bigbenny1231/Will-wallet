@@ -24,7 +24,7 @@ H-3. The reviewer did not write the code.
 | --- | --- | --- | --- |
 | H-4 | High | A second Monad payout can be made to revert under Monad's reserve-balance rule. Its pinned nonce is then used, so the payout is stuck for good | Fixed |
 | M-5 | Medium | Front-running step 3 with fees at the cap blocks every re-sign; on Monad, gas-limit billing makes the worst case 0.1 MON per payout, not 0.021 | Documented |
-| M-6 | Medium | Owner mutators, including `set_guardian`, accept 0-deposit calls, so a function-call key on the owner's account can use them (from round 1) | Documented |
+| M-6 | Medium | Owner mutators, including `set_guardian`, accept 0-deposit calls, so a function-call key on the owner's account can use them (from round 1) | Fixed |
 | L-7 | Low | A running pause survives an NFT transfer and an `nft_transfer_call` revert | By design, documented |
 | L-8 | Low | A guardian can keep the agent disarmed by re-pausing after every heartbeat; an early pause uses up the cycle's only pause | Documented |
 | L-9 | Low | The `guard:<id>` slot is not charged and is never removed after Trigger/Settle (stale guardian shown on settled vaults) | Documented |
@@ -144,6 +144,20 @@ pause.
 **Recommendation:** add `assert_one_yocto()` to every owner mutator and to `pause`. This changes
 the interface (callers must attach 1 yocto), and the keeper, dashboard and agent are being edited
 concurrently, so the change is left for a coordinated release.
+
+**Status: Fixed.** Every owner mutator (`set_heirs`, `set_policy`, `set_foreign_payouts`,
+`set_dao`, `set_timing`, `set_guardian`, `add_pulse_key`, `add_agent_key`, `remove_key`) is now
+`#[payable]` and calls `assert_one_yocto()` through `require_owner_mutable`, and `pause` asserts it
+first, for the guardian and the owner alike (a guardian with only a function-call key cannot
+pause; that is intended, since a pause disarms the agent). `create_vault` and `deposit` already
+need a non-zero deposit. `heartbeat`, `agent_pay`, `poke`, `execute_step`, `mark_broadcast` and
+`resign_foreign` stay deposit-free (pulse keys, agent keys and keepers call them), and so does
+`claim`, so an heir signed in with a function-call key can still collect after settlement.
+Callers attach 1 yocto: dashboard `calls.ts` builders, `scripts/demo.sh`, `contracts/smoke.sh`
+and the video tools (`tx.mjs` / `near-admin.mjs` take `1y` as the deposit). Unit test
+`m6_owner_mutators_and_pause_require_one_yocto` checks that each method rejects 0 and 2 yocto and
+accepts 1; SPEC §2.3 lists the deposit per method. Redeployed to `dmw-x8cx.testnet` (state
+compatible: no storage layout change).
 
 ## Low
 

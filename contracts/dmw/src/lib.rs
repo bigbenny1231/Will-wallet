@@ -4,8 +4,8 @@
 use near_sdk::collections::{LookupMap, UnorderedMap};
 use near_sdk::json_types::{Base64VecU8, U128};
 use near_sdk::{
-    env, near, require, AccountId, BorshStorageKey, Gas, NearToken, PanicOnDefault, Promise,
-    PromiseOrValue, PublicKey,
+    assert_one_yocto, env, near, require, AccountId, BorshStorageKey, Gas, NearToken,
+    PanicOnDefault, Promise, PromiseOrValue, PublicKey,
 };
 use serde_json::json;
 
@@ -257,16 +257,19 @@ impl Contract {
 
     /// Store a pulse key and add it to the contract account as a function-call key
     /// limited to `heartbeat`. The key's gas allowance is reserved from the vault.
+    #[payable]
     pub fn add_pulse_key(&mut self, token_id: TokenRef, public_key: PublicKey) -> Promise {
         self.add_key(token_id.id(), public_key, KeyKind::Pulse)
     }
 
     /// Same as `add_pulse_key` but the key may only call `agent_pay`.
+    #[payable]
     pub fn add_agent_key(&mut self, token_id: TokenRef, public_key: PublicKey) -> Promise {
         self.add_key(token_id.id(), public_key, KeyKind::Agent)
     }
 
     /// Remove a pulse or agent key from the vault and delete it from the contract account.
+    #[payable]
     pub fn remove_key(&mut self, token_id: TokenRef, public_key: PublicKey) {
         let id = token_id.id();
         let mut v = self.vault(id);
@@ -367,6 +370,7 @@ impl Contract {
         res
     }
 
+    #[payable]
     pub fn set_heirs(&mut self, token_id: TokenRef, heirs: Vec<Heir>) {
         let id = token_id.id();
         let mut v = self.vault(id);
@@ -379,6 +383,7 @@ impl Contract {
         self.vaults.insert(&id, &v);
     }
 
+    #[payable]
     pub fn set_policy(&mut self, token_id: TokenRef, policy: Policy) {
         let id = token_id.id();
         let mut v = self.vault(id);
@@ -391,6 +396,7 @@ impl Contract {
     }
 
     /// Replace the foreign payout list. Status is forced to `pending`.
+    #[payable]
     pub fn set_foreign_payouts(&mut self, token_id: TokenRef, payouts: Vec<ForeignPayout>) {
         let id = token_id.id();
         let mut v = self.vault(id);
@@ -439,6 +445,7 @@ impl Contract {
         self.vaults.insert(&id, &v);
     }
 
+    #[payable]
     pub fn set_dao(&mut self, token_id: TokenRef, dao_id: Option<AccountId>) {
         let id = token_id.id();
         let mut v = self.vault(id);
@@ -450,6 +457,7 @@ impl Contract {
         self.vaults.insert(&id, &v);
     }
 
+    #[payable]
     pub fn set_timing(&mut self, token_id: TokenRef, heartbeat_interval_s: u64, grace_missed: u32) {
         let id = token_id.id();
         let mut v = self.vault(id);
@@ -471,6 +479,7 @@ impl Contract {
     /// Owner, while not Triggered: appoint (or clear, with `guardian_id: null`) a guardian
     /// who may `pause` the vault once per heartbeat cycle for `max_pause_s` (SPEC §2.8).
     /// Changing the guardian does not touch a pause that is already running.
+    #[payable]
     pub fn set_guardian(
         &mut self,
         token_id: TokenRef,
@@ -510,7 +519,11 @@ impl Contract {
     /// until `now + max_pause_s` (SPEC §2.8). One pause per heartbeat cycle: a second pause
     /// is rejected until a heartbeat lands. While paused the vault reads as `Warning`, so
     /// `agent_pay` is denied. Returns the new effective `trigger_at_ms`.
+    #[payable]
     pub fn pause(&mut self, token_id: TokenRef) -> u64 {
+        // 1 yocto from the guardian and the owner alike (review 2 M-6): a pause disarms the
+        // agent, so a dApp's function-call key must not be able to do it silently.
+        assert_one_yocto();
         let id = token_id.id();
         let mut v = self.vault(id);
         let pred = env::predecessor_account_id();
@@ -1071,7 +1084,11 @@ impl Contract {
         self.vaults.get(&id).map(|v| hydrate(id, v))
     }
 
+    /// Owner-only mutators need exactly 1 yoctoNEAR attached (review 2 M-6): a function-call
+    /// access key cannot attach a deposit, so only a full-access key (a wallet prompt) can
+    /// call them.
     fn require_owner_mutable(&self, v: &Vault) {
+        assert_one_yocto();
         require!(
             env::predecessor_account_id() == v.owner_id,
             "only the vault owner"

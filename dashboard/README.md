@@ -85,5 +85,7 @@ The heir page uses the inverted (bone) palette. Screenshots: `shots/v2-*.png`, `
 - Deploy: `vercel.json` rewrites everything except `sw.js`, the manifest and icons to `index.html`, and serves `sw.js` with `no-cache`.
 - Vault page buttons: Heartbeat (10 TGas), Poke (anyone, enabled once `now >= trigger_at_ms`), Execute next step (anyone, 300 TGas, only
   while Triggered; step 3 fetches the Base/Monad nonce and fees, capped at the contract's 100 gwei, or the Solana blockhash first), Claim, Deposit, Transfer (nft_transfer, 1 yocto).
+  Every owner edit (heirs, policy, payouts, DAO, timing, guardian, add/remove key) and Pause attach exactly 1 yocto (contract
+  `assert_one_yocto`, review 2 M-6), so they always open a wallet confirmation; Heartbeat, Poke, Execute and Claim attach nothing.
   Signed foreign payouts get a "Broadcast and record" button (RPC send, then `mark_broadcast`).
 - Each pulse/agent key reserves 1 NEAR of the vault balance, so keep the balance above that before adding keys.

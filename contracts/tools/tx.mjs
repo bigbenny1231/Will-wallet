@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Like scripts/near-admin.mjs `call` / `call-with-key`, but prints the tx link,
 // every receipt log and the final result (used by contracts/smoke.sh).
-//   node contracts/tools/tx.mjs call <signer> <contract> <method> '<json>' [tgas] [depositNear]
+//   node contracts/tools/tx.mjs call <signer> <contract> <method> '<json>' [tgas] [deposit: NEAR, or 1y = 1 yocto]
 //   node contracts/tools/tx.mjs call-with-key <signerAcct> <ed25519:secret> <contract> <method> '<json>' [tgas]
 import { createRequire } from 'node:module';
 import { readFileSync, existsSync } from 'node:fs';
@@ -13,6 +13,9 @@ const { KeyPair, KeyPairSigner, Account, providers } = require('near-api-js');
 const provider = new providers.JsonRpcProvider({ url: process.env.NEAR_RPC || 'https://rpc.testnet.near.org' });
 const NEAR = 10n ** 24n;
 const toYocto = (n) => BigInt(Math.round(Number(n) * 1e6)) * (NEAR / 1_000_000n);
+// Deposit: NEAR as a decimal ("0.5") or yoctoNEAR with a `y` suffix ("1y": the 1 yocto that owner
+// methods and `pause` require, SPEC §2.3).
+const toDeposit = (d) => (/^\d+y$/.test(d) ? BigInt(d.slice(0, -1)) : toYocto(d));
 
 function loadKey(acct) {
   for (const p of [join(here, '../../keys', `${acct}.json`), join(process.env.HOME, '.near-credentials/testnet', `${acct}.json`)]) {
@@ -32,7 +35,7 @@ let r;
 try {
   r = await acc.callFunctionRaw({
     contractId: contract, methodName: method, args: JSON.parse(args || '{}'),
-    gas: BigInt(gas || 100) * 10n ** 12n, deposit: deposit ? toYocto(deposit) : 0n,
+    gas: BigInt(gas || 100) * 10n ** 12n, deposit: deposit ? toDeposit(deposit) : 0n,
   });
 } catch (e) {
   // Errors before inclusion (e.g. access-key scope) have no tx; failures after inclusion carry one.

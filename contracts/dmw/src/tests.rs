@@ -126,7 +126,7 @@ fn confirm_key(c: &mut Contract, k: PublicKey, kind: KeyKind) {
 }
 
 fn with_agent_key(c: &mut Contract) {
-    Ctx::new().set();
+    Ctx::new().dep(1).set();
     let _ = c.add_agent_key(1.into(), pk(2));
     confirm_key(c, pk(2), KeyKind::Agent);
 }
@@ -212,7 +212,7 @@ fn heartbeat_by_owner_resets_clock() {
 #[test]
 fn heartbeat_by_pulse_key() {
     let mut c = setup();
-    Ctx::new().set();
+    Ctx::new().dep(1).set();
     let _ = c.add_pulse_key(1.into(), pk(1));
     confirm_key(&mut c, pk(1), KeyKind::Pulse);
     assert_eq!(v(&c).pulse_keys, vec![pk(1)]);
@@ -252,7 +252,7 @@ fn heartbeat_rejected_once_triggered() {
 #[test]
 fn add_key_reserves_allowance_and_failure_refunds() {
     let mut c = setup();
-    Ctx::new().set();
+    Ctx::new().dep(1).set();
     let _ = c.add_pulse_key(1.into(), pk(1));
     assert_eq!(v(&c).balance, 10 * NEAR1 - KEY_ALLOWANCE);
     assert!(
@@ -271,7 +271,7 @@ fn add_key_reserves_allowance_and_failure_refunds() {
 #[should_panic(expected = "public key already registered")]
 fn key_cannot_be_registered_twice() {
     let mut c = setup();
-    Ctx::new().set();
+    Ctx::new().dep(1).set();
     let _ = c.add_pulse_key(1.into(), pk(1));
     let _ = c.add_agent_key(1.into(), pk(1));
 }
@@ -280,7 +280,7 @@ fn key_cannot_be_registered_twice() {
 #[should_panic(expected = "only the vault owner")]
 fn only_owner_adds_keys() {
     let mut c = setup();
-    Ctx::new().by("mallory.testnet").set();
+    Ctx::new().by("mallory.testnet").dep(1).set();
     let _ = c.add_pulse_key(1.into(), pk(1));
 }
 
@@ -288,7 +288,7 @@ fn only_owner_adds_keys() {
 fn remove_key_clears_vault_and_registry() {
     let mut c = setup();
     with_agent_key(&mut c);
-    Ctx::new().set();
+    Ctx::new().dep(1).set();
     c.remove_key(1.into(), pk(2));
     assert!(v(&c).agent_keys.is_empty());
     assert!(!c.key_index.contains_key(&pk(2)));
@@ -368,7 +368,7 @@ fn agent_pay_denied_vault_not_alive() {
 fn agent_pay_denied_insufficient_balance() {
     let mut c = setup();
     with_agent_key(&mut c);
-    Ctx::new().set();
+    Ctx::new().dep(1).set();
     c.set_policy(
         1.into(),
         Policy {
@@ -478,11 +478,11 @@ fn trigger(c: &mut Contract) {
 #[test]
 fn step_ordering_1_to_6_with_stub() {
     let mut c = setup();
-    Ctx::new().set();
+    Ctx::new().dep(1).set();
     let _ = c.add_pulse_key(1.into(), pk(1));
     confirm_key(&mut c, pk(1), KeyKind::Pulse);
     with_agent_key(&mut c);
-    Ctx::new().set();
+    Ctx::new().dep(1).set();
     c.set_foreign_payouts(
         1.into(),
         vec![ForeignPayout {
@@ -591,7 +591,7 @@ fn step3_without_payouts_goes_to_4() {
 #[test]
 fn step3_inflight_timeout_fails_payout_and_ignores_late_callback() {
     let mut c = setup();
-    Ctx::new().set();
+    Ctx::new().dep(1).set();
     c.set_foreign_payouts(
         1.into(),
         vec![ForeignPayout {
@@ -624,7 +624,7 @@ fn step3_inflight_timeout_fails_payout_and_ignores_late_callback() {
 #[test]
 fn step1_keeps_dao_reserve_and_step4_proposes() {
     let mut c = setup();
-    Ctx::new().set();
+    Ctx::new().dep(1).set();
     c.set_dao(1.into(), Some(acc("estate.sputnik-v2.testnet")));
     trigger(&mut c);
     let bal = v(&c).balance;
@@ -711,14 +711,14 @@ fn claim_rejects_non_owner() {
 fn owner_mutators_rejected_once_triggered() {
     let mut c = setup();
     trigger(&mut c);
-    Ctx::new().at(T0 + 41_000).set();
+    Ctx::new().at(T0 + 41_000).dep(1).set();
     c.set_heirs(1.into(), heirs2());
 }
 
 #[test]
 fn mark_broadcast_requires_signed() {
     let mut c = setup();
-    Ctx::new().set();
+    Ctx::new().dep(1).set();
     c.set_foreign_payouts(
         1.into(),
         vec![ForeignPayout {
@@ -812,7 +812,7 @@ fn heir_bps_validation() {
 #[test]
 fn primary_heir_highest_bps_first_on_tie() {
     let mut c = setup();
-    Ctx::new().set();
+    Ctx::new().dep(1).set();
     c.set_heirs(
         1.into(),
         vec![
@@ -1022,7 +1022,7 @@ fn mpc_ed_response(sig_hex: &str) -> serde_json::Value {
 /// Vault 1 triggered with the given payouts and steps 1-2 done (next: step 3).
 fn at_step3(payouts: Vec<ForeignPayout>) -> Contract {
     let mut c = setup();
-    Ctx::new().set();
+    Ctx::new().dep(1).set();
     c.set_foreign_payouts(1.into(), payouts);
     trigger(&mut c);
     Ctx::new().by("keeper.testnet").at(T0 + 41_000).set();
@@ -1503,7 +1503,7 @@ fn h1_evm_broadcast_resign_needs_cooldown_and_clears_hash() {
 fn h3_nft_transfer_revokes_previous_owner_keys() {
     let mut c = setup();
     with_agent_key(&mut c);
-    Ctx::new().set();
+    Ctx::new().dep(1).set();
     let _ = c.add_pulse_key(1.into(), pk(1));
     confirm_key(&mut c, pk(1), KeyKind::Pulse);
     Ctx::new().dep(1).set();
@@ -1530,7 +1530,7 @@ fn h3_nft_transfer_revokes_previous_owner_keys() {
 #[test]
 fn h3_key_add_landing_after_transfer_is_revoked() {
     let mut c = setup();
-    Ctx::new().set();
+    Ctx::new().dep(1).set();
     let _ = c.add_agent_key(1.into(), pk(3));
     Ctx::new().dep(1).set();
     c.nft_transfer(acc("bob.testnet"), "1".into(), None, None);
@@ -1548,7 +1548,7 @@ fn h3_key_add_landing_after_transfer_is_revoked() {
 #[should_panic(expected = "unauthorized: not owner or pulse key")]
 fn l4_pulse_key_must_be_signed_by_contract_account() {
     let mut c = setup();
-    Ctx::new().set();
+    Ctx::new().dep(1).set();
     let _ = c.add_pulse_key(1.into(), pk(1));
     confirm_key(&mut c, pk(1), KeyKind::Pulse);
     // same public key, but the tx signer is some other account
@@ -1622,7 +1622,7 @@ fn m1_storage_of_a_full_vault_vs_flat_fee() {
 /// Vault 1 (interval 20 s, grace 1: trigger at T0 + 40 s) with guardian `gina` and a 100 s pause.
 fn with_guardian() -> Contract {
     let mut c = setup();
-    Ctx::new().set();
+    Ctx::new().dep(1).set();
     c.set_guardian(1.into(), Some(acc("gina.testnet")), Some(100));
     c
 }
@@ -1641,10 +1641,10 @@ fn guardian_set_by_owner_shows_in_view() {
 #[test]
 fn set_guardian_owner_only_and_validated() {
     let mut c = setup();
-    Ctx::new().by("mallory.testnet").set();
+    Ctx::new().by("mallory.testnet").dep(1).set();
     let m = panics(|| c.set_guardian(1.into(), Some(acc("mallory.testnet")), Some(100)));
     assert!(m.contains("only the vault owner"), "{m}");
-    Ctx::new().set();
+    Ctx::new().dep(1).set();
     let m = panics(|| c.set_guardian(1.into(), Some(acc("gina.testnet")), None));
     assert!(m.contains("max_pause_s is required"), "{m}");
     let m = panics(|| c.set_guardian(1.into(), Some(acc("gina.testnet")), Some(5)));
@@ -1665,7 +1665,7 @@ fn set_guardian_owner_only_and_validated() {
 fn guardian_pause_extends_deadline_from_now() {
     let mut c = with_guardian();
     // in Warning (T0 + 30 s; base deadline T0 + 40 s)
-    Ctx::new().by("gina.testnet").at(T0 + 30_000).set();
+    Ctx::new().by("gina.testnet").at(T0 + 30_000).dep(1).set();
     let new_deadline = c.pause(1.into());
     assert_eq!(new_deadline, T0 + 30_000 + 100_000);
     let view = c.get_vault(1.into()).unwrap();
@@ -1695,15 +1695,15 @@ fn guardian_pause_extends_deadline_from_now() {
 #[test]
 fn second_pause_rejected_until_heartbeat() {
     let mut c = with_guardian();
-    Ctx::new().by("gina.testnet").at(T0 + 10_000).set();
+    Ctx::new().by("gina.testnet").at(T0 + 10_000).dep(1).set();
     c.pause(1.into());
     // neither the guardian nor the owner may stack a second pause
-    Ctx::new().by("gina.testnet").at(T0 + 100_000).set();
+    Ctx::new().by("gina.testnet").at(T0 + 100_000).dep(1).set();
     let m = panics(|| {
         c.pause(1.into());
     });
     assert!(m.contains("already_paused"), "{m}");
-    Ctx::new().at(T0 + 100_000).set();
+    Ctx::new().at(T0 + 100_000).dep(1).set();
     let m = panics(|| {
         c.pause(1.into());
     });
@@ -1715,7 +1715,7 @@ fn second_pause_rejected_until_heartbeat() {
     assert_eq!(view.paused_until_ms, 0);
     assert_eq!(view.trigger_at_ms, T0 + 105_000 + 40_000);
     assert_eq!(view.state, VaultState::Alive);
-    Ctx::new().by("gina.testnet").at(T0 + 110_000).set();
+    Ctx::new().by("gina.testnet").at(T0 + 110_000).dep(1).set();
     assert_eq!(c.pause(1.into()), T0 + 210_000);
 }
 
@@ -1723,10 +1723,10 @@ fn second_pause_rejected_until_heartbeat() {
 fn pause_cannot_extend_indefinitely() {
     // Once paused, the deadline is fixed at paused_until no matter how often anyone tries.
     let mut c = with_guardian();
-    Ctx::new().by("gina.testnet").at(T0 + 39_000).set();
+    Ctx::new().by("gina.testnet").at(T0 + 39_000).dep(1).set();
     let d = c.pause(1.into());
     for t in [T0 + 50_000, T0 + 100_000, T0 + 138_999] {
-        Ctx::new().by("gina.testnet").at(t).set();
+        Ctx::new().by("gina.testnet").at(t).dep(1).set();
         let _ = panics(|| {
             c.pause(1.into());
         });
@@ -1738,12 +1738,12 @@ fn pause_cannot_extend_indefinitely() {
 #[test]
 fn owner_may_pause_strangers_may_not() {
     let mut c = with_guardian();
-    Ctx::new().by("mallory.testnet").at(T0 + 5_000).set();
+    Ctx::new().by("mallory.testnet").at(T0 + 5_000).dep(1).set();
     let m = panics(|| {
         c.pause(1.into());
     });
     assert!(m.contains("not guardian or owner"), "{m}");
-    Ctx::new().at(T0 + 5_000).set();
+    Ctx::new().at(T0 + 5_000).dep(1).set();
     assert_eq!(c.pause(1.into()), T0 + 105_000);
     assert!(v(&c).log.last().unwrap().detail.starts_with("owner "));
 }
@@ -1751,7 +1751,7 @@ fn owner_may_pause_strangers_may_not() {
 #[test]
 fn pause_requires_guardian_configured() {
     let mut c = setup();
-    Ctx::new().at(T0 + 5_000).set();
+    Ctx::new().at(T0 + 5_000).dep(1).set();
     let m = panics(|| {
         c.pause(1.into());
     });
@@ -1762,19 +1762,19 @@ fn pause_requires_guardian_configured() {
 fn pause_rejected_when_triggered_or_past_deadline() {
     let mut c = with_guardian();
     // past the deadline but not yet poked: too late
-    Ctx::new().by("gina.testnet").at(T0 + 40_000).set();
+    Ctx::new().by("gina.testnet").at(T0 + 40_000).dep(1).set();
     let m = panics(|| {
         c.pause(1.into());
     });
     assert!(m.contains("deadline_passed"), "{m}");
     trigger(&mut c);
-    Ctx::new().by("gina.testnet").at(T0 + 40_001).set();
+    Ctx::new().by("gina.testnet").at(T0 + 40_001).dep(1).set();
     let m = panics(|| {
         c.pause(1.into());
     });
     assert!(m.contains("vault_triggered"), "{m}");
     // owner cannot reconfigure the guardian once triggered either
-    Ctx::new().at(T0 + 40_001).set();
+    Ctx::new().at(T0 + 40_001).dep(1).set();
     let m = panics(|| c.set_guardian(1.into(), None, None));
     assert!(m.contains("vault_triggered"), "{m}");
 }
@@ -1784,7 +1784,7 @@ fn paused_vault_reads_warning_and_denies_agent_pay() {
     let mut c = with_guardian();
     with_agent_key(&mut c);
     // pause while Alive: state becomes Warning, agent disarmed
-    Ctx::new().by("gina.testnet").at(T0 + 5_000).set();
+    Ctx::new().by("gina.testnet").at(T0 + 5_000).dep(1).set();
     c.pause(1.into());
     Ctx::new().at(T0 + 6_000).set();
     assert_eq!(c.get_vault(1.into()).unwrap().state, VaultState::Warning);
@@ -1806,14 +1806,14 @@ fn paused_vault_reads_warning_and_denies_agent_pay() {
 #[test]
 fn nft_transfer_clears_guardian_but_keeps_running_pause() {
     let mut c = with_guardian();
-    Ctx::new().by("gina.testnet").at(T0 + 5_000).set();
+    Ctx::new().by("gina.testnet").at(T0 + 5_000).dep(1).set();
     c.pause(1.into());
     Ctx::new().dep(1).at(T0 + 6_000).set();
     c.nft_transfer(acc("buyer.testnet"), "1".into(), None, None);
     let view = c.get_vault(1.into()).unwrap();
     assert_eq!(view.guardian_id, None);
     assert_eq!(view.paused_until_ms, T0 + 105_000);
-    Ctx::new().by("gina.testnet").at(T0 + 7_000).set();
+    Ctx::new().by("gina.testnet").at(T0 + 7_000).dep(1).set();
     let m = panics(|| {
         c.pause(1.into());
     });
@@ -1859,7 +1859,7 @@ fn monad_payout() -> ForeignPayout {
 #[test]
 fn monad_payout_validation() {
     let mut c = setup();
-    Ctx::new().set();
+    Ctx::new().dep(1).set();
     let bad = ForeignPayout {
         to: "cd".repeat(21),
         ..monad_payout()
@@ -1972,7 +1972,7 @@ fn config_lists_chain_registry() {
 #[test]
 fn h4_at_most_one_monad_payout_per_vault() {
     let mut c = setup();
-    Ctx::new().set();
+    Ctx::new().dep(1).set();
     // Two payouts from monad-<id>: the second could be relayed right behind the first,
     // revert under Monad's reserve-balance rule and burn its pinned nonce.
     let m = panics(|| c.set_foreign_payouts(1.into(), vec![monad_payout(), monad_payout()]));
@@ -2014,4 +2014,77 @@ fn h4_single_monad_payout_signs_nonce_zero_after_base() {
     let c = at_step3(vec![base_payout(), base_payout(), monad_payout()]);
     assert_eq!(foreign::evm_nonce_for(&v(&c).foreign, 2), 0);
     assert_eq!(foreign::evm_nonce_for(&v(&c).foreign, 1), 1);
+}
+
+// ---------------------------------------------------------------- 1 yocto on owner mutators (review 2 M-6)
+
+/// Every owner mutator and `pause` (owner or guardian) rejects 0 and 2 yocto, so a function-call
+/// access key (which cannot attach a deposit) can never call them; 1 yocto goes through.
+#[test]
+fn m6_owner_mutators_and_pause_require_one_yocto() {
+    type Call = fn(&mut Contract);
+    let calls: Vec<(&str, Call)> = vec![
+        ("set_heirs", |c| c.set_heirs(1.into(), heirs2())),
+        ("set_policy", |c| c.set_policy(1.into(), policy())),
+        ("set_foreign_payouts", |c| {
+            c.set_foreign_payouts(1.into(), vec![base_payout()])
+        }),
+        ("set_dao", |c| {
+            c.set_dao(1.into(), Some(acc("estate.sputnik-v2.testnet")))
+        }),
+        ("set_timing", |c| c.set_timing(1.into(), 30, 2)),
+        ("set_guardian", |c| {
+            c.set_guardian(1.into(), Some(acc("gina.testnet")), Some(100))
+        }),
+        ("add_pulse_key", |c| {
+            let _ = c.add_pulse_key(1.into(), pk(1));
+        }),
+        ("add_agent_key", |c| {
+            let _ = c.add_agent_key(1.into(), pk(2));
+        }),
+        ("remove_key", |c| c.remove_key(1.into(), pk(9))),
+    ];
+    // One contract for every call: the mocked storage outlives `testing_env!`.
+    let mut c = with_guardian();
+    Ctx::new().dep(1).set();
+    let _ = c.add_pulse_key(1.into(), pk(9));
+    confirm_key(&mut c, pk(9), KeyKind::Pulse);
+    for (name, f) in calls {
+        for d in [0u128, 2] {
+            Ctx::new().dep(d).set();
+            let m = panics(|| f(&mut c));
+            assert!(
+                m.contains("exactly 1 yoctoNEAR"),
+                "{name} with {d} yocto: {m}"
+            );
+        }
+        Ctx::new().dep(1).set();
+        f(&mut c);
+    }
+    // pause: neither the guardian nor the owner may pause without exactly 1 yocto
+    for who in ["gina.testnet", "alice.testnet"] {
+        for d in [0u128, 2] {
+            Ctx::new().by(who).at(T0 + 5_000).dep(d).set();
+            let m = panics(|| {
+                c.pause(1.into());
+            });
+            assert!(m.contains("exactly 1 yoctoNEAR"), "pause by {who}: {m}");
+        }
+    }
+    Ctx::new().by("gina.testnet").at(T0 + 5_000).dep(1).set();
+    assert_eq!(c.pause(1.into()), T0 + 105_000);
+}
+
+/// The deposit-free surface stays deposit-free: a pulse key (a function-call key) and the owner can
+/// heartbeat with nothing attached. `claim` with 0 deposit is covered by `claim_by_heir_after_settled`.
+#[test]
+fn m6_heartbeat_and_claim_need_no_deposit() {
+    let mut c = setup();
+    Ctx::new().dep(1).set();
+    let _ = c.add_pulse_key(1.into(), pk(1));
+    confirm_key(&mut c, pk(1), KeyKind::Pulse);
+    Ctx::new().key(pk(1)).at(T0 + 5_000).set();
+    assert_eq!(c.heartbeat(1.into()), T0 + 5_000);
+    Ctx::new().at(T0 + 6_000).set();
+    c.heartbeat(1.into());
 }
