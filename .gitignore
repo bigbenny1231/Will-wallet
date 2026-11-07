@@ -11,3 +11,4 @@ dist/
 keys/
 .DS_Store
 keys/
+.demo/

@@ -3,6 +3,7 @@ import type { Backend } from './backend.js';
 import type { Chains } from './chainsApi.js';
 import { deriveState, describeAction, nextAction } from './machine.js';
 import type { StepArgs, TxResult, VaultView } from './types.js';
+import { MAX_RESIGNS, RELAY_COOLDOWN, classifyRelayError } from './relay.js';
 import { errMsg, foreignTxLink, logErr, logInfo, logOk, logWarn, nearTxLink, sleep } from './util.js';
 
 export interface Logger {
@@ -23,10 +24,16 @@ export interface KeeperDeps {
   relayed: Map<string, string>;
   /** last observed state per token, for change lines */
   lastState: Map<string, string>;
+  /** "token:index" -> parked relay (unfunded source, errors); retried after `until`. Status stays `signed` on-chain. */
+  relayBlock: Map<string, { until: number; reason: string }>;
+  /** "token:index" -> resign_foreign calls so far (capped so an unfunded Solana payout cannot burn gas forever). */
+  resigns: Map<string, number>;
+  /** When set, only these token ids are driven (the live demo must not touch other people's vaults). */
+  only?: Set<string>;
 }
 
 export function makeDeps(p: Pick<KeeperDeps, 'backend' | 'chains' | 'contractId'> & Partial<KeeperDeps>): KeeperDeps {
-  return { now: Date.now, log: consoleLogger, relayed: new Map(), lastState: new Map(), ...p };
+  return { now: Date.now, log: consoleLogger, relayed: new Map(), lastState: new Map(), relayBlock: new Map(), resigns: new Map(), ...p };
 }
 
 export interface ActionRecord {
@@ -67,7 +74,7 @@ export async function driveVault(deps: KeeperDeps, initial: VaultView): Promise<
   const failed = (tx: TxResult) => !!tx.failure;
 
   for (let i = 0; i < MAX_ACTIONS_PER_VAULT; i++) {
-    const action = nextAction(v, deps.now());
+    const action = nextAction(v, deps.now(), (idx) => (deps.relayBlock.get(`${id}:${idx}`)?.until ?? 0) > deps.now());
     if (!action) break;
     try {
       if (action.kind === 'poke') {
@@ -116,8 +123,43 @@ export async function driveVault(deps: KeeperDeps, initial: VaultView): Promise<
         const key = `${id}:${action.index}`;
         let hash = deps.relayed.get(key);
         if (!hash) {
-          hash = action.chain === 'base' ? await chains.broadcastEvm(p.signed_tx!) : await chains.broadcastSolana(p.signed_tx!);
+          try {
+            hash = action.chain === 'base' ? await chains.broadcastEvm(p.signed_tx!) : await chains.broadcastSolana(p.signed_tx!);
+          } catch (e) {
+            const kind = classifyRelayError(action.chain, e);
+            const label = `vault ${id} payout #${action.index} ${action.chain}`;
+            const n = deps.resigns.get(key) ?? 0;
+            if (kind === 'stale' && n < MAX_RESIGNS) {
+              // Expired Solana blockhash / stale EVM nonce: ask the contract to sign again with fresh chain params, then relay.
+              deps.resigns.set(key, n + 1);
+              log.warn('resign', `${label} signed tx is stale (${errMsg(e)}); resign_foreign with fresh params`);
+              const rargs = await stepArgsFor(deps, v, action.chain, action.index);
+              const rtx = await backend.resignForeign(id, action.index, rargs);
+              out.push({ kind: 'step', tokenId: id, hash: rtx.hash, ok: !failed(rtx), detail: 'resign_foreign' });
+              log[failed(rtx) ? 'err' : 'ok']('resign', `${label} resign_foreign${failed(rtx) ? ` failed: ${rtx.failure}` : ''}  ${nearTxLink(rtx.hash)}`);
+              if (failed(rtx)) break;
+              v = await backend.getVault(id);
+              continue;
+            }
+            const prev = deps.relayBlock.get(key);
+            if (kind === 'stale') {
+              deps.resigns.set(key, 0);
+              deps.relayBlock.set(key, { until: deps.now() + RELAY_COOLDOWN.resignCap, reason: 'stale' });
+              log.warn('relay', `${label} still stale after ${MAX_RESIGNS} resigns; parked ${RELAY_COOLDOWN.resignCap / 1000}s (status stays signed)`);
+            } else if (kind === 'unfunded') {
+              deps.relayBlock.set(key, { until: deps.now() + RELAY_COOLDOWN.unfunded, reason: 'unfunded' });
+              const from = p.from_address || (await deps.chains.deriveAddresses(deps.contractId, id).then((a) => (action.chain === 'base' ? a.base : a.solana)).catch(() => 'the derived address'));
+              if (prev?.reason === 'unfunded') log.info('relay', `${label} still unfunded; status stays signed, retry in ${RELAY_COOLDOWN.unfunded / 1000}s`);
+              else log.warn('relay', `${label} NOT broadcast: source ${from} is unfunded (${errMsg(e)}). Status stays signed; fund it and the keeper will relay. Retry in ${RELAY_COOLDOWN.unfunded / 1000}s`);
+            } else {
+              deps.relayBlock.set(key, { until: deps.now() + RELAY_COOLDOWN.other, reason: 'other' });
+              log.err('relay', `${label} relay error: ${errMsg(e)} (status stays signed, retry in ${RELAY_COOLDOWN.other / 1000}s)`);
+            }
+            out.push({ kind: 'broadcast', tokenId: id, ok: false, detail: kind === 'other' ? errMsg(e) : kind });
+            continue;
+          }
           deps.relayed.set(key, hash);
+          deps.relayBlock.delete(key);
           out.push({ kind: 'broadcast', tokenId: id, hash, ok: true, detail: action.chain });
           log.ok('relay', `vault ${id} payout #${action.index} ${action.chain} sent  ${foreignTxLink(action.chain, hash)}`);
         }
@@ -156,8 +198,9 @@ export async function tickOnce(deps: KeeperDeps): Promise<TickResult> {
     return { vaults: 0, actions: [], error: errMsg(e) };
   }
   const actions: ActionRecord[] = [];
+  if (deps.only) vaults = vaults.filter((x) => deps.only!.has(x.token_id));
   for (const v of vaults) actions.push(...(await driveVault(deps, v)));
-  return { vaults: vaults.length, actions, error: actions.some((a) => !a.ok && a.detail !== 'not_due') ? 'action_failed' : undefined };
+  return { vaults: vaults.length, actions, error: actions.some((a) => !a.ok && a.detail !== 'not_due' && a.detail !== 'unfunded' && a.detail !== 'stale') ? 'action_failed' : undefined };
 }
 
 export async function runKeeper(

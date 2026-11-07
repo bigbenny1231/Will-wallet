@@ -85,10 +85,11 @@ export type KeeperAction =
 /**
  * The single next thing the keeper should do for a vault, or null.
  * Relaying comes first: a Solana blockhash baked into a signed tx expires in ~60-90 s.
+ * `skipRelay` lets the loop park a payout whose relay is failing (unfunded source) so it never blocks settlement.
  */
-export function nextAction(v: VaultView, now: number): KeeperAction | null {
+export function nextAction(v: VaultView, now: number, skipRelay: (index: number) => boolean = () => false): KeeperAction | null {
   if (v.state === 'Triggered' || v.state === 'Settled') {
-    const idx = v.foreign.findIndex((p) => p.status === 'signed' && !!p.signed_tx);
+    const idx = v.foreign.findIndex((p, i) => p.status === 'signed' && !!p.signed_tx && !skipRelay(i));
     if (idx >= 0) return { kind: 'relay', index: idx, chain: v.foreign[idx].chain };
   }
   if (v.state === 'Settled') return null;

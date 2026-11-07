@@ -11,16 +11,21 @@ export interface Backend {
   poke(tokenId: string): Promise<TxResult>;
   executeStep(tokenId: string, args?: StepArgs): Promise<TxResult>;
   markBroadcast(tokenId: string, index: number, txHash: string): Promise<TxResult>;
+  /** Re-request a signature for a signed/failed payout (expired Solana blockhash, stale EVM nonce). */
+  resignForeign(tokenId: string, index: number, args: StepArgs): Promise<TxResult>;
   agentPay(args: AgentPayArgs): Promise<TxResult>;
 }
 
 type RpcProvider = InstanceType<typeof providers.JsonRpcProvider>;
 const TGAS = 10n ** 12n;
 export const GAS = {
-  heartbeat: 30n * TGAS,
+  // The access-key allowance is charged on PREPAID gas, so keep heartbeat small (contract notes, SPEC 2.7).
+  heartbeat: 10n * TGAS,
   poke: 60n * TGAS,
   executeStep: 300n * TGAS,
   markBroadcast: 30n * TGAS,
+  resignForeign: 300n * TGAS,
+  addKey: 50n * TGAS,
   agentPay: 60n * TGAS,
   daoCreate: 150n * TGAS,
 };
@@ -120,6 +125,9 @@ export class NearBackend implements Backend {
   }
   markBroadcast(tokenId: string, index: number, txHash: string) {
     return this.call('mark_broadcast', { token_id: tokenId, index, tx_hash: txHash }, GAS.markBroadcast);
+  }
+  resignForeign(tokenId: string, index: number, args: StepArgs) {
+    return this.call('resign_foreign', { token_id: tokenId, index, args }, GAS.resignForeign);
   }
   agentPay(a: AgentPayArgs) {
     return this.call('agent_pay', a, GAS.agentPay);

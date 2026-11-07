@@ -7,8 +7,10 @@ import { pulseCommand } from './commands/pulse.js';
 import { loadConfig, need } from './config.js';
 import { agentBackend, getChains, keeperBackend, pulseBackend } from './factory.js';
 import { makeDeps, runKeeper } from './keeperLoop.js';
+import { countdown, formatDuration } from './machine.js';
 import { MockBackend } from './mock.js';
-import { errMsg } from './util.js';
+import { errMsg, formatYocto, foreignTxLink } from './util.js';
+import { viewBackend } from './factory.js';
 
 const program = new Command('dmw').description("Dead Man's Wallet keeper and demo CLI (DMW_MOCK=1 for an offline mock vault)");
 
@@ -40,6 +42,27 @@ program
   );
 
 program
+  .command('status')
+  .description('print a vault: state, countdown, settlement step, heirs and foreign payouts')
+  .requiredOption('--token <id>', 'vault token id')
+  .option('--json', 'raw VaultView JSON')
+  .action((o) =>
+    run(async () => {
+      const cfg = loadConfig();
+      const v = await viewBackend(cfg).getVault(o.token);
+      if (o.json) return void console.log(JSON.stringify(v, null, 2));
+      const c = countdown(v, Date.now());
+      const when = c.state === 'Settled' || c.state === 'Triggered' ? '' : c.due ? ' · poke is legal now' : ` · warning in ${formatDuration(c.msToWarning)}, poke legal in ${formatDuration(c.msToTrigger)}`;
+      console.log(`${pc.bold(`vault ${v.token_id}`)}  ${c.state}${when}`);
+      console.log(`  owner ${v.owner_id} · interval ${v.heartbeat_interval_s}s grace ${v.grace_missed} · balance ${formatYocto(v.balance)} · step ${Math.min(v.step, 5)}/5 · keys ${v.pulse_keys.length} pulse, ${v.agent_keys.length} agent`);
+      console.log(`  heirs ${v.heirs.map((h) => `${h.account_id} ${h.bps / 100}%`).join(', ')}`);
+      for (const [i, p] of v.foreign.entries())
+        console.log(`  payout #${i} ${p.chain} ${p.amount} → ${p.to} · ${p.status}${p.tx_hash ? ' ' + foreignTxLink(p.chain, p.tx_hash) : ''}`);
+      for (const l of v.log.slice(-5)) console.log(pc.dim(`  ${new Date(l.ms).toISOString().slice(11, 19)} ${l.event} ${l.detail}`.slice(0, 140)));
+    }),
+  );
+
+program
   .command('pulse')
   .description('heartbeat daemon: signs heartbeat as the contract account with the pulse key; Ctrl-C = the owner disappears')
   .requiredOption('--token <id>', 'vault token id')
@@ -60,13 +83,14 @@ program
   .description('poll loop: poke overdue vaults, drive execute_step, relay signed foreign txs, mark_broadcast')
   .option('--poll <seconds>', 'poll interval', '5')
   .option('--once', 'run a single pass and exit')
+  .option('--token <ids>', 'only drive these vault token ids (comma separated); default: every vault')
   .action((o) =>
     run(async () => {
       const cfg = loadConfig();
       const ac = new AbortController();
       process.once('SIGINT', () => ac.abort());
       process.once('SIGTERM', () => ac.abort());
-      const deps = makeDeps({ backend: keeperBackend(cfg), chains: getChains(cfg), contractId: cfg.contract });
+      const deps = makeDeps({ backend: keeperBackend(cfg), chains: getChains(cfg), contractId: cfg.contract, only: o.token ? new Set<string>(String(o.token).split(',').map((x) => x.trim()).filter(Boolean)) : undefined });
       await runKeeper(deps, { pollS: Number(o.poll), once: !!o.once, signal: ac.signal });
     }),
   );

@@ -51,7 +51,7 @@ export async function agentDemo(o: {
   const calls: DemoCall[] = [];
   for (const [label, p, color] of [
     ['ALLOWED  (small, allowlisted)', plan.allowed, pc.green],
-    ['DENIED   (over per_tx_max, unknown receiver)', plan.denied, pc.red],
+    ['DENIED   (unknown receiver, over per_tx_max)', plan.denied, pc.red],
   ] as const) {
     const call: DemoCall = { label, receiver: p.receiver, amount: p.amount };
     w('');

@@ -270,6 +270,15 @@ export class MockBackend implements Backend {
     const { hash } = this.mutate(tokenId, (v, now) => mockMarkBroadcast(v, index, txHash, now));
     return { hash, logs: [], returnValue: null };
   }
+  async resignForeign(tokenId: string, index: number, _args: StepArgs): Promise<TxResult> {
+    const { hash } = this.mutate(tokenId, (v) => {
+      const p = v.foreign[index];
+      if (!p || (p.status !== 'signed' && p.status !== 'failed')) throw new Error('payout is not failed/signed');
+      p.status = 'signed';
+      p.signed_tx = `${p.signed_tx ?? 'mock'}r`;
+    });
+    return { hash, logs: [], returnValue: 'signed' };
+  }
   async agentPay(a: AgentPayArgs): Promise<TxResult> {
     const { result, hash } = this.mutate(a.token_id, (v, now) => mockAgentPay(v, now, a.receiver_id, BigInt(a.amount)));
     return { hash, logs: result.logs, returnValue: result.allowed ? { allowed: true } : { allowed: false, reason: result.reason } };

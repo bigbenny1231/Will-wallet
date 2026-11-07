@@ -127,6 +127,68 @@ describe('keeper loop against the mock vault', () => {
   });
 });
 
+describe('relay failures', () => {
+  it('an unfunded source parks the payout (status stays signed) and never blocks settlement', async () => {
+    const clock = { t: 1_000_000 };
+    const backend = fresh(clock);
+    await backend.getVaults();
+    clock.t += 25_000;
+    const chains = mockChains();
+    chains.broadcastEvm = async () => {
+      throw new Error('eth_sendRawTransaction: insufficient funds for gas * price + value: have 0 want 1');
+    };
+    chains.broadcastSolana = async () => {
+      throw new Error('sendTransaction: Transaction simulation failed {"err":"AccountNotFound"}');
+    };
+    const warns: string[] = [];
+    const deps = makeDeps({ backend, chains, contractId: 'c', now: () => clock.t, log: { ...quiet, warn: (_t, m) => warns.push(m) } });
+    const r = await tickOnce(deps);
+    expect(r.error).toBeUndefined(); // unfunded is expected, not an action failure
+    const v = await backend.getVault('1');
+    expect(v.state).toBe('Settled');
+    expect(v.foreign.map((p) => p.status)).toEqual(['signed', 'signed']);
+    expect(warns.filter((w) => /unfunded/.test(w))).toHaveLength(2);
+    // inside the cooldown nothing is retried; after it the keeper tries again
+    const send = vi.spyOn(chains, 'broadcastEvm');
+    await tickOnce(deps);
+    expect(send).not.toHaveBeenCalled();
+    clock.t += 61_000;
+    await tickOnce(deps);
+    expect(send).toHaveBeenCalledTimes(1);
+  });
+
+  it('an expired solana blockhash triggers resign_foreign, then relays the new signature', async () => {
+    const clock = { t: 1_000_000 };
+    const backend = fresh(clock, { foreign: 'solana' });
+    await backend.getVaults();
+    clock.t += 25_000;
+    const chains = mockChains();
+    let first = true;
+    chains.broadcastSolana = async (raw) => {
+      if (first) {
+        first = false;
+        throw new Error('sendTransaction: Blockhash not found');
+      }
+      return `mocksolsig${raw.slice(-6)}`;
+    };
+    const resign = vi.spyOn(backend, 'resignForeign');
+    const deps = makeDeps({ backend, chains, contractId: 'c', now: () => clock.t, log: quiet });
+    await tickOnce(deps);
+    expect(resign).toHaveBeenCalledTimes(1);
+    expect((await backend.getVault('1')).foreign[0].status).toBe('broadcast');
+  });
+
+  it('--token style filter leaves other vaults alone', async () => {
+    const clock = { t: 1_000_000 };
+    const backend = fresh(clock);
+    await backend.getVaults();
+    clock.t += 25_000;
+    const deps = makeDeps({ backend, chains: mockChains(), contractId: 'c', now: () => clock.t, log: quiet, only: new Set(['99']) });
+    expect((await tickOnce(deps)).vaults).toBe(0);
+    expect((await backend.getVault('1')).state).not.toBe('Triggered');
+  });
+});
+
 describe('retry and helpers', () => {
   it('classifies transient vs contract errors', () => {
     expect(isTransient(new Error('fetch failed'))).toBe(true);
