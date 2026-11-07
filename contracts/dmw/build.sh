@@ -6,7 +6,6 @@
 #   REPRODUCIBLE=1 ./build.sh   `cargo near build reproducible-wasm`: builds the COMMITTED tree inside the
 #                               Docker image pinned in Cargo.toml, so the same commit always gives the same
 #                               code hash and NEP-330 `build_info` is filled in. Needs Docker and cargo-near.
-#                               Set SKIP_REMOTE_CHECK=1 to build a commit that is not pushed yet.
 #
 # Every build fills NEP-330 `link` (Cargo.toml `repository`) and `version`, readable with the
 # `contract_source_metadata` view. Prints the wasm path and its NEAR code hash (base58 sha256).
@@ -21,9 +20,7 @@ code_hash() { node -e '
 if [ "${REPRODUCIBLE:-0}" = 1 ]; then
   command -v cargo-near >/dev/null 2>&1 || { echo "REPRODUCIBLE=1 needs cargo-near: cargo install cargo-near --locked" >&2; exit 1; }
   command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1 || { echo "REPRODUCIBLE=1 needs a running Docker daemon" >&2; exit 1; }
-  flags=()
-  [ "${SKIP_REMOTE_CHECK:-0}" = 1 ] && flags+=(--skip-git-remote-check)
-  cargo near build reproducible-wasm "${flags[@]}"
+  cargo near build reproducible-wasm
   OUT=target/near/dmw.wasm
 elif command -v cargo-near >/dev/null 2>&1; then
   cargo near build non-reproducible-wasm --locked
