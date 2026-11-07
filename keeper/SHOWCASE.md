@@ -14,21 +14,28 @@ Dashboard route: `/vault/6`. Created 2026-11-07.
 | Policy | per_tx_max 0.5 NEAR, daily_max 1 NEAR, allowlist `[dmw-api-8d2e.testnet]` |
 | Bounty | 0.05 NEAR |
 | Payout 0 (Base Sepolia) | 0.0005 ETH (`500000000000000` wei) to `0xcA024adC7cac111339Fe077C739F8085aE705F2F` |
-| Payout 1 (Solana devnet) | 0.01 SOL (`10000000` lamports) to `CFdWXa1ean7bBoewSv2SZESrDpWSxeoN1hfLrqaqZQUr` |
+| Payout 1 (Monad testnet) | 0.01 MON (`10000000000000000` wei) to `0x360d02320ebff8439fe0d804e68dfc6976230e13` (one Monad payout per vault) |
+| Payout 2 (Solana devnet) | 0.01 SOL (`10000000` lamports) to `CFdWXa1ean7bBoewSv2SZESrDpWSxeoN1hfLrqaqZQUr` |
 
 Setup transactions: [create_vault](https://testnet.nearblocks.io/txns/9tQ5JnJyjXZqohxyS2E1BKNxN1SYvp7uVhFc5sajTSGL),
 [set_foreign_payouts](https://testnet.nearblocks.io/txns/Gd5TcHycMhUnszvrxDoKq319i8jyfbVGkicXHsXgFPmd),
-[set_timing](https://testnet.nearblocks.io/txns/5P7bsCvjXUcfUbxw6282cX4sPdChvgkiPH29E2pXwSgZ).
+[set_timing](https://testnet.nearblocks.io/txns/5P7bsCvjXUcfUbxw6282cX4sPdChvgkiPH29E2pXwSgZ),
+[set_foreign_payouts with Monad added](https://testnet.nearblocks.io/txns/5coQJ8pDWP4HFNDCGQoES12fr9oDbnb8FJ89reouasDL) (Base and Solana kept; the payouts are now Base, Monad, Solana).
 
-## A human must fund these two addresses (faucets need a login)
+## A human must fund these three addresses (faucets need a login)
 
-These are the MPC-derived source addresses for vault 6 (`base-6`, `sol-6`). No private key exists for them; the contract asks the
+These are the MPC-derived source addresses for vault 6 (`base-6`, `monad-6`, `sol-6`). No private key exists for them; the contract asks the
 signer at settlement. Without funds the signed transactions are produced (status `signed`) but the relay says insufficient funds.
 
 | Chain | Address | Send at least | Faucet | Explorer |
 | --- | --- | --- | --- | --- |
 | Base Sepolia | `0x2cC6e278a4f4d5785f52c22cD52a132Fc06928f4` | 0.001 ETH (payout 0.0005 + gas ~0.00025) | [Alchemy](https://www.alchemy.com/faucets/base-sepolia), [Coinbase CDP](https://portal.cdp.coinbase.com/products/faucet) | [basescan](https://sepolia.basescan.org/address/0x2cC6e278a4f4d5785f52c22cD52a132Fc06928f4) |
+| Monad testnet | `0x07BF795e809E5064Ab810Cf89991D958A48aBA5b` | **0.05 MON** or more (payout 0.01 + gas). See the reserve rule below | [faucet.monad.xyz](https://faucet.monad.xyz) (other faucets: [docs.monad.xyz](https://docs.monad.xyz)) | [monadexplorer](https://testnet.monadexplorer.com/address/0x07BF795e809E5064Ab810Cf89991D958A48aBA5b) |
 | Solana devnet | `5iueWMRjMiVBQHvwqQdHgHvyUckQ9rCoHtPrzFMwpvzc` | 0.05 SOL (payout 0.01 + fee) | [faucet.solana.com](https://faucet.solana.com) (GitHub login) | [explorer](https://explorer.solana.com/address/5iueWMRjMiVBQHvwqQdHgHvyUckQ9rCoHtPrzFMwpvzc?cluster=devnet) |
+
+Monad's 10 MON reserve rule: an account may not dip below the reserve (10 MON) except by a transaction that empties it,
+and the vault's single Monad payout is the first transaction from `monad-6`, nonce 0, so it is an emptying transaction
+and is allowed. Fund at least 0.05 MON; the payout sends exactly 0.01 MON and whatever is left stays at the address.
 
 Re-check any time: `cd keeper && npm run derive -- --token 6`.
 
