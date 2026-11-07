@@ -349,3 +349,53 @@ near contract call-function as-transaction dmw-x8cx.testnet heartbeat \
 
 Same shape for `agent_pay` with an agent key (`json-args '{"token_id":"N","receiver_id":"...","amount":"<yocto>"}'`, 30 Tgas).
 The private key is passed positionally. near-cli-rs 0.31 does not accept `--signer-public-key`.
+
+## Later on Nov 7: reproducible redeploy, cleanup, and the Sputnik step
+
+These came after the smoke run above (its 21 transaction links are the ones before this heading).
+
+### Code redeployed from a reproducible build (state kept)
+
+`dmw-x8cx.testnet` now runs the `cargo near build reproducible-wasm` output of commit `88cd83b`
+(image `sourcescan/cargo-near:0.23.0-rust-1.99.1`). Code hash **`G6eiYJj6gkVt4QaJPHYBQz4eov4fU5ihwsUFqSog25hM`**,
+and a second build in a separate clone gave the same hash. Redeploy tx:
+[E8SpKyY…](https://testnet.nearblocks.io/txns/E8SpKyYSRq4RTRFCp4qCiXukwrm5rtKvne53NWEUf2wE). `contract_source_metadata`
+now returns `link` and `build_info` (NEP-330 1.3.0). Vault state, including showcase vault 6, was not changed.
+
+### Cleanup of the leftover vaults 1-3
+
+Vault 3 was stuck in `Triggered` at step 1, and vaults 1 and 2 were overdue in `Warning`. The keeper account
+finished them (anyone may call `poke` and `execute_step`):
+
+| Vault | poke | steps 1 → 5 |
+| --- | --- | --- |
+| 3 | (already triggered) | [1](https://testnet.nearblocks.io/txns/HcfuaB3KTJ3ZpymxczePMy3CB4dBtAvaW4GmnUfZW4na) [2](https://testnet.nearblocks.io/txns/3GcW9hGeXJheR5wQmE6AzsUeCgctGYwyg2rFgRDmGiyA) [3](https://testnet.nearblocks.io/txns/8nvdAM23mnZkJThSw8nvmTe86shJMjmZFR6JVQM8i1bX) [4](https://testnet.nearblocks.io/txns/8MwUQSNd51rAodA1PYSyvW4smq62JZFp1mvc8ohrVq5D) [5](https://testnet.nearblocks.io/txns/8AQ38LE1uupEDCJ2BB71XASsJZsYyWNT8Z8cMwJ5K16B) |
+| 1 | [poke](https://testnet.nearblocks.io/txns/8ijTfDhS99oTFTKvi3Vgc5HH7bbHPSgSLTkta7BG9Lmo) | [1](https://testnet.nearblocks.io/txns/FYoQ5xpKAZijF4LQPVM6h6RzZnZVk8zPEEivEShL8Are) [2](https://testnet.nearblocks.io/txns/4moE1XG5fC2NinLpZc1cS28eSrMjYhceMqWLt8CXwvui) [3](https://testnet.nearblocks.io/txns/kXzpmJX72xGX2NvnURT6oWhKpjUHDhg4M5PAkak72z5) [4](https://testnet.nearblocks.io/txns/2HaHfw3iXKf7yYi3DhiS8sSdjdt57RPCVLdEGSWo7LXD) [5](https://testnet.nearblocks.io/txns/A8sCa8HBva3GzonuCPNECbUpz4vB4kNuAxLqm3GJUVnA) |
+| 2 | [poke](https://testnet.nearblocks.io/txns/DWcCDzJYukn3khR21vrroc1YsuAHsym4gKFyjwfNGbZS) | [1](https://testnet.nearblocks.io/txns/EK5UAHJXZUBUL9sNNUA3NQhtsxrWRfb9zCdifK6qrV6j) [2](https://testnet.nearblocks.io/txns/Dxb7arMarnszFPgALvY55JPFDCsEqiV6y67CNEJhxuVi) [3](https://testnet.nearblocks.io/txns/6EYfUND5UJ8xxiN28P3X7PidyvFCZM1PjceSgNbvGyAH) [4](https://testnet.nearblocks.io/txns/Bbnq33pRGEohPW6CBhf2ieC5EVvFKUQcevmcmUGHVQ28) [5](https://testnet.nearblocks.io/txns/81Rix2jKCcuS7KemtVEJgqnYE2sycX2J3zNo4FwNnKTC) |
+
+Step 2 of each deleted that vault's pulse and agent keys. Afterwards `view_access_key_list dmw-x8cx.testnet` returns
+a single key, the deployer's FullAccess key `ed25519:6fBT4G1E…GtC2`. Showcase vault 6 has no keys yet.
+
+### Step 4 live: a Sputnik DAO files and ratifies the estate proposal (vault 10)
+
+1. DAO `estate-82bd1f.sputnik-v2.testnet` created through `sputnik-v2.testnet` (6 NEAR, council = the keeper account):
+   `cd keeper && npm run dao create -- --name estate-82bd1f`,
+   [create tx](https://testnet.nearblocks.io/txns/FqVPramiNSwbELhpefwQHPpDdfjGv8pbyGP5kT7ioa8m).
+2. Fresh vault 10 (owner `dmw-dao-owner-391f.testnet`, heir `dmw-dao-heir-391f.testnet`, 4 NEAR, 30 s interval, grace 1,
+   one Base payout): [create_vault](https://testnet.nearblocks.io/txns/3QGs6do7cEUJZvJwttMdQVqy9nbQcPZjuiJsJxKyuRkG),
+   [set_dao](https://testnet.nearblocks.io/txns/ECZwvct4LFqMCtg3vdKXqX6ABz8cydbhYPWpMBNRbPet),
+   [set_foreign_payouts](https://testnet.nearblocks.io/txns/4gLY9fwz5JmZeqyFfPaZ8y7K4QihGCpy1q9SxEB5sJiQ).
+3. No heartbeats. The keeper (`keeper --token 10`) ran
+   [poke](https://testnet.nearblocks.io/txns/2TqPKSuYiVkWDRZqeMnKUgA6kAQgBk63mT2dnw3wPhFW),
+   [step 1](https://testnet.nearblocks.io/txns/8M2sYum9wMMyacdPgurkP6reD4gQz9as3MmyJKNPRjqw) (heir paid, 1.5 NEAR reserve kept for the DAO path),
+   [step 2](https://testnet.nearblocks.io/txns/45mWXtXDKqxi6rQoz2LsGYjJggwGCM9UY811dZsrLTJh),
+   [step 3](https://testnet.nearblocks.io/txns/3pMDTihHVyyEuT7iibAQ3PmYfFFujaLVmbVxK4aGdiva) (Base tx signed by `v1.signer-prod.testnet`; relay pending funding),
+   **[step 4](https://testnet.nearblocks.io/txns/FAzezve68HDjUDsNzsb8qV7KnE6SNE8kVap6S5Hmkd6e): `dmw-x8cx.testnet` calls
+   `add_proposal` on the DAO with a 1 NEAR bond; the callback stores `dao_proposal_id = 0`**, and
+   [step 5](https://testnet.nearblocks.io/txns/HLzaj2MHAA7et6BFJZS5UfJma9FzdE2hFsYNDmaYxrzE) (Will NFT to the heir, `Settled`).
+4. Proposal 0 (proposer `dmw-x8cx.testnet`, kind `FunctionCall` → `mark_broadcast(token 10, "dao-ratified")`).
+   The council approved it: [act_proposal VoteApprove](https://testnet.nearblocks.io/txns/5y9hspPGwhmzfU2ivNggFQhPrTaHtznqpaB5dNcfBgeB).
+   The DAO executed the call and the contract emitted `dao_ratified {"token_id":"10","dao_id":"estate-82bd1f.sputnik-v2.testnet"}`.
+   Check with `get_proposal {"id":0}` on `estate-82bd1f.sputnik-v2.testnet`.
+
+The ratification only records an event (SPEC §2.4): the DAO cannot change heirs, amounts or destinations.
