@@ -71,3 +71,8 @@ export function CopyBox({ value, label }: { value: string; label?: string }) {
 export function ErrorNote({ children }: { children: ReactNode }) {
   return <div className="rounded-xl border border-dead/50 bg-dead/10 px-4 py-3 text-base text-dead">{children}</div>;
 }
+
+export function ReconnectHint({ show }: { show: boolean }) {
+  if (!show) return null;
+  return <div className="rounded-xl border border-warn/50 bg-warn/10 px-4 py-2 text-sm text-warn">reconnecting… the node is not responding, retrying automatically</div>;
+}

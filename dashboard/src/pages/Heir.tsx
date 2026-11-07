@@ -4,7 +4,7 @@ import { api } from "../lib/near";
 import { useWallet } from "../lib/wallet";
 import { usePoll } from "../lib/usePoll";
 import { bpsToPct, expectedShare, unitsFor, yoctoToNear } from "../lib/format";
-import { ErrorNote, ExtLink, Ribbon } from "../components/ui";
+import { ErrorNote, ExtLink, Ribbon, ReconnectHint } from "../components/ui";
 import { parseStep1Detail, step1AmountFor } from "../lib/logparse";
 import type { VaultView } from "../types";
 
@@ -21,6 +21,7 @@ export default function Heir() {
           <button className="btn btn-primary" onClick={connect} disabled={!ready}>Connect wallet</button>
         </div>
       )}
+      <ReconnectHint show={res.reconnecting} />
       {accountId && res.error && <ErrorNote>{res.error}</ErrorNote>}
       {accountId && res.loaded && (res.data?.length ?? 0) === 0 && !res.error && (
         <div className="panel text-lg text-mute">{accountId} is not named as an heir in any vault.</div>

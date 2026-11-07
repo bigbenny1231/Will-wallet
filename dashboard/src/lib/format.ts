@@ -10,6 +10,22 @@ export function yoctoToNear(y: string | bigint | undefined | null, maxFrac = 4):
   return f ? `${whole}.${f}` : whole.toString();
 }
 
+/** yocto -> NEAR with 2 to 4 decimals (truncated, never rounded up), e.g. "0.05", "1.2346". */
+export function fmtNear(y: string | bigint | undefined | null, minFrac = 2, maxFrac = 4): string {
+  if (y === undefined || y === null || y === "") return "0.00";
+  const v = BigInt(y);
+  const whole = v / YOCTO;
+  let f = (v % YOCTO).toString().padStart(24, "0").slice(0, maxFrac).replace(/0+$/, "");
+  f = f.padEnd(minFrac, "0");
+  return `${whole}.${f}`;
+}
+
+/** Replaces raw yocto integers (15+ digits) inside a contract log detail with "<n> NEAR". */
+export function humanizeYocto(text: string | null | undefined): string {
+  if (!text) return "";
+  return text.replace(/\b\d{15,}\b/g, (m) => `${fmtNear(m)} NEAR`);
+}
+
 export function nearToYocto(near: string): string {
   const s = near.trim();
   if (!/^\d+(\.\d{0,24})?$/.test(s)) throw new Error(`Invalid NEAR amount: ${near}`);

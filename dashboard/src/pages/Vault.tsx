@@ -13,7 +13,7 @@ import AgentPanel from "../components/AgentPanel";
 import KeysPanel from "../components/KeysPanel";
 import Timeline from "../components/Timeline";
 import TxBanner from "../components/TxBanner";
-import { Countdown, ErrorNote, ExtLink, Ribbon } from "../components/ui";
+import { Countdown, ErrorNote, ExtLink, ReconnectHint, Ribbon } from "../components/ui";
 import { links } from "../config";
 import { currentForeign } from "../lib/chains";
 
@@ -100,6 +100,7 @@ export default function Vault() {
   return (
     <div className="space-y-8">
       <TxBanner />
+      <ReconnectHint show={vault.reconnecting} />
       {vault.error && <ErrorNote>Could not refresh: {vault.error}</ErrorNote>}
 
       <section className="grid gap-8 lg:grid-cols-[400px_1fr]">

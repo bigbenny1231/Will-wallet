@@ -6,7 +6,7 @@ import { useWallet } from "../lib/wallet";
 import { usePoll } from "../lib/usePoll";
 import { bpsToPct, fmtInterval, yoctoToNear } from "../lib/format";
 import TxBanner from "../components/TxBanner";
-import { ErrorNote, Ribbon } from "../components/ui";
+import { ErrorNote, Ribbon, ReconnectHint } from "../components/ui";
 
 export default function Home() {
   const { accountId, connect, ready } = useWallet();
@@ -32,6 +32,7 @@ export default function Home() {
         </div>
       )}
 
+      <ReconnectHint show={mine.reconnecting || everyone.reconnecting} />
       {accountId && mine.error && <ErrorNote>{mine.error}</ErrorNote>}
       {accountId && mine.loaded && (mine.data?.length ?? 0) === 0 && !mine.error && (
         <div className="panel text-lg text-mute">No vaults for {accountId} yet.</div>

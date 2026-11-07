@@ -1,5 +1,5 @@
 import { links } from "../config";
-import { fmtTime, shortAddr, unitsFor } from "../lib/format";
+import { fmtTime, humanizeYocto, shortAddr, unitsFor } from "../lib/format";
 import { lastEvent, parseStep1Detail } from "../lib/logparse";
 import type { ForeignPayout, VaultView } from "../types";
 import { ExtLink } from "./ui";
@@ -64,7 +64,7 @@ export default function Timeline({ v, contract, onRelay, relayBusy }: Props) {
             ))}
           </ul>
         ) : ev(1)?.detail ? (
-          <span className="mono">{ev(1)!.detail}</span>
+          <span className="mono">{humanizeYocto(ev(1)!.detail)}</span>
         ) : (
           <ExtLink href={links.nearAddress(contract)}>Contract on nearblocks</ExtLink>
         ),
@@ -74,7 +74,7 @@ export default function Timeline({ v, contract, onRelay, relayBusy }: Props) {
       title: "Pulse and agent keys deleted",
       body: (
         <span>
-          {ev(2)?.detail && <span className="mr-3">{ev(2)!.detail}</span>}
+          {ev(2)?.detail && <span className="mr-3">{humanizeYocto(ev(2)!.detail)}</span>}
           <ExtLink href={links.nearAddress(contract)}>Access keys on nearblocks</ExtLink>
         </span>
       ),
@@ -116,13 +116,13 @@ export default function Timeline({ v, contract, onRelay, relayBusy }: Props) {
           {v.dao_proposal_id !== null && v.dao_proposal_id !== undefined && <span className="ml-3 text-mute">proposal #{v.dao_proposal_id}</span>}
         </span>
       ) : (
-        <span className="text-mute">{ev(4)?.detail ?? "No DAO set, step is skipped"}</span>
+        <span className="text-mute">{ev(4)?.detail ? humanizeYocto(ev(4)!.detail) : "No DAO set, step is skipped"}</span>
       ),
     },
     {
       n: 5,
       title: "Will NFT sent to primary heir",
-      body: ev(5)?.detail ? <span className="mono">{ev(5)!.detail}</span> : <ExtLink href={links.nearAddress(contract)}>Contract on nearblocks</ExtLink>,
+      body: ev(5)?.detail ? <span className="mono">{humanizeYocto(ev(5)!.detail)}</span> : <ExtLink href={links.nearAddress(contract)}>Contract on nearblocks</ExtLink>,
     },
   ];
 
@@ -130,7 +130,7 @@ export default function Timeline({ v, contract, onRelay, relayBusy }: Props) {
     <div>
       {trig && (
         <p className="mb-5 text-mute">
-          Triggered at <span className="font-mono">{fmtTime(trig.ms)}</span>: <span className="mono">{trig.detail}</span>
+          Triggered at <span className="font-mono">{fmtTime(trig.ms)}</span>: <span className="mono">{humanizeYocto(trig.detail)}</span>
         </p>
       )}
       <ol className="space-y-0">
