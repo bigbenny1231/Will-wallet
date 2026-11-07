@@ -99,7 +99,7 @@
       <li class="card">
         <span class="num" aria-hidden="true">2</span>
         <h3>2. Stay alive</h3>
-        <p>Your phone sends a heartbeat. Miss one and we text you. A guardian can pause it.</p>
+        <p>A pulse key sends a heartbeat (today a small daemon you run; phone app <span class="soon">coming soon</span>). Reminders when you miss one and a guardian who can pause the vault are <span class="soon">coming soon</span>.</p>
       </li>
       <li class="card">
         <span class="num" aria-hidden="true">3</span>
@@ -156,7 +156,7 @@
       <div class="card"><h3>The agent key</h3><p>Can only call <code>agent_pay</code>, and only within the spending policy you set. If you ran an AI agent, this is its key.</p></div>
       <div class="card"><h3>The contract</h3><p>Holds the plan. At settlement it pays heirs and requests MPC signatures for each foreign-chain payout, then deletes the pulse and agent keys.</p></div>
       <div class="card"><h3>The keeper</h3><p>Anyone can be one. A keeper can only supply the nonce and gas that settlement needs. It cannot change who gets what.</p></div>
-      <div class="card wide"><h3>A thief with your phone</h3><p>Can do nothing useful. The phone holds a pulse key, and a pulse key can only say you are still here.</p></div>
+      <div class="card wide"><h3>A thief with your device</h3><p>Can do nothing useful. The device holds only a pulse key, and a pulse key can only say you are still here.</p></div>
     </div>
   </div>
 </section>
@@ -165,7 +165,7 @@
   <div class="wrap narrow">
     <h2>Questions</h2>
     <details><summary>What if I'm in the hospital?</summary>
-      <p>Set an interval and grace period that suit your life. A missed heartbeat first triggers reminders to you, and a guardian you name can pause the vault. If you can't check in, they can do it for you.</p></details>
+      <p>Set an interval and grace period that suit your life: up to ten years between heartbeats, plus missed beats of grace. Reminders after a missed heartbeat and a guardian you name who can pause the vault are <span class="soon">coming soon</span>; neither is in the hackathon build.</p></details>
     <details><summary>Is this a will?</summary>
       <p>No. It is not a will or a trust. It executes the distribution your will or trust specifies, so configure it with your estate attorney and keep the two consistent.</p></details>
     <details><summary>What does it cost?</summary>
@@ -173,7 +173,7 @@
     <details><summary>Which chains?</summary>
       <p>NEAR, plus Base and Solana through NEAR Chain Signatures. The demo uses Base Sepolia and Solana devnet. Assets must be held at the vault's derived addresses to be included.</p></details>
     <details><summary>What is a heartbeat?</summary>
-      <p>A small signed message from your phone saying you are still here. It is the proof of life. Nothing happens while heartbeats keep arriving.</p></details>
+      <p>A small signed message from your pulse key saying you are still here. It is the proof of life. Nothing happens while heartbeats keep arriving.</p></details>
     <details><summary>Can my heirs see my balance?</summary>
       <p>Not through the app. They see nothing until settlement. Note that NEAR is a public ledger, so the plan and balances in the contract are visible to anyone who looks up the vault on-chain.</p></details>
   </div>

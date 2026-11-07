@@ -96,3 +96,4 @@ input[type=email]{flex:1 1 240px;padding:.75em 1em;border-radius:10px;border:1px
  .section{padding:56px 0}
 }
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+.soon{display:inline-block;font-size:.72rem;line-height:1.5;padding:0 .45em;border:1px solid var(--line);border-radius:999px;color:var(--muted);white-space:nowrap;vertical-align:.1em}
