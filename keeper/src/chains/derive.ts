@@ -1,7 +1,8 @@
-// Derived foreign source addresses for a vault (SPEC §1): paths base-<id> / sol-<id>,
+// Derived foreign source addresses for a vault (SPEC §1): paths base-<id> / monad-<id> / sol-<id>,
 // predecessor = the dmw contract account. Uses the live signer's `derived_public_key`
 // view (authoritative; verified byte-identical to chainsig.js deriveAddressAndPublicKey).
 import { base58Decode, evmAddressFromPubkey64 } from './codec.js';
+import { chainConfig, type EvmChainName } from './evm.js';
 
 export const MPC_SIGNER_TESTNET = 'v1.signer-prod.testnet';
 const DEFAULT_NEAR_RPC = 'https://rpc.testnet.near.org';
@@ -12,7 +13,14 @@ export interface DeriveOptions {
 }
 
 export const basePath = (tokenId: string | number) => `base-${tokenId}`;
+export const monadPath = (tokenId: string | number) => `monad-${tokenId}`;
 export const solanaPath = (tokenId: string | number) => `sol-${tokenId}`;
+
+/** Derivation path of a vault's source address on any payout chain (matches the contract). */
+export function derivationPath(chain: string, tokenId: string | number): string {
+  if (chain === 'solana') return solanaPath(tokenId);
+  return `${chainConfig(chain).pathPrefix}-${tokenId}`;
+}
 
 async function viewDerivedKey(
   rpcUrl: string, signer: string, path: string, predecessor: string, domainId: 0 | 1,
@@ -45,10 +53,17 @@ export function solanaAddressFromNearKey(key: string): string {
   return b58;
 }
 
-export async function deriveBaseAddress(contractId: string, tokenId: string | number, opts: DeriveOptions = {}) {
-  const key = await viewDerivedKey(opts.rpcUrl ?? DEFAULT_NEAR_RPC, opts.mpcSigner ?? MPC_SIGNER_TESTNET, basePath(tokenId), contractId, 0);
-  return { address: evmAddressFromNearKey(key), publicKey: key, path: basePath(tokenId) };
+/** EVM source address of `chain` (`base` | `monad`) for a vault: path `<chain>-<id>`, domain 0. */
+export async function deriveEvmAddress(chain: EvmChainName, contractId: string, tokenId: string | number, opts: DeriveOptions = {}) {
+  const path = derivationPath(chain, tokenId);
+  const key = await viewDerivedKey(opts.rpcUrl ?? DEFAULT_NEAR_RPC, opts.mpcSigner ?? MPC_SIGNER_TESTNET, path, contractId, 0);
+  return { address: evmAddressFromNearKey(key), publicKey: key, path };
 }
+
+export const deriveBaseAddress = (contractId: string, tokenId: string | number, opts: DeriveOptions = {}) =>
+  deriveEvmAddress('base', contractId, tokenId, opts);
+export const deriveMonadAddress = (contractId: string, tokenId: string | number, opts: DeriveOptions = {}) =>
+  deriveEvmAddress('monad', contractId, tokenId, opts);
 
 export async function deriveSolanaAddress(contractId: string, tokenId: string | number, opts: DeriveOptions = {}) {
   const key = await viewDerivedKey(opts.rpcUrl ?? DEFAULT_NEAR_RPC, opts.mpcSigner ?? MPC_SIGNER_TESTNET, solanaPath(tokenId), contractId, 1);
@@ -58,8 +73,18 @@ export async function deriveSolanaAddress(contractId: string, tokenId: string | 
 /** Keeper entry point. Third arg may be the keeper Config (uses its `rpcUrl`). */
 export async function deriveAddresses(
   contractId: string, tokenId: string | number, opts: DeriveOptions = {},
-): Promise<{ base: string; solana: string }> {
+): Promise<{ base: string; monad: string; solana: string }> {
   const o = { rpcUrl: opts.rpcUrl, mpcSigner: opts.mpcSigner ?? process.env.MPC_SIGNER };
-  const [b, s] = await Promise.all([deriveBaseAddress(contractId, tokenId, o), deriveSolanaAddress(contractId, tokenId, o)]);
-  return { base: b.address, solana: s.address };
+  const [b, m, s] = await Promise.all([
+    deriveBaseAddress(contractId, tokenId, o), deriveMonadAddress(contractId, tokenId, o), deriveSolanaAddress(contractId, tokenId, o),
+  ]);
+  return { base: b.address, monad: m.address, solana: s.address };
+}
+
+/** Source address for one payout chain (`base` | `monad` | `solana`). */
+export async function deriveAddressFor(
+  chain: string, contractId: string, tokenId: string | number, opts: DeriveOptions = {},
+): Promise<string> {
+  if (chain === 'solana') return (await deriveSolanaAddress(contractId, tokenId, opts)).address;
+  return (await deriveEvmAddress(chainConfig(chain).chain, contractId, tokenId, opts)).address;
 }

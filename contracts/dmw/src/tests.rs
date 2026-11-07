@@ -132,7 +132,7 @@ fn with_agent_key(c: &mut Contract) {
 }
 
 fn v(c: &Contract) -> Vault {
-    c.vaults.get(&1).unwrap()
+    c.load(1).unwrap()
 }
 
 fn step_value(r: PromiseOrValue<u8>) -> u8 {
@@ -1615,4 +1615,359 @@ fn m1_storage_of_a_full_vault_vs_flat_fee() {
     // > 10 kB: the flat fee under-collects for a maxed-out vault
     assert!(used > 10_000, "used {used}");
     assert!(used < 20_000, "used {used}");
+}
+
+// ---------------------------------------------------------------- guardian pause (§2.8)
+
+/// Vault 1 (interval 20 s, grace 1: trigger at T0 + 40 s) with guardian `gina` and a 100 s pause.
+fn with_guardian() -> Contract {
+    let mut c = setup();
+    Ctx::new().set();
+    c.set_guardian(1.into(), Some(acc("gina.testnet")), Some(100));
+    c
+}
+
+#[test]
+fn guardian_set_by_owner_shows_in_view() {
+    let c = with_guardian();
+    let view = c.get_vault(1.into()).unwrap();
+    assert_eq!(view.guardian_id, Some(acc("gina.testnet")));
+    assert_eq!(view.max_pause_s, 100);
+    assert_eq!(view.paused_until_ms, 0);
+    assert_eq!(view.state, VaultState::Alive);
+    assert_eq!(v(&c).log.last().unwrap().event, "guardian_set");
+}
+
+#[test]
+fn set_guardian_owner_only_and_validated() {
+    let mut c = setup();
+    Ctx::new().by("mallory.testnet").set();
+    let m = panics(|| c.set_guardian(1.into(), Some(acc("mallory.testnet")), Some(100)));
+    assert!(m.contains("only the vault owner"), "{m}");
+    Ctx::new().set();
+    let m = panics(|| c.set_guardian(1.into(), Some(acc("gina.testnet")), None));
+    assert!(m.contains("max_pause_s is required"), "{m}");
+    let m = panics(|| c.set_guardian(1.into(), Some(acc("gina.testnet")), Some(5)));
+    assert!(m.contains("out of range"), "{m}");
+    let m = panics(|| c.set_guardian(1.into(), Some(acc("gina.testnet")), Some(MAX_PAUSE_S + 1)));
+    assert!(m.contains("out of range"), "{m}");
+    let m = panics(|| c.set_guardian(1.into(), Some(contract_id()), Some(100)));
+    assert!(m.contains("cannot be the dmw contract"), "{m}");
+    // clear
+    c.set_guardian(1.into(), Some(acc("gina.testnet")), Some(100));
+    c.set_guardian(1.into(), None, None);
+    let view = c.get_vault(1.into()).unwrap();
+    assert_eq!(view.guardian_id, None);
+    assert_eq!(view.max_pause_s, 0);
+}
+
+#[test]
+fn guardian_pause_extends_deadline_from_now() {
+    let mut c = with_guardian();
+    // in Warning (T0 + 30 s; base deadline T0 + 40 s)
+    Ctx::new().by("gina.testnet").at(T0 + 30_000).set();
+    let new_deadline = c.pause(1.into());
+    assert_eq!(new_deadline, T0 + 30_000 + 100_000);
+    let view = c.get_vault(1.into()).unwrap();
+    assert_eq!(view.paused_until_ms, T0 + 130_000);
+    assert_eq!(view.trigger_at_ms, T0 + 130_000);
+    assert_eq!(
+        view.warning_at_ms,
+        T0 + 20_000,
+        "warning boundary is not moved"
+    );
+    assert_eq!(v(&c).log.last().unwrap().event, "paused");
+    assert!(get_logs()
+        .iter()
+        .any(|l| l.contains("\"event\":\"paused\"") && l.contains("\"by\":\"guardian\"")));
+    // the old deadline no longer pokes; the extended one does
+    Ctx::new().by("bob.testnet").at(T0 + 40_000).set();
+    let m = panics(|| {
+        c.poke(1.into());
+    });
+    assert!(m.contains("not_due"), "{m}");
+    assert!(!v(&c).is_due(T0 + 129_999));
+    Ctx::new().by("bob.testnet").at(T0 + 130_000).set();
+    c.poke(1.into());
+    assert_eq!(v(&c).stored, StoredState::Triggered);
+}
+
+#[test]
+fn second_pause_rejected_until_heartbeat() {
+    let mut c = with_guardian();
+    Ctx::new().by("gina.testnet").at(T0 + 10_000).set();
+    c.pause(1.into());
+    // neither the guardian nor the owner may stack a second pause
+    Ctx::new().by("gina.testnet").at(T0 + 100_000).set();
+    let m = panics(|| {
+        c.pause(1.into());
+    });
+    assert!(m.contains("already_paused"), "{m}");
+    Ctx::new().at(T0 + 100_000).set();
+    let m = panics(|| {
+        c.pause(1.into());
+    });
+    assert!(m.contains("already_paused"), "{m}");
+    // a heartbeat clears the pause and re-arms it
+    Ctx::new().at(T0 + 105_000).set();
+    c.heartbeat(1.into());
+    let view = c.get_vault(1.into()).unwrap();
+    assert_eq!(view.paused_until_ms, 0);
+    assert_eq!(view.trigger_at_ms, T0 + 105_000 + 40_000);
+    assert_eq!(view.state, VaultState::Alive);
+    Ctx::new().by("gina.testnet").at(T0 + 110_000).set();
+    assert_eq!(c.pause(1.into()), T0 + 210_000);
+}
+
+#[test]
+fn pause_cannot_extend_indefinitely() {
+    // Once paused, the deadline is fixed at paused_until no matter how often anyone tries.
+    let mut c = with_guardian();
+    Ctx::new().by("gina.testnet").at(T0 + 39_000).set();
+    let d = c.pause(1.into());
+    for t in [T0 + 50_000, T0 + 100_000, T0 + 138_999] {
+        Ctx::new().by("gina.testnet").at(t).set();
+        let _ = panics(|| {
+            c.pause(1.into());
+        });
+        assert_eq!(v(&c).trigger_at_ms(), d);
+    }
+    assert!(v(&c).is_due(d));
+}
+
+#[test]
+fn owner_may_pause_strangers_may_not() {
+    let mut c = with_guardian();
+    Ctx::new().by("mallory.testnet").at(T0 + 5_000).set();
+    let m = panics(|| {
+        c.pause(1.into());
+    });
+    assert!(m.contains("not guardian or owner"), "{m}");
+    Ctx::new().at(T0 + 5_000).set();
+    assert_eq!(c.pause(1.into()), T0 + 105_000);
+    assert!(v(&c).log.last().unwrap().detail.starts_with("owner "));
+}
+
+#[test]
+fn pause_requires_guardian_configured() {
+    let mut c = setup();
+    Ctx::new().at(T0 + 5_000).set();
+    let m = panics(|| {
+        c.pause(1.into());
+    });
+    assert!(m.contains("no guardian set"), "{m}");
+}
+
+#[test]
+fn pause_rejected_when_triggered_or_past_deadline() {
+    let mut c = with_guardian();
+    // past the deadline but not yet poked: too late
+    Ctx::new().by("gina.testnet").at(T0 + 40_000).set();
+    let m = panics(|| {
+        c.pause(1.into());
+    });
+    assert!(m.contains("deadline_passed"), "{m}");
+    trigger(&mut c);
+    Ctx::new().by("gina.testnet").at(T0 + 40_001).set();
+    let m = panics(|| {
+        c.pause(1.into());
+    });
+    assert!(m.contains("vault_triggered"), "{m}");
+    // owner cannot reconfigure the guardian once triggered either
+    Ctx::new().at(T0 + 40_001).set();
+    let m = panics(|| c.set_guardian(1.into(), None, None));
+    assert!(m.contains("vault_triggered"), "{m}");
+}
+
+#[test]
+fn paused_vault_reads_warning_and_denies_agent_pay() {
+    let mut c = with_guardian();
+    with_agent_key(&mut c);
+    // pause while Alive: state becomes Warning, agent disarmed
+    Ctx::new().by("gina.testnet").at(T0 + 5_000).set();
+    c.pause(1.into());
+    Ctx::new().at(T0 + 6_000).set();
+    assert_eq!(c.get_vault(1.into()).unwrap().state, VaultState::Warning);
+    let r = deny(&mut c, "api.provider.testnet", NEAR1 / 10, T0 + 6_000);
+    assert_eq!(r.reason.as_deref(), Some("vault_not_alive"));
+    // after a heartbeat the agent works again
+    Ctx::new().at(T0 + 7_000).set();
+    c.heartbeat(1.into());
+    Ctx::new().key(pk(2)).at(T0 + 8_000).set();
+    let ok = c.agent_pay(
+        1.into(),
+        acc("api.provider.testnet"),
+        U128(NEAR1 / 10),
+        None,
+    );
+    assert!(ok.allowed);
+}
+
+#[test]
+fn nft_transfer_clears_guardian_but_keeps_running_pause() {
+    let mut c = with_guardian();
+    Ctx::new().by("gina.testnet").at(T0 + 5_000).set();
+    c.pause(1.into());
+    Ctx::new().dep(1).at(T0 + 6_000).set();
+    c.nft_transfer(acc("buyer.testnet"), "1".into(), None, None);
+    let view = c.get_vault(1.into()).unwrap();
+    assert_eq!(view.guardian_id, None);
+    assert_eq!(view.paused_until_ms, T0 + 105_000);
+    Ctx::new().by("gina.testnet").at(T0 + 7_000).set();
+    let m = panics(|| {
+        c.pause(1.into());
+    });
+    assert!(m.contains("no guardian set"), "{m}");
+}
+
+#[test]
+fn guard_lives_outside_stored_vault_bytes() {
+    // State compatibility: the borsh bytes of a Vault do not include the guard, so vaults
+    // written by the previous code version still deserialize.
+    let c = with_guardian();
+    let mut vault = v(&c);
+    assert!(vault.guard.guardian_id.is_some());
+    let with = near_sdk::borsh::to_vec(&vault).unwrap();
+    vault.guard = Guard::default();
+    let without = near_sdk::borsh::to_vec(&vault).unwrap();
+    assert_eq!(with, without);
+    let back: Vault = near_sdk::borsh::from_slice(&with).unwrap();
+    assert_eq!(back.guard, Guard::default());
+    // and the raw-slot copy is what `load` returns
+    assert_eq!(c.load(1).unwrap().guard.max_pause_s, 100);
+    assert_eq!(c.vaults.get(&1).unwrap().guard, Guard::default());
+}
+
+#[test]
+fn vault_created_log_names_original_owner() {
+    let c = setup();
+    let first = &v(&c).log[0];
+    assert_eq!(first.event, "vault_created");
+    assert_eq!(first.detail, "alice.testnet");
+}
+
+// ---------------------------------------------------------------- monad (chain registry)
+
+fn monad_payout() -> ForeignPayout {
+    ForeignPayout {
+        chain: ForeignChain::Monad,
+        to: format!("0x{}", "cd".repeat(20)),
+        ..sol_payout(1_000)
+    }
+}
+
+#[test]
+fn monad_payout_validation() {
+    let mut c = setup();
+    Ctx::new().set();
+    let bad = ForeignPayout {
+        to: "cd".repeat(21),
+        ..monad_payout()
+    };
+    let m = panics(|| c.set_foreign_payouts(1.into(), vec![bad]));
+    assert!(m.contains("evm `to` must be 0x + 40 hex"), "{m}");
+    let bad_hex = ForeignPayout {
+        to: format!("0x{}", "zz".repeat(20)),
+        ..monad_payout()
+    };
+    let m = panics(|| c.set_foreign_payouts(1.into(), vec![bad_hex]));
+    assert!(m.contains("evm `to`"), "{m}");
+    c.set_foreign_payouts(1.into(), vec![monad_payout()]);
+    let view = c.get_vault(1.into()).unwrap();
+    let j = serde_json::to_value(&view.foreign[0]).unwrap();
+    assert_eq!(j["chain"], "monad");
+}
+
+#[test]
+fn step3_monad_signs_with_monad_path_chain_id_and_own_nonce() {
+    // [base, monad, base, monad]: each EVM chain has its own derived address and nonce.
+    let mut c = at_step3(vec![
+        base_payout(),
+        monad_payout(),
+        base_payout(),
+        monad_payout(),
+    ]);
+    let _ = c.execute_step(1.into(), Some(base_args()));
+    Ctx::new().by("dmw.testnet").at(T0 + 41_500).set();
+    assert_eq!(c.on_foreign_signed(1, 0, Ok(mpc_secp_response())), 3);
+    Ctx::new().by("keeper.testnet").at(T0 + 42_000).set();
+    let _ = c.execute_step(1.into(), Some(evm(77, 1_500_000_000, 1_000_000, 21_000)));
+    let sign = created_calls("sign");
+    let req = &sign.last().unwrap()["request"];
+    assert_eq!(req["path"], "monad-1");
+    assert_eq!(req["domain_id"], 0);
+    assert!(req["payload_v2"]["Ecdsa"].is_string());
+    match pending_slot(1) {
+        foreign::PendingTx::Evm(t) => {
+            assert_eq!(t.chain_id, 10143);
+            assert_eq!(
+                t.nonce, 0,
+                "first monad payout: nonce 0 on the monad address"
+            );
+        }
+        _ => panic!("expected evm"),
+    }
+    Ctx::new().by("dmw.testnet").at(T0 + 42_500).set();
+    assert_eq!(c.on_foreign_signed(1, 1, Ok(mpc_secp_response())), 3);
+    let p = v(&c).foreign[1].clone();
+    assert_eq!(p.status, ForeignStatus::Signed);
+    let raw = p.signed_tx.unwrap();
+    assert!(raw.contains("82279f"), "chain id 10143 in the RLP");
+    assert_eq!(foreign::evm_nonce_for(&v(&c).foreign, 2), 1);
+    assert_eq!(foreign::evm_nonce_for(&v(&c).foreign, 3), 1);
+    // mark_broadcast accepts the keccak id (case-insensitive, like base)
+    let id = foreign::expected_tx_id(ForeignChain::Monad, &raw).unwrap();
+    Ctx::new().by("keeper.testnet").at(T0 + 43_000).set();
+    c.mark_broadcast(1.into(), 1, id.to_ascii_uppercase().replace("0X", "0x"));
+    assert_eq!(v(&c).foreign[1].status, ForeignStatus::Broadcast);
+    assert_eq!(v(&c).foreign[1].tx_hash.as_deref(), Some(id.as_str()));
+}
+
+#[test]
+fn monad_fee_cap_is_per_chain() {
+    // Monad's base fee floor is 100 gwei: 202 gwei must pass there, but not on Base.
+    let mut c = at_step3(vec![monad_payout(), base_payout()]);
+    assert!(matches!(
+        c.execute_step(
+            1.into(),
+            Some(evm(0, 202_000_000_000, 2_000_000_000, 21_000))
+        ),
+        PromiseOrValue::Promise(_)
+    ));
+    Ctx::new().by("dmw.testnet").at(T0 + 41_500).set();
+    assert_eq!(c.on_foreign_signed(1, 0, Ok(mpc_secp_response())), 3);
+    Ctx::new().by("keeper.testnet").at(T0 + 42_000).set();
+    let m = panics(|| {
+        let _ = c.execute_step(
+            1.into(),
+            Some(evm(0, 202_000_000_000, 2_000_000_000, 21_000)),
+        );
+    });
+    assert!(m.contains("1..=100 gwei"), "{m}");
+    let m = panics(|| {
+        let _ = c.resign_foreign(1.into(), 0, evm(0, 1_001_000_000_000, 1, 21_000));
+    });
+    assert!(m.contains("1..=1000 gwei"), "{m}");
+}
+
+#[test]
+fn monad_payout_without_evm_args_panics() {
+    let mut c = at_step3(vec![monad_payout()]);
+    let m = panics(|| {
+        let _ = c.execute_step(1.into(), Some(sol_args()));
+    });
+    assert!(m.contains("args.evm is required for an evm payout"), "{m}");
+}
+
+#[test]
+fn config_lists_chain_registry() {
+    let c = setup();
+    let cfg = c.get_config();
+    let chains = cfg["chains"].as_array().unwrap();
+    let monad = chains.iter().find(|x| x["chain"] == "monad").unwrap();
+    assert_eq!(monad["chain_id"], 10143);
+    assert_eq!(monad["path"], "monad-<token_id>");
+    assert_eq!(monad["rpc"], "https://testnet-rpc.monad.xyz");
+    let base = chains.iter().find(|x| x["chain"] == "base").unwrap();
+    assert_eq!(base["chain_id"], 84532);
 }

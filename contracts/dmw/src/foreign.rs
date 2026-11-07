@@ -57,9 +57,13 @@ pub const GAS_DERIVED_KEY: Gas = Gas::from_tgas(10);
 pub const GAS_ON_SOL_KEY: Gas = Gas::from_tgas(100);
 /// Gas for the self-call that records an unbuildable payout as failed.
 const GAS_FOREIGN_FAIL: Gas = Gas::from_tgas(10);
-/// Cap on caller-supplied EIP-1559 fees (100 gwei). Bounds how much of the derived
-/// address's ETH a permissionless caller can burn as gas (H-2).
+/// Cap on caller-supplied EIP-1559 fees on Base (100 gwei). Bounds how much of the derived
+/// address's ETH a permissionless caller can burn as gas (H-2). Each registry chain has
+/// its own cap (`EvmChain::max_fee_per_gas`).
 pub const MAX_EVM_FEE_PER_GAS: u128 = 100_000_000_000;
+/// Monad testnet fee cap (1000 gwei). Monad's base fee floor is 100 gwei, so the Base cap
+/// would reject every honest Monad step. 21000 gas x 1000 gwei = 0.021 MON worst case.
+pub const MAX_MONAD_FEE_PER_GAS: u128 = 1_000_000_000_000;
 /// Caller-supplied gas limit range for a native transfer.
 pub const MIN_EVM_GAS_LIMIT: u128 = 21_000;
 pub const MAX_EVM_GAS_LIMIT: u128 = 100_000;
@@ -73,12 +77,91 @@ pub const MPC_SIGNER: &str = "v1.signer-prod.testnet";
 /// Deposit required by the MPC `sign` method.
 pub const MPC_SIGN_DEPOSIT: NearToken = NearToken::from_yoctonear(1);
 
+/// Wire values `"base"`, `"solana"`, `"monad"`. New variants go at the END: the borsh
+/// discriminant of existing stored payouts must not change.
 #[near(serializers = [borsh, json])]
 #[serde(rename_all = "lowercase")]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ForeignChain {
     Base,
     Solana,
+    Monad,
+}
+
+/// One EVM chain in the registry (SPEC §1). Every EVM chain shares the step-3 path:
+/// EIP-1559 native transfer, secp256k1 (domain 0), nonce pinned per chain.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct EvmChain {
+    pub chain_id: u64,
+    pub path_prefix: &'static str,
+    pub rpc: &'static str,
+    pub explorer_tx: &'static str,
+    /// Upper bound on caller-supplied `max_fee_per_gas` (wei).
+    pub max_fee_per_gas: u128,
+}
+
+pub const BASE_SEPOLIA: EvmChain = EvmChain {
+    chain_id: 84532,
+    path_prefix: "base",
+    rpc: "https://sepolia.base.org",
+    explorer_tx: "https://sepolia.basescan.org/tx/",
+    max_fee_per_gas: MAX_EVM_FEE_PER_GAS,
+};
+
+pub const MONAD_TESTNET: EvmChain = EvmChain {
+    chain_id: 10143,
+    path_prefix: "monad",
+    rpc: "https://testnet-rpc.monad.xyz",
+    explorer_tx: "https://testnet.monadexplorer.com/tx/",
+    max_fee_per_gas: MAX_MONAD_FEE_PER_GAS,
+};
+
+impl ForeignChain {
+    pub const ALL: [ForeignChain; 3] = [
+        ForeignChain::Base,
+        ForeignChain::Monad,
+        ForeignChain::Solana,
+    ];
+
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            ForeignChain::Base => "base",
+            ForeignChain::Solana => "solana",
+            ForeignChain::Monad => "monad",
+        }
+    }
+    /// Registry entry for EVM chains, `None` for Solana.
+    pub fn evm(&self) -> Option<EvmChain> {
+        match self {
+            ForeignChain::Base => Some(BASE_SEPOLIA),
+            ForeignChain::Monad => Some(MONAD_TESTNET),
+            ForeignChain::Solana => None,
+        }
+    }
+    pub fn is_evm(&self) -> bool {
+        self.evm().is_some()
+    }
+}
+
+/// Chain registry as JSON (exposed through `get_config().chains`).
+pub fn chain_registry() -> Vec<serde_json::Value> {
+    ForeignChain::ALL
+        .iter()
+        .map(|c| match c.evm() {
+            Some(e) => json!({
+                "chain": c.as_str(), "kind": "evm", "chain_id": e.chain_id,
+                "path": format!("{}-<token_id>", e.path_prefix), "domain_id": DOMAIN_ECDSA,
+                "rpc": e.rpc, "explorer_tx": e.explorer_tx,
+                "max_fee_per_gas": U128(e.max_fee_per_gas),
+            }),
+            None => json!({
+                "chain": c.as_str(), "kind": "solana", "cluster": "devnet",
+                "path": "sol-<token_id>", "domain_id": DOMAIN_EDDSA,
+                "rpc": "https://api.devnet.solana.com",
+                "explorer_tx": "https://explorer.solana.com/tx/",
+            }),
+        })
+        .collect()
 }
 
 #[near(serializers = [borsh, json])]
@@ -156,9 +239,9 @@ pub struct SolanaArgs {
 
 /// Derivation path for a vault's foreign source address (SPEC §1).
 pub fn derivation_path(chain: ForeignChain, token_id: u64) -> String {
-    match chain {
-        ForeignChain::Base => format!("base-{token_id}"),
-        ForeignChain::Solana => format!("sol-{token_id}"),
+    match chain.evm() {
+        Some(e) => format!("{}-{token_id}", e.path_prefix),
+        None => format!("sol-{token_id}"),
     }
 }
 
@@ -220,25 +303,31 @@ fn write_track(token_id: u64, index: usize, t: &SignTrack) {
     );
 }
 
-/// The EVM nonce of Base payout `index`: the number of Base payouts before it. The
-/// derived `base-<id>` address can only be signed for by this contract, and only in
-/// settlement, so its nonce starts at 0 and payouts consume nonces in list order.
+/// The EVM nonce of payout `index`: the number of payouts on the SAME chain before it.
+/// Each EVM chain has its own derived address (`base-<id>`, `monad-<id>`) that only this
+/// contract can sign for, and only in settlement, so its nonce starts at 0 and that
+/// chain's payouts consume nonces in list order.
 pub fn evm_nonce_for(foreign: &[ForeignPayout], index: usize) -> u64 {
-    foreign[..index]
-        .iter()
-        .filter(|p| p.chain == ForeignChain::Base)
-        .count() as u64
+    let chain = foreign[index].chain;
+    foreign[..index].iter().filter(|p| p.chain == chain).count() as u64
 }
 
 /// Reject out-of-range caller-supplied EVM params (panics, so nothing is burned or stored).
-pub fn validate_evm_args(a: &EvmArgs) {
+pub fn validate_evm_args(a: &EvmArgs, chain: ForeignChain) {
+    let cap = chain
+        .evm()
+        .unwrap_or_else(|| env::panic_str("not an evm chain"))
+        .max_fee_per_gas;
     require!(
         (MIN_EVM_GAS_LIMIT..=MAX_EVM_GAS_LIMIT).contains(&a.gas_limit.0),
         "evm gas_limit out of range (21000..=100000)"
     );
     require!(
-        a.max_fee_per_gas.0 > 0 && a.max_fee_per_gas.0 <= MAX_EVM_FEE_PER_GAS,
-        "evm max_fee_per_gas out of range (1..=100 gwei)"
+        a.max_fee_per_gas.0 > 0 && a.max_fee_per_gas.0 <= cap,
+        &format!(
+            "evm max_fee_per_gas out of range (1..={} gwei)",
+            cap / 1_000_000_000
+        )
     );
     require!(
         a.max_priority_fee_per_gas.0 <= a.max_fee_per_gas.0,
@@ -250,7 +339,7 @@ pub fn validate_evm_args(a: &EvmArgs) {
 /// hex), Solana base58 of the first signature. `mark_broadcast` only accepts this value.
 pub fn expected_tx_id(chain: ForeignChain, signed_tx: &str) -> Result<String, String> {
     match chain {
-        ForeignChain::Base => {
+        ForeignChain::Base | ForeignChain::Monad => {
             let h = signed_tx.strip_prefix("0x").unwrap_or(signed_tx);
             let raw = hex::decode(h).map_err(|_| "signed_tx is not hex".to_string())?;
             Ok(format!("0x{}", hex::encode(keccak256(&raw))))
@@ -269,11 +358,16 @@ pub fn expected_tx_id(chain: ForeignChain, signed_tx: &str) -> Result<String, St
     }
 }
 
-/// Build the EVM transfer for `payout` from keeper-supplied chain params.
+/// Build the EVM transfer for `payout` from keeper-supplied chain params. The chain id
+/// comes from the registry entry of `payout.chain`, never from the caller.
 pub fn evm_transfer_for(
     payout: &ForeignPayout,
     a: &EvmArgs,
 ) -> Result<(EvmTransfer, [u8; 32]), String> {
+    let chain = payout
+        .chain
+        .evm()
+        .ok_or_else(|| "not an evm payout".to_string())?;
     let t = EvmTransfer {
         to: payout.to.clone(),
         value: payout.amount,
@@ -281,7 +375,7 @@ pub fn evm_transfer_for(
         max_fee_per_gas: a.max_fee_per_gas,
         max_priority_fee_per_gas: a.max_priority_fee_per_gas,
         gas_limit: a.gas_limit,
-        chain_id: BASE_SEPOLIA_CHAIN_ID,
+        chain_id: chain.chain_id,
     };
     let hash = evm_sighash(&evm_tx(&t)?);
     Ok((t, hash))
@@ -413,11 +507,11 @@ impl Contract {
         let path = derivation_path(payout.chain, token_id);
         let now = env::block_timestamp_ms();
         match payout.chain {
-            ForeignChain::Base => {
+            ForeignChain::Base | ForeignChain::Monad => {
                 let mut a = args.and_then(|a| a.evm).unwrap_or_else(|| {
-                    env::panic_str("step 3: args.evm is required for a base payout")
+                    env::panic_str("step 3: args.evm is required for an evm payout")
                 });
-                validate_evm_args(&a);
+                validate_evm_args(&a, payout.chain);
                 a.nonce = evm_nonce_for(&foreign, index);
                 write_track(
                     token_id,
@@ -614,11 +708,11 @@ impl Contract {
         let me = env::current_account_id();
         let path = derivation_path(payout.chain, id);
         match payout.chain {
-            ForeignChain::Base => {
+            ForeignChain::Base | ForeignChain::Monad => {
                 let mut a = args
                     .evm
-                    .unwrap_or_else(|| env::panic_str("args.evm is required for a base payout"));
-                validate_evm_args(&a);
+                    .unwrap_or_else(|| env::panic_str("args.evm is required for an evm payout"));
+                validate_evm_args(&a, payout.chain);
                 if has_sig {
                     require!(
                         a.max_fee_per_gas.0 * 100 >= track.max_fee_per_gas * EVM_FEE_BUMP_PCT
@@ -781,6 +875,7 @@ pub mod chainsig {
     pub const DOMAIN_ECDSA: u64 = 0;
     pub const DOMAIN_EDDSA: u64 = 1;
     pub const BASE_SEPOLIA_CHAIN_ID: u64 = 84532;
+    pub const MONAD_TESTNET_CHAIN_ID: u64 = 10143;
     /// A valid 32-byte base58 key, used only to pre-validate a payout before the key lookup.
     pub const SYSTEM_PROGRAM_B58: &str = "11111111111111111111111111111111";
 
@@ -1140,5 +1235,72 @@ mod chainsig_tests {
     fn paths_follow_spec() {
         assert_eq!(derivation_path(ForeignChain::Base, 12), "base-12");
         assert_eq!(derivation_path(ForeignChain::Solana, 12), "sol-12");
+        assert_eq!(derivation_path(ForeignChain::Monad, 12), "monad-12");
+    }
+
+    #[test]
+    fn chain_registry_ids_and_wire_names() {
+        assert_eq!(
+            ForeignChain::Base.evm().unwrap().chain_id,
+            BASE_SEPOLIA_CHAIN_ID
+        );
+        assert_eq!(
+            ForeignChain::Monad.evm().unwrap().chain_id,
+            MONAD_TESTNET_CHAIN_ID
+        );
+        assert_eq!(MONAD_TESTNET_CHAIN_ID, 10143);
+        assert!(ForeignChain::Solana.evm().is_none());
+        assert_eq!(
+            serde_json::to_value(ForeignChain::Monad).unwrap(),
+            json!("monad")
+        );
+        let c: ForeignChain = serde_json::from_value(json!("monad")).unwrap();
+        assert_eq!(c, ForeignChain::Monad);
+        // Borsh discriminants of stored payouts must not move.
+        assert_eq!(
+            near_sdk::borsh::to_vec(&ForeignChain::Base).unwrap(),
+            vec![0]
+        );
+        assert_eq!(
+            near_sdk::borsh::to_vec(&ForeignChain::Solana).unwrap(),
+            vec![1]
+        );
+        assert_eq!(
+            near_sdk::borsh::to_vec(&ForeignChain::Monad).unwrap(),
+            vec![2]
+        );
+        let reg = chain_registry();
+        assert_eq!(reg.len(), 3);
+        assert_eq!(reg[1]["chain"], "monad");
+        assert_eq!(reg[1]["chain_id"], 10143);
+        assert_eq!(reg[1]["rpc"], "https://testnet-rpc.monad.xyz");
+        assert_eq!(
+            reg[1]["explorer_tx"],
+            "https://testnet.monadexplorer.com/tx/"
+        );
+    }
+
+    #[test]
+    fn monad_tx_uses_chain_id_10143() {
+        let p = ForeignPayout {
+            chain: ForeignChain::Monad,
+            ..payout_base()
+        };
+        let (t, hash) = evm_transfer_for(&p, &evm_args(0)).unwrap();
+        assert_eq!(t.chain_id, 10143);
+        let (tb, hb) = evm_transfer_for(&payout_base(), &evm_args(0)).unwrap();
+        assert_eq!(tb.chain_id, 84532);
+        assert_ne!(hash, hb, "chain id is part of the signed payload");
+        // signed tx assembles; RLP starts with type 2 + chain id 10143 (0x279f)
+        let (raw, txid) =
+            assemble_signed(&PendingTx::Evm(t), &mpc_secp(EVM[0].2, EVM[0].3, 1)).unwrap();
+        assert!(raw.starts_with("0x02f8"));
+        assert!(raw.contains("82279f"));
+        assert_eq!(expected_tx_id(ForeignChain::Monad, &raw).unwrap(), txid);
+        let sol = ForeignPayout {
+            chain: ForeignChain::Solana,
+            ..payout_base()
+        };
+        assert!(evm_transfer_for(&sol, &evm_args(0)).is_err());
     }
 }

@@ -28,10 +28,11 @@ The keeper (off-chain) relays the signed foreign transactions and records their 
 | NEAR network | testnet, RPC `https://rpc.testnet.near.org` |
 | Contract account | `$DMW_CONTRACT` (e.g. `dmw-1.testnet`); set in `.env` |
 | MPC signer | `v1.signer-prod.testnet` |
-| EVM target | Base Sepolia, chain id `84532`, RPC `https://sepolia.base.org` |
+| EVM targets (registry) | Base Sepolia, chain id `84532`, RPC `https://sepolia.base.org`, explorer `https://sepolia.basescan.org/tx/<hash>` |
+| | Monad testnet, chain id `10143`, RPC `https://testnet-rpc.monad.xyz`, explorer `https://testnet.monadexplorer.com/tx/<hash>` |
 | Solana target | devnet, RPC `https://api.devnet.solana.com` |
 | Sputnik factory | `sputnik-v2.testnet` (DAO created by dashboard/CLI; contract only needs the DAO account id) |
-| Derivation paths | `base-<token_id>` (secp256k1, domain 0), `sol-<token_id>` (ed25519, domain 1) |
+| Derivation paths | `base-<token_id>`, `monad-<token_id>` (secp256k1, domain 0), `sol-<token_id>` (ed25519, domain 1) |
 
 The foreign *source* addresses are derived from `(contract_account_id, path)` and are
 computed **off-chain** (keeper `derive` command, dashboard) with chainsig.js
@@ -48,7 +49,7 @@ for them exists anywhere; the contract requests signatures at settlement time.
 
 // ForeignPayout (set by owner while Alive)
 {
-  "chain": "base" | "solana",
+  "chain": "base" | "monad" | "solana",
   "to": "0xabc..." | "<base58 pubkey>",
   "amount": "1000000000000000",   // string integer in the chain's smallest unit (wei / lamports)
   "from_address": "0x...",         // derived address, informational, set by dashboard
@@ -91,6 +92,9 @@ for them exists anywhere; the contract requests signatures at settlement time.
   "dao_proposal_id": null | 7,
   "step": 0..5,                 // next step to execute when Triggered
   "foreign_index": 0,           // next foreign payout to sign within step 3
+  "guardian_id": null | "gina.testnet",   // §2.8
+  "max_pause_s": 0,                       // §2.8, 0 when no guardian
+  "paused_until_ms": 0,                   // §2.8, 0 when no pause since the last heartbeat
   "log": [ { "ms": ..., "event": "heartbeat"|"agent_pay_allowed"|"agent_pay_denied"|"triggered"|"step_1"|...|"settled", "detail": "..." } ]
 }
 ```
@@ -117,6 +121,8 @@ for them exists anywhere; the contract requests signatures at settlement time.
 | `remove_key({token_id, public_key})` | owner | — | removes from vault + `delete_key` |
 | `agent_pay({token_id, receiver_id, amount, memo?})` | agent key only | — | policy check; on allow: `balance -= amount`, `Promise::new(receiver).transfer(amount)`; event `agent_pay_allowed` / `agent_pay_denied` with `reason` in {`over_per_tx_max`, `over_daily_max`, `receiver_not_allowlisted`, `vault_not_alive`, `insufficient_balance`}. Denied calls **do not panic** (so the log entry persists) |
 | `set_heirs`, `set_policy`, `set_foreign_payouts`, `set_dao({token_id, dao_id})`, `set_timing({token_id, heartbeat_interval_s, grace_missed})` | owner, while not Triggered | — | update |
+| `set_guardian({token_id, guardian_id, max_pause_s})` | owner, while not Triggered | — | appoint (`guardian_id: null` clears) the guardian; `max_pause_s` 10 s..90 d (§2.8) |
+| `pause({token_id})` → `trigger_at_ms` | guardian or owner, while Live and before the deadline | — | `paused_until = now + max_pause_s`, once per heartbeat cycle; event `paused` (§2.8) |
 | `poke({token_id})` | anyone | — | if deadline passed: state=Triggered, step=1, pay `bounty` to predecessor from balance, event `triggered`. Else panic `not_due` |
 | `execute_step({token_id, args?})` | anyone | — | runs the current step (see §2.4), advances `step`; idempotent on re-entry; panics if not Triggered or already Settled |
 | `mark_broadcast({token_id, index, tx_hash})` | anyone | — | sets foreign[index].status=broadcast, tx_hash (must equal the stored signed tx's id; §2.7) |
@@ -142,7 +148,7 @@ Each call does **one** unit of work and returns the new `step`. Gas budget per c
 | 5 | `nft_transfer` Will NFT to heir with highest bps (owner_id = heir); state=Settled; event `settled` | step=6 |
 
 Foreign tx construction (chainsig conventions to verify against the live signer on day 1):
-- **EVM**: EIP-1559 `TransactionBuilder::new::<EVM>()` with `to`, `value`, `chain_id=84532`, `nonce`, fees, `gas_limit`, empty input. `build_for_signing()` → keccak256 → `payload_v2: {Ecdsa: hex}`, `domain_id: 0`. Callback: signature `{big_r:{affine_point}, s:{scalar}, recovery_id}` → `build_with_signature(...)` → raw RLP hex stored in `signed_tx`.
+- **EVM** (Base and Monad, one shared path): EIP-1559 `TransactionBuilder::new::<EVM>()` with `to`, `value`, `chain_id` from the registry (84532 / 10143), `nonce`, fees, `gas_limit`, empty input. `build_for_signing()` → keccak256 → `payload_v2: {Ecdsa: hex}`, `domain_id: 0`. Callback: signature `{big_r:{affine_point}, s:{scalar}, recovery_id}` → `build_with_signature(...)` → raw RLP hex stored in `signed_tx`.
 - **Solana**: `SystemProgram::transfer` from derived pubkey to `to`, `recent_blockhash` from args. Message bytes → `payload_v2: {Eddsa: hex of message bytes}`, `domain_id: 1`. Callback: 64-byte signature → serialized tx (base64) stored in `signed_tx`.
 - The MPC `sign` returns through a yield/resume; budget 250 TGas for the call and 30 TGas for the callback.
 
@@ -193,6 +199,48 @@ These are the places where the shipped contract (`contracts/dmw`, deployed at `d
 - **Extra views:** `get_config()`. `get_vaults({from_index, limit})` takes JSON numbers (limit ≤ 100).
 - **Callbacks:** `on_key_added`, `on_transfer_done`, `on_dao_proposal`, `on_foreign_signed`, `nft_resolve_transfer` (all `#[private]`). `on_foreign_signed` returns the new step.
 - **Build:** near-sdk 5.30 needs `--cfg near` for on-chain builds without cargo-near. `contracts/dmw/build.sh` handles it.
+
+### 2.8 Guardian pause and chain registry (contracts agent, 2026-11-07)
+
+Addresses docs/SECURITY_REVIEW.md M-1 (a dead pulse key triggers a live owner's vault).
+
+- **`set_guardian({token_id, guardian_id: AccountId|null, max_pause_s: u64|null})`**: owner only, while not
+  Triggered. `max_pause_s` is required with a guardian, range 10 s..90 days; the guardian cannot be the contract.
+  Event/log `guardian_set` (detail `"<guardian> <s>s"` or `"cleared"`). Changing the guardian leaves a running pause alone.
+- **`pause({token_id})` → new `trigger_at_ms`**: the guardian or the owner. Rejected with `no guardian set`,
+  `unauthorized: not guardian or owner`, `vault_triggered` (stored Triggered/Settled), `deadline_passed`
+  (the effective deadline is already reached, even if nobody poked yet), or `already_paused` (a pause was taken
+  since the last heartbeat). Sets `paused_until_ms = now + max_pause_s`. Event/log `paused`, data
+  `{token_id, by: "guardian"|"owner", account_id, paused_until_ms, trigger_at_ms, previous_trigger_at_ms}`,
+  log detail `"<guardian|owner> <account> until <ms>"`.
+- **One pause per heartbeat cycle.** Only a heartbeat (owner or pulse key) clears the pause and re-arms it. There is
+  no `resume`. So without a heartbeat the deadline can move at most once, to `paused_at + max_pause_s`.
+- **State derivation:** `trigger_at_ms = max(last_beat + interval*(grace+1), paused_until_ms)`; `warning_at_ms` is not
+  moved. While `now < paused_until_ms` the vault reads as `Warning`, even if it would otherwise be Alive, so
+  `agent_pay` is denied with `vault_not_alive`. `poke` uses the extended deadline.
+- **NFT transfer** while Live clears `guardian_id`/`max_pause_s` (like keys, the guardian belonged to the old owner);
+  a running pause stays until the new owner's first heartbeat.
+- **Storage compatibility:** the guard lives in a raw slot `guard:<token_id>` (borsh `{guardian_id, max_pause_s,
+  paused_until_ms, paused_at_ms}`), not in the stored `Vault` bytes (`#[borsh(skip)]`, filled in on every read).
+  Existing vaults read unchanged with no guardian.
+- **`vault_created` log detail** is now the original owner account (the dashboard needs it after settlement).
+  Vaults created before this change have an empty detail; the `vault_created` event data always had `owner_id`.
+
+**Chain registry.** `ForeignChain` is `base | solana | monad` (Monad appended, so stored borsh discriminants are
+unchanged). EVM chains share step 3: the registry gives each its chain id, path prefix and fee cap:
+
+| chain | chain id | path | `max_fee_per_gas` cap |
+| --- | --- | --- | --- |
+| `base` | 84532 | `base-<id>` | 100 gwei |
+| `monad` | 10143 | `monad-<id>` | 1000 gwei (Monad's base fee floor is 100 gwei) |
+
+- The EVM nonce of payout `i` = number of payouts **on the same chain** before it (each chain has its own derived address).
+- `set_foreign_payouts` requires `0x` + 40 hex for every EVM chain. `mark_broadcast` lower-cases EVM hashes for both.
+- `args.evm` is used for whichever EVM payout is current; `resign_foreign` applies the same rules to Monad as to Base.
+- `get_config().chains` lists the registry (`chain`, `kind`, `chain_id`, `path`, `domain_id`, `rpc`, `explorer_tx`,
+  `max_fee_per_gas`), plus `min_pause_s`/`max_pause_s`.
+- Keeper side: `keeper/src/chains/evm.ts` `chainConfig(chain)` mirrors the registry (rpc, chainId, explorer,
+  fee cap; `MONAD_RPC` env override). `derive.ts` derives `monad-<id>`.
 
 ## 3. Keeper: `keeper/` (TypeScript, Node 22, ESM)
 

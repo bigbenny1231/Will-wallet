@@ -62,6 +62,28 @@ const GAS_MARK_BROADCAST_DAO: u64 = 10_000_000_000_000;
 /// Raw storage slot for the optional keeper account (kept out of `Contract` so the
 /// stored contract layout is unchanged across this upgrade).
 const KEEPER_SLOT: &[u8] = b"cfg:keeper";
+/// Shortest and longest guardian pause (SPEC §2.8).
+pub const MIN_PAUSE_S: u64 = 10;
+pub const MAX_PAUSE_S: u64 = 90 * 24 * 3600;
+
+/// Raw storage slot of a vault's `Guard` (outside the stored `Vault` bytes).
+fn guard_key(token_id: u64) -> Vec<u8> {
+    format!("guard:{token_id}").into_bytes()
+}
+
+pub(crate) fn read_guard(token_id: u64) -> Guard {
+    env::storage_read(&guard_key(token_id))
+        .and_then(|raw| near_sdk::borsh::from_slice(&raw).ok())
+        .unwrap_or_default()
+}
+
+pub(crate) fn write_guard(token_id: u64, g: &Guard) {
+    if g == &Guard::default() {
+        env::storage_remove(&guard_key(token_id));
+    } else {
+        env::storage_write(&guard_key(token_id), &near_sdk::borsh::to_vec(g).unwrap());
+    }
+}
 
 pub const EVENT_STANDARD: &str = "dmw";
 pub const EVENT_VERSION: &str = "1.0.0";
@@ -175,13 +197,15 @@ impl Contract {
             foreign_inflight_since_ms: None,
             created_ms: now,
             log: vec![],
+            guard: Guard::default(),
         };
         let data = json!({
             "token_id": token_id.to_string(), "owner_id": owner,
             "balance": yocto(vault.balance), "heartbeat_interval_s": heartbeat_interval_s,
             "grace_missed": grace_missed,
         });
-        record(&mut vault, token_id, "vault_created", "", data);
+        // Detail = original owner: the dashboard still needs it after settlement moves the NFT.
+        record(&mut vault, token_id, "vault_created", owner.as_ref(), data);
         self.vaults.insert(&token_id, &vault);
         self.index_add(&owner, token_id);
         nft::emit_mint(&owner, token_id);
@@ -217,8 +241,15 @@ impl Contract {
         let now = env::block_timestamp_ms();
         let was = v.state_at(now);
         v.last_beat_ms = now;
+        // Only a heartbeat clears a pause (and re-arms the one pause per cycle).
+        let was_paused = v.guard.paused_at_ms != 0 || v.guard.paused_until_ms != 0;
+        if was_paused {
+            v.guard.paused_at_ms = 0;
+            v.guard.paused_until_ms = 0;
+            write_guard(id, &v.guard);
+        }
         let by = if via_key { "pulse_key" } else { "owner" };
-        let data = json!({"token_id": id.to_string(), "by": by, "was": was.as_str(), "next_due_ms": v.warning_at_ms()});
+        let data = json!({"token_id": id.to_string(), "by": by, "was": was.as_str(), "next_due_ms": v.warning_at_ms(), "pause_cleared": was_paused});
         record(&mut v, id, "heartbeat", by, data);
         self.vaults.insert(&id, &v);
         now
@@ -374,10 +405,11 @@ impl Contract {
                 require!(!p.to.is_empty() && p.to.len() <= 64, "invalid foreign `to`");
                 require!(p.from_address.len() <= 64, "invalid foreign `from_address`");
                 require!(p.amount.0 > 0, "foreign amount must be > 0");
-                if p.chain == ForeignChain::Base {
+                if p.chain.is_evm() {
                     require!(
-                        p.to.starts_with("0x") && p.to.len() == 42,
-                        "base `to` must be 0x + 40 hex"
+                        p.to.starts_with("0x")
+                            && foreign::chainsig::parse_evm_address(&p.to).is_ok(),
+                        "evm `to` must be 0x + 40 hex"
                     );
                 }
                 p.status = ForeignStatus::Pending;
@@ -420,6 +452,93 @@ impl Contract {
             data,
         );
         self.vaults.insert(&id, &v);
+    }
+
+    /// Owner, while not Triggered: appoint (or clear, with `guardian_id: null`) a guardian
+    /// who may `pause` the vault once per heartbeat cycle for `max_pause_s` (SPEC §2.8).
+    /// Changing the guardian does not touch a pause that is already running.
+    pub fn set_guardian(
+        &mut self,
+        token_id: TokenRef,
+        guardian_id: Option<AccountId>,
+        max_pause_s: Option<u64>,
+    ) {
+        let id = token_id.id();
+        let mut v = self.vault(id);
+        self.require_owner_mutable(&v);
+        match &guardian_id {
+            Some(g) => {
+                require!(
+                    g != &env::current_account_id(),
+                    "guardian cannot be the dmw contract"
+                );
+                let s = max_pause_s.unwrap_or_else(|| env::panic_str("max_pause_s is required"));
+                require!(
+                    (MIN_PAUSE_S..=MAX_PAUSE_S).contains(&s),
+                    "max_pause_s out of range (10s..90d)"
+                );
+                v.guard.max_pause_s = s;
+            }
+            None => v.guard.max_pause_s = 0,
+        }
+        v.guard.guardian_id = guardian_id.clone();
+        write_guard(id, &v.guard);
+        let detail = guardian_id
+            .as_ref()
+            .map(|g| format!("{g} {}s", v.guard.max_pause_s))
+            .unwrap_or_else(|| "cleared".into());
+        let data = json!({"token_id": id.to_string(), "guardian_id": guardian_id, "max_pause_s": v.guard.max_pause_s});
+        record(&mut v, id, "guardian_set", &detail, data);
+        self.vaults.insert(&id, &v);
+    }
+
+    /// Guardian or owner, while Alive/Warning and before the deadline: hold off the trigger
+    /// until `now + max_pause_s` (SPEC §2.8). One pause per heartbeat cycle: a second pause
+    /// is rejected until a heartbeat lands. While paused the vault reads as `Warning`, so
+    /// `agent_pay` is denied. Returns the new effective `trigger_at_ms`.
+    pub fn pause(&mut self, token_id: TokenRef) -> u64 {
+        let id = token_id.id();
+        let mut v = self.vault(id);
+        let pred = env::predecessor_account_id();
+        let Some(guardian) = v.guard.guardian_id.clone() else {
+            env::panic_str("no guardian set");
+        };
+        require!(
+            pred == guardian || pred == v.owner_id,
+            "unauthorized: not guardian or owner"
+        );
+        require!(v.stored == StoredState::Live, "vault_triggered");
+        let now = env::block_timestamp_ms();
+        require!(!v.is_due(now), "deadline_passed");
+        require!(
+            v.guard.paused_at_ms == 0,
+            "already_paused: a heartbeat must land before the next pause"
+        );
+        let before = v.trigger_at_ms();
+        v.guard.paused_at_ms = now;
+        v.guard.paused_until_ms = now.saturating_add(v.guard.max_pause_s.saturating_mul(1000));
+        write_guard(id, &v.guard);
+        let after = v.trigger_at_ms();
+        let by = if pred == guardian {
+            "guardian"
+        } else {
+            "owner"
+        };
+        let until = v.guard.paused_until_ms;
+        let data = json!({
+            "token_id": id.to_string(), "by": by, "account_id": pred,
+            "paused_until_ms": until, "trigger_at_ms": after,
+            "previous_trigger_at_ms": before,
+        });
+        record(
+            &mut v,
+            id,
+            "paused",
+            &format!("{by} {pred} until {until}"),
+            data,
+        );
+        self.vaults.insert(&id, &v);
+        after
     }
 
     /// Anyone: move an overdue vault to `Triggered` and earn the bounty.
@@ -679,7 +798,7 @@ impl Contract {
             .unwrap_or_else(|| env::panic_str("payout has no signed tx"));
         let expected =
             foreign::expected_tx_id(p.chain, signed).unwrap_or_else(|e| env::panic_str(&e));
-        let tx_hash = if p.chain == ForeignChain::Base {
+        let tx_hash = if p.chain.is_evm() {
             tx_hash.to_ascii_lowercase()
         } else {
             tx_hash
@@ -726,7 +845,7 @@ impl Contract {
 
     pub fn get_vault(&self, token_id: TokenRef) -> Option<VaultView> {
         let id = token_id.id();
-        self.vaults.get(&id).map(|v| view(id, &v))
+        self.load(id).map(|v| view(id, &v))
     }
 
     pub fn get_vaults(&self, from_index: Option<u64>, limit: Option<u64>) -> Vec<VaultView> {
@@ -735,7 +854,10 @@ impl Contract {
         let from = from_index.unwrap_or(0);
         let limit = limit.unwrap_or(50).min(100);
         (from..keys.len().min(from.saturating_add(limit)))
-            .filter_map(|i| Some(view(keys.get(i)?, &vals.get(i)?)))
+            .filter_map(|i| {
+                let id = keys.get(i)?;
+                Some(view(id, &hydrate(id, vals.get(i)?)))
+            })
             .collect()
     }
 
@@ -744,7 +866,7 @@ impl Contract {
             .get(&account_id)
             .unwrap_or_default()
             .into_iter()
-            .filter_map(|id| self.vaults.get(&id).map(|v| view(id, &v)))
+            .filter_map(|id| self.load(id).map(|v| view(id, &v)))
             .collect()
     }
 
@@ -759,6 +881,9 @@ impl Contract {
             "dao_bond": yocto(DAO_BOND),
             "mpc_signer": foreign::MPC_SIGNER,
             "keeper": self.keeper(),
+            "chains": foreign::chain_registry(),
+            "min_pause_s": MIN_PAUSE_S,
+            "max_pause_s": MAX_PAUSE_S,
         })
     }
 
@@ -795,7 +920,7 @@ impl Contract {
         owner: Option<AccountId>,
     ) -> bool {
         let ok = promise_ok();
-        let Some(mut v) = self.vaults.get(&token_id) else {
+        let Some(mut v) = self.load(token_id) else {
             return false;
         };
         let pk_str = String::from(&public_key);
@@ -862,7 +987,7 @@ impl Contract {
         if promise_ok() {
             return true;
         }
-        if let Some(mut v) = self.vaults.get(&token_id) {
+        if let Some(mut v) = self.load(token_id) {
             v.balance += amount.0;
             if kind == "agent_pay" {
                 v.daily_spent = v.daily_spent.saturating_sub(amount.0);
@@ -923,9 +1048,13 @@ impl Contract {
 
 impl Contract {
     pub(crate) fn vault(&self, id: u64) -> Vault {
-        self.vaults
-            .get(&id)
+        self.load(id)
             .unwrap_or_else(|| env::panic_str("vault not found"))
+    }
+
+    /// Read a vault with its raw-slot `Guard` filled in. Use this, never `vaults.get`.
+    pub(crate) fn load(&self, id: u64) -> Option<Vault> {
+        self.vaults.get(&id).map(|v| hydrate(id, v))
     }
 
     fn require_owner_mutable(&self, v: &Vault) {
@@ -1079,6 +1208,13 @@ impl Contract {
         } else {
             vec![]
         };
+        // The guardian was appointed by the previous owner: it goes with the keys. A running
+        // pause stays (it only delays; the new owner clears it with a heartbeat).
+        if v.stored == StoredState::Live && v.guard.guardian_id.is_some() {
+            v.guard.guardian_id = None;
+            v.guard.max_pause_s = 0;
+            write_guard(id, &v.guard);
+        }
         record(
             v,
             id,
@@ -1092,6 +1228,11 @@ impl Contract {
         self.index_add(to, id);
         nft::emit_transfer(&old, to, id, memo);
     }
+}
+
+pub(crate) fn hydrate(id: u64, mut v: Vault) -> Vault {
+    v.guard = read_guard(id);
+    v
 }
 
 /// One DeleteKey promise per key so a single failure cannot block the others.
@@ -1234,5 +1375,8 @@ pub(crate) fn view(id: u64, v: &Vault) -> VaultView {
         foreign_inflight: v.foreign_inflight_since_ms.is_some(),
         created_ms: v.created_ms,
         log: v.log.clone(),
+        guardian_id: v.guard.guardian_id.clone(),
+        max_pause_s: v.guard.max_pause_s,
+        paused_until_ms: v.guard.paused_until_ms,
     }
 }

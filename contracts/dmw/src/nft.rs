@@ -254,7 +254,7 @@ impl Contract {
             return true;
         }
         let id = parse_id(&token_id);
-        let Some(mut v) = self.vaults.get(&id) else {
+        let Some(mut v) = self.load(id) else {
             return true;
         };
         if v.owner_id != receiver_id || v.stored == StoredState::Settled {
@@ -267,7 +267,7 @@ impl Contract {
 
     pub fn nft_token(&self, token_id: String) -> Option<Token> {
         let id = token_id.parse::<u64>().ok()?;
-        self.vaults.get(&id).map(|v| token_view(id, &v))
+        self.load(id).map(|v| token_view(id, &v))
     }
 
     // ----- NEP-177 metadata -----
@@ -296,7 +296,10 @@ impl Contract {
         let from = from_index.map(|f| f.0 as u64).unwrap_or(0);
         let limit = limit.unwrap_or(50).min(100);
         (from..keys.len().min(from.saturating_add(limit)))
-            .filter_map(|i| Some(token_view(keys.get(i)?, &vals.get(i)?)))
+            .filter_map(|i| {
+                let id = keys.get(i)?;
+                Some(token_view(id, &crate::hydrate(id, vals.get(i)?)))
+            })
             .collect()
     }
 
@@ -321,7 +324,7 @@ impl Contract {
         ids.into_iter()
             .skip(from)
             .take(limit)
-            .filter_map(|id| self.vaults.get(&id).map(|v| token_view(id, &v)))
+            .filter_map(|id| self.load(id).map(|v| token_view(id, &v)))
             .collect()
     }
 }

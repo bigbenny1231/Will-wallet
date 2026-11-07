@@ -1,8 +1,8 @@
 // npx tsx src/chains/selfcheck.ts  -- offline vectors + live derivation/RPC checks.
 import assert from 'node:assert/strict';
 import { keccak256, toHex, toChecksumAddress } from './codec.js';
-import { deriveAddresses } from './derive.js';
-import { evmTxHash, getEvmStepArgs, broadcastEvm } from './evm.js';
+import { deriveAddresses, derivationPath } from './derive.js';
+import { chainConfig, evmTxHash, getEvmStepArgs, broadcastEvm } from './evm.js';
 import { getSolanaStepArgs, solanaTxSignature, broadcastSolana } from './solana.js';
 
 assert.equal(toHex(keccak256(new Uint8Array())), 'c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470');
@@ -16,15 +16,28 @@ assert.equal(
   solanaTxSignature('ATeKNaZSfowSiNlpVUam/tRbfMiakrXIxZeMPGmkzysh2Q5qn/+y8KoHEk6d8OM3+OZ0FQZ77JwwfJxoD1pR3AABAAED6kpsY+KcUgq+9VB7Ey7F+ZVHdq6+vnuSQh7qaRRG0iwCAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAzEkOkozS44c7s0P8ldozF5ymD02/RsLDbpEpnVXU5rkBAgIAAQwCAAAAQEIPAAAAAAA='),
   '27QTHoE8sRsRtvZRG6RMiLntqG6zh18eCU7DvBghcEbWKNVTgGZVSj4Y1jC87xFUtbydm5tuJFf5QdzJaLaARhYj',
 );
+assert.equal(chainConfig('monad', {}).chainId, 10143);
+assert.equal(chainConfig('monad', {}).rpc, 'https://testnet-rpc.monad.xyz');
+assert.equal(chainConfig('monad', {}).explorerTx('0xab'), 'https://testnet.monadexplorer.com/tx/0xab');
+assert.equal(chainConfig('base', {}).chainId, 84532);
+assert.equal(chainConfig('monad', { MONAD_RPC: 'http://x' }).rpc, 'http://x');
+assert.throws(() => chainConfig('solana'));
+assert.equal(derivationPath('monad', 7), 'monad-7');
+assert.equal(derivationPath('base', 7), 'base-7');
+assert.equal(derivationPath('solana', 7), 'sol-7');
 console.log('offline vectors ok');
 
 if (!process.argv.includes('--offline')) {
   // (signature above cross-checked with the bs58 npm package)
   // chainsig.js deriveAddressAndPublicKey gave these for the probe contract (docs/chainsig-notes.md)
   const d = await deriveAddresses('dmw-sig-4e3b1c65.testnet', 1);
-  assert.deepEqual(d, { base: '0xcA024adC7cac111339Fe077C739F8085aE705F2F', solana: 'CFdWXa1ean7bBoewSv2SZESrDpWSxeoN1hfLrqaqZQUr' });
+  assert.equal(d.base, '0xcA024adC7cac111339Fe077C739F8085aE705F2F');
+  assert.equal(d.solana, 'CFdWXa1ean7bBoewSv2SZESrDpWSxeoN1hfLrqaqZQUr');
+  assert.match(d.monad, /^0x[0-9a-fA-F]{40}$/);
+  assert.notEqual(d.monad, d.base);
   console.log('derive ok', d);
   console.log('evm args', await getEvmStepArgs(d.base));
+  console.log('monad args', await getEvmStepArgs(d.monad, 'monad'));
   console.log('solana args', await getSolanaStepArgs());
   await broadcastEvm('0x02f87183014a3480830f42408405f5e10082520894000000000000000000000000000000000000dead85e8d4a5100080c001a0488833e3912f3f6a2909811f5e3b98f74392cb9aba5fa927807db6ad9411f87aa069d220b745ac974c6465917e4d7ced686ff7dcee3f8c295c8a4bd9ca6672efc1')
     .then(() => console.log('evm broadcast accepted'), (e) => console.log('evm broadcast (expected while unfunded):', e.message));

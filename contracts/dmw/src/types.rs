@@ -123,6 +123,26 @@ pub struct Vault {
     pub foreign_inflight_since_ms: Option<u64>,
     pub created_ms: u64,
     pub log: Vec<LogEntry>,
+    /// Guardian config and pause state. NOT part of the stored `Vault` bytes (existing
+    /// vaults keep their layout): kept in the raw slot `guard:<token_id>` and filled in
+    /// by `Contract::load` on every read.
+    #[borsh(skip)]
+    pub guard: Guard,
+}
+
+/// Guardian pause (SPEC §2.8). Persisted in raw storage, see `Vault::guard`.
+#[near(serializers = [borsh, json])]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Guard {
+    /// Account allowed (besides the owner) to `pause` the vault.
+    pub guardian_id: Option<AccountId>,
+    /// How far a pause pushes the trigger deadline, counted from the pause.
+    pub max_pause_s: u64,
+    /// Trigger is held off until this time (0 = no pause since the last heartbeat).
+    pub paused_until_ms: u64,
+    /// When the current pause was taken (0 = none since the last heartbeat). A second
+    /// pause is rejected until a heartbeat clears this.
+    pub paused_at_ms: u64,
 }
 
 impl Vault {
@@ -132,19 +152,28 @@ impl Vault {
     pub fn warning_at_ms(&self) -> u64 {
         self.last_beat_ms.saturating_add(self.interval_ms())
     }
-    pub fn trigger_at_ms(&self) -> u64 {
+    /// Deadline from heartbeats alone (no pause).
+    pub fn base_trigger_at_ms(&self) -> u64 {
         self.last_beat_ms.saturating_add(
             self.interval_ms()
                 .saturating_mul(u64::from(self.grace_missed) + 1),
         )
     }
-    /// SPEC §2.2 state derivation.
+    /// Effective trigger deadline: the heartbeat deadline, pushed out by an active pause.
+    pub fn trigger_at_ms(&self) -> u64 {
+        self.base_trigger_at_ms().max(self.guard.paused_until_ms)
+    }
+    /// A guardian/owner pause is holding the vault (SPEC §2.8).
+    pub fn is_paused(&self, now_ms: u64) -> bool {
+        now_ms < self.guard.paused_until_ms
+    }
+    /// SPEC §2.2 state derivation. A paused vault reads as `Warning` (agent disarmed).
     pub fn state_at(&self, now_ms: u64) -> VaultState {
         match self.stored {
             StoredState::Triggered => VaultState::Triggered,
             StoredState::Settled => VaultState::Settled,
             StoredState::Live => {
-                if now_ms < self.warning_at_ms() {
+                if now_ms < self.warning_at_ms() && !self.is_paused(now_ms) {
                     VaultState::Alive
                 } else {
                     VaultState::Warning
@@ -195,6 +224,12 @@ pub struct VaultView {
     pub foreign_inflight: bool,
     pub created_ms: u64,
     pub log: Vec<LogEntry>,
+    /// Guardian who may `pause` (SPEC §2.8); null when none.
+    pub guardian_id: Option<AccountId>,
+    /// Pause length in seconds (0 when no guardian).
+    pub max_pause_s: u64,
+    /// Trigger held off until this time; 0 when no pause since the last heartbeat.
+    pub paused_until_ms: u64,
 }
 
 /// Result of `agent_pay`. Denials are returned (and logged), never panicked.
