@@ -4,13 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Dead Man's Wallet | Crypto that arrives.</title>
-<meta name="description" content="A non-custodial NEAR contract that executes the distribution your will or trust specifies. Proof of life while you are here, settlement when you are not. Heirs sign in with an email, not a seed phrase.">
+<meta name="description" content="A NEAR contract that carries out the distribution you configure from your will or trust. Proof of life while you are here, settlement when you are not. Testnet build; heirs sign nothing to receive NEAR.">
 <meta name="theme-color" content="#0B0C0F">
 <meta name="color-scheme" content="dark">
 <link rel="canonical" href="https://deadmanswallet.dev/">
 <meta property="og:type" content="website">
 <meta property="og:title" content="Dead Man's Wallet | Crypto that arrives.">
-<meta property="og:description" content="Proof of life while you are here. Settlement when you are not. Non-custodial, works alongside your will or trust.">
+<meta property="og:description" content="Proof of life while you are here. Settlement when you are not. A testnet NEAR contract meant to sit alongside a will or trust.">
 <meta property="og:url" content="https://deadmanswallet.dev/">
 <meta property="og:image" content="https://deadmanswallet.dev/assets/og.png">
 <meta property="og:image:width" content="1200">
@@ -18,7 +18,7 @@
 <meta property="og:image:alt" content="The Dead Man's Wallet seal beside the line: Crypto that arrives.">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Dead Man's Wallet | Crypto that arrives.">
-<meta name="twitter:description" content="Non-custodial NEAR contract that executes the distribution your will or trust specifies.">
+<meta name="twitter:description" content="A testnet NEAR contract that carries out the distribution you configure from your will or trust.">
 <meta name="twitter:image" content="https://deadmanswallet.dev/assets/og.png">
 <meta name="twitter:image:alt" content="The Dead Man's Wallet seal beside the line: Crypto that arrives.">
 <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
@@ -43,7 +43,7 @@
         <li><a href="#heirs">For heirs</a></li>
         <li><a href="#attorneys">For attorneys</a></li>
         <li><a href="#security">Security</a></li>
-        <li><a href="#docs" data-link="docs">Docs</a></li>
+        <li><a href="https://github.com/agarretson/deadmans-wallet#readme">Docs</a></li>
       </ul>
     </nav>
     <a class="link nav-cta" href="#waitlist">Join the waitlist</a>
@@ -56,12 +56,12 @@
   <div class="wrap hero-grid">
     <div class="hero-copy">
       <h1 id="hero-h">Crypto that arrives.</h1>
-      <p class="lede">While you are alive, nothing happens. When you are not, your vault pays each heir on every chain you hold, the way your will or trust says. They sign in with an email. No seed phrase. Nobody locked out.</p>
+      <p class="lede">While you are alive, nothing happens. When you are not, your vault pays your heirs on NEAR, the way you configured it from your will or trust, and has NEAR&#8217;s network sign their payouts on Base, Monad and Solana. Heirs sign nothing to receive their NEAR.</p>
       <div class="cta-row">
-        <a class="pill" href="https://app.deadmanswallet.dev" data-link="dashboard">Set up a vault</a>
+        <a class="pill" href="https://github.com/agarretson/deadmans-wallet#run-it-in-about-10-minutes-testnet">Run it on testnet</a>
         <a class="link" href="#demo">Watch the demo, 2:50</a>
       </div>
-      <p class="fine">Non-custodial. Open source. Works alongside your will or trust.</p>
+      <p class="fine">Open source. Testnet only. Not a will; meant to sit alongside one.</p>
     </div>
 
     <figure class="hero-seal">
@@ -167,7 +167,7 @@
         <li class="step" style="--n:2">
           <span class="step-n" aria-hidden="true">III</span>
           <h3>It arrives.</h3>
-          <p>If the heartbeats stop, the contract pays each heir on every chain and disarms any agent you ran. Your heirs sign in.</p>
+          <p>If the heartbeats stop, the contract pays your heirs on NEAR, deletes the pulse and agent keys, and has NEAR&#8217;s MPC network sign the Base, Monad and Solana payouts for any keeper to relay. In the testnet build those payouts are signed but not yet relayed.</p>
         </li>
       </ol>
     </div>
@@ -178,13 +178,13 @@
   <div class="wrap demo-grid">
     <div class="demo-head">
       <h2 id="demo-h">Watch a vault settle.</h2>
-      <p>A vault is created, its agent is refused a payment, the heartbeats stop, and settlement runs. Every frame is a real run on NEAR testnet. Nothing is mocked.</p>
+      <p>A vault is created, its agent is refused a payment, the heartbeats stop, and settlement runs. Recorded from one real run on NEAR testnet, with idle stretches sped up and three stalled-RPC stretches cut; every cut is listed in the repo&#8217;s <span class="mono">docs/video</span>.</p>
     </div>
     <figure class="player">
       <div class="player-frame">
         <video id="demo-video" preload="none" playsinline width="1280" height="720" poster="assets/poster.jpg" aria-describedby="demo-cap">
           <source src="assets/demo-720p.mp4" type="video/mp4">
-          <p>Your browser cannot play this video. The demo is linked from the <a href="#docs" data-link="docs">docs</a>.</p>
+          <p>Your browser cannot play this video. The demo is linked from the <a href="https://github.com/agarretson/deadmans-wallet#readme">docs</a>.</p>
         </video>
         <button class="play" type="button" aria-controls="demo-video">
           <span>Play the demo</span>
@@ -198,10 +198,10 @@
 
 <section class="heirs" id="heirs" aria-labelledby="heirs-h">
   <div class="wrap heirs-grid">
-    <h2 id="heirs-h">Got an email saying someone left you something?</h2>
+    <h2 id="heirs-h">Were you named as an heir?</h2>
     <div class="heirs-body">
-      <p>Sign in with the address it was sent to. The assets are already in your name. You do not need a wallet, a seed phrase, or to know what NEAR is.</p>
-      <a class="link link-ink" href="https://app.deadmanswallet.dev/heir" data-link="heir">Claim what was left to you</a>
+      <p>Your share of NEAR is sent to your account at settlement; you do not sign anything to receive it. The heir page lists each vault that names your account. Sign-in with Google, which shows the NEAR account your Google identity controls so you can give it to the owner, works on testnet from a local copy only, and email notices are not built yet.</p>
+      <a class="link link-ink" href="https://github.com/agarretson/deadmans-wallet/blob/master/dashboard/docs/near-auth.md">How heir sign-in works today</a>
     </div>
   </div>
 </section>
@@ -210,7 +210,7 @@
   <div class="wrap">
     <div class="sec-head">
       <h2 id="security-h">The security model, in plain words.</h2>
-      <p>Every key does one thing. None of them can change who gets what.</p>
+      <p>Every key does one thing. None of them can change who gets what, except, on testnet, the deployer key, which can still upgrade the contract.</p>
     </div>
     <div class="table-scroll" tabindex="0" role="region" aria-label="Security model table">
       <table class="ledger">
@@ -230,18 +230,23 @@
           </tr>
           <tr>
             <th scope="row">The contract</th>
-            <td>Hold the plan. At settlement, pay heirs, request an MPC signature for each foreign-chain payout, then delete the pulse and agent keys.</td>
-            <td>Move assets outside the configured plan.</td>
+            <td>Hold the plan. At settlement, pay heirs, delete the pulse and agent keys, then request an MPC signature for each foreign-chain payout.</td>
+            <td>Move assets outside the configured plan, as deployed.</td>
           </tr>
           <tr>
             <th scope="row">A keeper <span class="aside">anyone can be one</span></th>
-            <td>Supply the nonce and gas that settlement needs.</td>
+            <td>Supply the fees, gas limit and Solana blockhash that settlement needs. The contract sets the nonce.</td>
             <td>Change who gets what.</td>
           </tr>
           <tr>
             <th scope="row">A thief with your device</th>
-            <td>Send a heartbeat, which only says you are still here.</td>
-            <td>Anything useful. The device holds only a pulse key.</td>
+            <td>Send heartbeats, which only say you are still here. That can postpone settlement until you remove the key.</td>
+            <td>Move funds or change heirs. The device holds only a pulse key.</td>
+          </tr>
+          <tr>
+            <th scope="row">The deployer key <span class="aside">testnet build</span></th>
+            <td>Upgrade the contract, and so move any vault&#8217;s funds.</td>
+            <td>Nothing is out of its reach. Mainnet would remove it or put upgrades behind a DAO.</td>
           </tr>
         </tbody>
       </table>
@@ -253,15 +258,15 @@
   <div class="wrap att-grid">
     <div class="att-copy">
       <h2 id="attorneys-h">For attorneys</h2>
-      <p>Dead Man&#8217;s Wallet is a RUFADAA-style online tool that your client configures. The client names heirs and shares, chooses the chains, and sets the proof-of-life interval, working from the distribution their will or trust specifies. The contract executes that configuration. It does not interpret or amend the governing document.</p>
-      <p>It is non-custodial: no party, including us, holds the client&#8217;s keys or can move assets outside the configured plan. The plan lives on-chain, so a fiduciary can read exactly what was configured and when it last changed.</p>
-      <p>Counsel can reference the tool in the instrument. The clause is a starting point only.</p>
+      <p>Dead Man&#8217;s Wallet is a tool your client configures. The client names heirs and shares, chooses the chains, and sets the proof-of-life interval, working from the distribution their will or trust specifies. The contract executes that configuration. It does not interpret or amend the governing document. Whether it counts as an &#8220;online tool&#8221; under RUFADAA, or under any state&#8217;s law, is a question for counsel; we make no such claim.</p>
+      <p>No person holds keys to the vault&#8217;s foreign-chain addresses, and the deployed code moves assets only as configured. In this testnet build the deployer&#8217;s key can still upgrade the contract, so it is not yet free of our control. The plan lives on-chain, so a fiduciary can read what was configured and the transactions that changed it.</p>
+      <p>Nothing on this page is legal advice. The clause below is an illustration of the idea, not language to use.</p>
       <p><a class="link" href="assets/attorney-one-pager.pdf" download>One-pager for counsel, PDF</a></p>
     </div>
     <aside class="clause" id="clause" aria-labelledby="clause-h">
       <header class="clause-head">
         <h3 id="clause-h">Sample trust clause</h3>
-        <p class="clause-tag">Sample. Review with counsel.</p>
+        <p class="clause-tag">Illustration only. Not legal advice.</p>
       </header>
       <blockquote>
         <p><span class="clause-title">Digital asset distribution tool.</span> The Settlor may configure an online tool known as Dead Man&#8217;s Wallet (the &#8220;Vault&#8221;) to hold or distribute digital assets. The Trustee is authorized to rely on the distribution configured in the Vault as of the date of the Settlor&#8217;s incapacity or death, to the extent it is consistent with this instrument, and to access, manage, and transfer on-chain assets associated with the Vault as necessary to administer the trust. In the event of any inconsistency between the Vault&#8217;s configuration and this instrument, this instrument controls, and the Trustee may take such steps as are needed to give effect to it.</p>
@@ -282,9 +287,9 @@
       <details><summary>What is a heartbeat?</summary>
         <p>A small signed message from your pulse key saying you are still here. It is the proof of life. Nothing happens while heartbeats keep arriving.</p></details>
       <details><summary>Which chains?</summary>
-        <p>NEAR, Base, Monad and Solana, the last three through NEAR Chain Signatures. The demo uses Base Sepolia, Monad testnet and Solana devnet. Assets must be held at the vault&#8217;s derived addresses to be included.</p></details>
+        <p>NEAR, Base, Monad and Solana, the last three through NEAR Chain Signatures. The demo uses Base Sepolia, Monad testnet and Solana devnet. Each foreign payout is a fixed amount from the vault&#8217;s derived address, which must hold the funds. On testnet those payouts have been signed but none has been relayed yet, because the derived addresses are unfunded.</p></details>
       <details><summary>Can my heirs see my balance?</summary>
-        <p>Not through the app. They see nothing until settlement. NEAR is a public ledger, though, so the plan and balances in the contract are visible to anyone who looks up the vault on-chain.</p></details>
+        <p>Yes. The heir page lists every vault that names the heir&#8217;s account, with the share set aside for them, while you are alive. NEAR is a public ledger, so the plan and balances in the contract are visible to anyone who looks up the vault on-chain.</p></details>
       <details><summary>What does it cost?</summary>
         <p>The hackathon version runs on testnet and is free. Mainnet pricing has not been set; the waitlist hears first.</p></details>
     </div>
@@ -312,13 +317,13 @@
 
 <footer class="footer">
   <div class="wrap foot-grid">
-    <p class="disclaimer">Not a will. Not a custodian. Configure it with your estate attorney.</p>
+    <p class="disclaimer">Not a will. Not a custodian. Not legal advice. Configure it with your estate attorney.</p>
     <ul class="foot-links">
-      <li><a href="#docs" data-link="docs">Docs</a></li>
+      <li><a href="https://github.com/agarretson/deadmans-wallet#readme">Docs</a></li>
       <li><a href="#security">Security model</a></li>
       <li><a href="#clause">Sample trust clause</a></li>
-      <li><a href="mailto:hello@deadmanswallet.dev" data-link="contact">Contact</a></li>
-      <li><a href="https://github.com/agarretson/deadmans-wallet" data-link="github" rel="noopener">GitHub</a></li>
+      <li><a href="https://github.com/agarretson/deadmans-wallet/issues">Contact</a></li>
+      <li><a href="https://github.com/agarretson/deadmans-wallet" rel="noopener">GitHub</a></li>
     </ul>
     <p class="colophon">Built on NEAR Chain Signatures for the NEAR Hackathon, November 2026. Testnet only.</p>
   </div>

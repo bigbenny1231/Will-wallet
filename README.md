@@ -3,32 +3,38 @@
 **A NEAR contract that executes your estate plan — for humans and for AI agents.**
 While you're alive, a pulse key sends a heartbeat. If the heartbeats stop, the contract
 pays your heirs on NEAR, deletes your AI agent's spending key, has NEAR's MPC network sign payouts
-on Base, Monad and Solana (signed; relay pending funding of the derived addresses), files a proposal in your
-estate DAO, and hands the Will NFT (which holds the funds) to your primary heir. Heirs never touch a
-seed phrase.
+on Base, Monad and Solana, files a proposal in your estate DAO, and hands the Will NFT (whose holder can
+claim what is left in the vault) to your primary heir. Heirs do not sign anything to receive their NEAR.
+The foreign payouts are signed but have never been relayed: no derived source address has been funded, so
+nothing has arrived on Base, Monad or Solana yet.
 
 What is in the build:
 
 - **Phone pulse PWA.** The dashboard's `/pulse` page is the owner's phone: pair it with a QR code from the vault
   page, and it sends heartbeats with a pulse key that can only call `heartbeat`.
 - **Autonomous agent.** `agent/` runs an agent loop whose wallet wrapper holds only the scoped agent key. The
-  [live attack transcript](agent/LIVE_TRANSCRIPT.md) shows a prompt-injected agent being refused by the wrapper,
-  and then, with the wrapper's pre-checks off, by the contract itself.
+  [live attack transcript](agent/LIVE_TRANSCRIPT.md) shows an agent that obeys a planted prompt injection being
+  refused by the wrapper, and then, with the wrapper's pre-checks off, by the contract itself. The recorded runs use
+  the offline scripted brain (written to obey the injection); the LLM brains are unit-tested but were not used there.
 - **Guardian pause.** The owner can name a guardian who can pause the vault once per heartbeat cycle, for at most
   a length the owner sets (SPEC §2.8). It closes the "dead pulse key triggers a live owner" finding (M-1).
-- **Four chains.** NEAR, plus Base Sepolia, Monad testnet and Solana devnet through Chain Signatures. The
-  keeper relays Monad payouts like Base ones.
-- **Heir sign-in with Google (partial).** Heirs can sign in with Google through NEAR Auth on testnet (shared
-  credentials, `localhost:3000` only). The Google identity resolves to the NEAR implicit account its MPC key
-  controls, and the page lists what was left to it. On the public site the button reads "NEAR Auth (coming)"
-  until we have production credentials ([`dashboard/docs/near-auth.md`](dashboard/docs/near-auth.md)).
+- **NEAR plus three signing targets.** Heirs are paid on NEAR; Base Sepolia, Monad testnet and Solana devnet
+  payouts are signed through Chain Signatures. The keeper has the same relay code for Monad as for Base. No foreign
+  payout has been relayed yet (every derived source address on `dmw-x8cx.testnet` holds 0 and has nonce 0).
+- **Heir sign-in with Google (partial, read-only).** On `localhost:3000` only (the shared NEAR Auth testnet
+  client), "Continue with Google" opens NEAR Auth's Google login; the page derives the NEAR implicit account the
+  identity's MPC key controls and lists vaults that name it. A full Google login has not been completed end to end:
+  the popup was shown reaching Google's sign-in page, and the identity-to-account step is tested with a known `sub`
+  and in mock mode. The heir cannot claim or sign through it yet, and the owner must name the implicit account id,
+  which the heir has to send them first. On any other origin the button reads "NEAR Auth (coming)"
+  ([`dashboard/docs/near-auth.md`](dashboard/docs/near-auth.md)).
 - **Attorney one-pager.** [One page for estate attorneys](docs/one-pager/attorney-one-pager.pdf).
 
 Built at NEAR Hackathon, Nov 1–14 2026. Tracks: `security` (06 AI Security & Defense), `nfts` (10), `open` (13).
 Testnet only. Not a will, not a custodian, not audited. MIT license.
 
 Live contract: [`dmw-x8cx.testnet`](https://testnet.nearblocks.io/address/dmw-x8cx.testnet) ·
-Live keeper run (alive → settled, both foreign payouts signed): [`keeper/LIVE_RUN.md`](keeper/LIVE_RUN.md) ·
+Live keeper run (alive → settled, both foreign payouts signed, none relayed): [`keeper/LIVE_RUN.md`](keeper/LIVE_RUN.md) ·
 Showcase vault for the demo video: [`keeper/SHOWCASE.md`](keeper/SHOWCASE.md) ·
 Smoke run with 21 transaction links, plus the live Sputnik run: [`contracts/TESTNET_SMOKE.md`](contracts/TESTNET_SMOKE.md) ·
 Chain Signatures proof: [`docs/chainsig-notes.md`](docs/chainsig-notes.md) ·
@@ -38,8 +44,8 @@ Security review: [`docs/SECURITY_REVIEW.md`](docs/SECURITY_REVIEW.md)
 
 Agents hold wallets, API budgets and treasuries. When their operator dies, loses access or is
 incapacitated, the agent keeps spending until it runs dry and anything it held on other chains is gone.
-Existing dead-man's switches move a key or a file on one chain. None can disarm an agent or settle an
-estate across chains from one contract.
+The dead-man's switches we looked at move a key or a file on one chain; we found none that disarms an agent or
+settles an estate across chains from one contract.
 
 ## Run it in about 10 minutes (testnet)
 
@@ -163,34 +169,36 @@ source addresses; the faucets need a human login), and step 4 is skipped because
 
 | Claim | Where to look |
 | --- | --- |
-| The pulse key can only call `heartbeat`, the agent key only `agent_pay` | your own `make demo` contract: `node scripts/near-admin.mjs keys <contract>` shows `FunctionCall` keys with `method_names` `["heartbeat"]` / `["agent_pay"]`. On `dmw-x8cx.testnet` every vault is settled or keyless now, so it holds only the deployer's FullAccess key |
-| An autonomous agent is refused when a prompt injection tells it to drain the vault | [`agent/LIVE_TRANSCRIPT.md`](agent/LIVE_TRANSCRIPT.md): three real runs against vault 13 on `dmw-x8cx.testnet` (wrapper refuses; contract denies when the wrapper's checks are off; a vigilant brain refuses on its own), with the setup transactions |
+| The pulse key can only call `heartbeat`, the agent key only `agent_pay` | your own `make demo` contract: `node scripts/near-admin.mjs keys <contract>` shows `FunctionCall` keys with `method_names` `["heartbeat"]` / `["agent_pay"]`. On `dmw-x8cx.testnet` (checked Nov 7 2026) the list is the deployer's FullAccess key, one `["agent_pay"]` key (vault 13, Alive) and one `["heartbeat"]` key (vault 15) |
+| An autonomous agent is refused when a prompt injection tells it to drain the vault | [`agent/LIVE_TRANSCRIPT.md`](agent/LIVE_TRANSCRIPT.md): three real runs against vault 13 on `dmw-x8cx.testnet` with the scripted brain (wrapper refuses; contract denies when the wrapper's checks are off; the vigilant scripted brain refuses on its own), with the setup transactions |
 | A guardian can pause once and the deadline moves | [TESTNET_SMOKE.md](contracts/TESTNET_SMOKE.md) vault 14: [`set_guardian`](https://testnet.nearblocks.io/txns/HqomRLAzzUd6KYTuz2bsNU1qYEsuC9RyBQUtuToFShcG), [`pause`](https://testnet.nearblocks.io/txns/FNZntghrMV7pj2S5qLvqqu4zrpLKJZ933mNQSyMm163o) (deadline +153 s, state Warning), a second [`pause`](https://testnet.nearblocks.io/txns/Chnrufz6tF2Z6qrSijL9xPgRuoukz8oNDfKMxqddY7Ub) rejected `already_paused`, an early [`poke`](https://testnet.nearblocks.io/txns/31xYgVNdcpY2sqaT369SVVFDf5oohmry8ifjzN23qEDn) rejected `not_due` |
 | The contract signs a Monad transaction | TESTNET_SMOKE.md vault 14, [step 3](https://testnet.nearblocks.io/txns/DFmmyrRWNTUdsn3KLXuoHfjuaAcMoY7c71i2EUN3p976): `v1.signer-prod.testnet` signs path `monad-14`; the stored tx decodes to chain id 10143 from the derived address `0x360D0232…0e13`. Relay is pending funding (the RPC answers `insufficient balance`) |
 | Denied agent payments are logged, not reverted | `agent_pay` returns `{allowed:false, reason}`; the tx succeeds; see TESTNET_SMOKE.md item 5 |
 | Settlement deletes the keys | TESTNET_SMOKE.md item 8, key list before/after |
 | The contract itself requests MPC signatures | `docs/chainsig-notes.md`: NEAR txs where `dmw` calls `v1.signer-prod.testnet.sign`. The probe contract `ecrecover`s the Base signature on-chain to the derived address; for `dmw` the signed Base tx recovers off-chain (viem) to the derived address |
 | Step 4 files and ratifies a Sputnik proposal | TESTNET_SMOKE.md, last section: vault 10 on `dmw-x8cx.testnet`, [`add_proposal` from the contract](https://testnet.nearblocks.io/txns/FAzezve68HDjUDsNzsb8qV7KnE6SNE8kVap6S5Hmkd6e), proposal 0 on `estate-82bd1f.sputnik-v2.testnet`, [approved and executed](https://testnet.nearblocks.io/txns/5y9hspPGwhmzfU2ivNggFQhPrTaHtznqpaB5dNcfBgeB) |
-| The live contract is this source | `contract_source_metadata` on `dmw-x8cx.testnet` returns `link` and `build_info`; `git checkout 88cd83b && make build-reproducible` (Docker) prints code hash `G6eiYJj6gkVt4QaJPHYBQz4eov4fU5ihwsUFqSog25hM`, the same as `view_account`. A plain `make build` uses your local toolchain, so its hash differs |
+| The live contract is this source | `view_account dmw-x8cx.testnet` → code hash `13ug5kLS5oCUSHBjJ7P5sEJ7gANxaATHtHtfdDUZfsqU`, the last redeploy ([tx](https://testnet.nearblocks.io/txns/81DnDj5PrzPdpaA1aWiAw4NpLtzQ2nRebmuaC8gPNhAV)), built with `cargo near build non-reproducible-wasm` from commit `f0178de` (the contract source is unchanged since). `make build` on that source with rustc 1.97.0 and cargo-near 0.23.0 gives the same hash (re-checked Nov 7 2026); another toolchain gives a different one. It is **not** a reproducible build: `contract_source_metadata` returns `link` but `build_info: null`. The Docker build of `88cd83b` (`G6eiYJj6…25hM`) was deployed earlier and has since been replaced |
 | The Will NFT holds funds and redraws itself | `nft_token {"token_id":"4"}` → `media` is an on-chain SVG data URI (grey, Settled) |
 
-## How NEAR fits (and why this can't be built elsewhere)
+## How NEAR fits
 
 - **Function-call access keys.** NEAR accounts hold many keys, each scoped to one contract and a list of
   methods. The contract adds the pulse and agent keys to *its own* account, scoped to `heartbeat` /
-  `agent_pay`, and deletes them at settlement. A stolen phone can only say "alive"; a compromised agent can
-  only spend inside its policy; neither can touch the plan.
+  `agent_pay`, and deletes them at settlement. A stolen phone can only say "alive" (which postpones settlement
+  until the owner removes the key); a compromised agent can only spend inside its policy; neither can touch the plan.
 - **Chain Signatures.** The contract calls `v1.signer-prod.testnet.sign` with the hash of an EIP-1559
   Base transaction (secp256k1, domain 0) and the bytes of a Solana transfer (ed25519, domain 1). The
-  foreign source addresses are derived from the contract account + a per-vault path, so no key for them
-  exists anywhere, and no signature exists until the trigger fires. Transactions are built in-contract
-  with `omni-transaction`.
+  foreign source addresses are derived from the contract account + a per-vault path. No single party holds
+  a private key for them: the MPC network holds shares of the root key and signs for this path only when the
+  contract account asks, which the deployed code does only after `Triggered` (the deployer key could deploy other
+  code; see the security model). Transactions are built in-contract with `omni-transaction`.
 - **NEP-171 + on-chain SVG.** The will is a token the contract owns the balance of; its image is
   computed from state (green / amber / red / grey) at read time.
 - **Sputnik DAO.** Step 4 files a `FunctionCall` proposal in the estate's DAO so a council can ratify. Run live
   once on testnet (vault 10, proposal 0 on `estate-82bd1f.sputnik-v2.testnet`). Ratifying only records an event.
-- **Permissionless keepers.** `poke` and `execute_step` are callable by anyone and pay a bounty; the
-  keeper only supplies nonce/gas/blockhash for foreign chains, never destinations or amounts.
+- **Permissionless keepers.** `poke` and `execute_step` are callable by anyone; `poke` pays the vault's bounty,
+  `execute_step` pays none. The keeper only supplies EVM fees and gas limit (the contract sets the nonce) or a
+  Solana blockhash, never destinations or amounts.
 
 ## Diagrams
 
@@ -222,10 +230,12 @@ For estate attorneys: [one-page PDF](docs/one-pager/attorney-one-pager.pdf) (sou
 "Neither can touch the plan" in the section above holds for pulse and agent keys. It does not hold against the
 deployer key until that key is removed.
 
-An independent review (a separate agent that had not seen the code) found 1 Critical, 3 High, 4 Medium, 6 Low: a
-double-payout path on foreign chains via caller-chosen nonces, fake `mark_broadcast` hashes, unbounded EVM gas, and
-keys surviving an NFT transfer. All Critical/High items are fixed with regression tests and redeployed; the Medium/Low
-items are documented with their mitigations. Full findings: [`docs/SECURITY_REVIEW.md`](docs/SECURITY_REVIEW.md).
+Two review rounds by a separate AI agent that did not write the code (not a third-party audit). Round 1 found
+1 Critical, 3 High, 4 Medium, 6 Low, 5 Info: a double-payout path on foreign chains via caller-chosen nonces, fake
+`mark_broadcast` hashes, unbounded EVM gas, and keys surviving an NFT transfer. Round 2 (guardian pause, Monad) found
+1 High, 2 Medium, 3 Low, 4 Info. Every Critical/High item, and Medium M-6, is fixed with regression tests and
+redeployed; the other Medium/Low items are documented with their mitigations. Full findings:
+[`docs/SECURITY_REVIEW.md`](docs/SECURITY_REVIEW.md), [`docs/SECURITY_REVIEW_2.md`](docs/SECURITY_REVIEW_2.md).
 
 ## Repository
 
@@ -238,28 +248,49 @@ items are documented with their mitigations. Full findings: [`docs/SECURITY_REVI
 | `dashboard/` | Vite + React app: create vault, live Will NFT, agent log, keys, guardian, settlement timeline, heir view, phone pulse (`/pulse`) |
 | `site/` | public landing page |
 | `scripts/` | `near-admin.mjs` (faucet/deploy/call without near-cli), `deploy.sh`, `demo.sh`, `kill.sh`, `check.sh` |
-| `docs/` | Chain Signatures notes, security review, diagrams, attorney one-pager, judge dry runs (`JUDGE_DRY_RUN.md`, `_2`, `_3`) |
+| `docs/` | Chain Signatures notes, security review, diagrams, attorney one-pager, judge dry runs (`JUDGE_DRY_RUN.md`, `_2`, `_3`, `_4`), claims audit (`AUDIT_CLAIMS.md`) |
 | `SPEC.md` | the interface every component was built against |
 
 ## Libraries, templates and AI-generated code
 
-near-sdk-rs 5, near-contract-standards, omni-transaction 0.5, near-api-js 6, chainsig.js (derivation
-reference), wallet-selector 10, Vite, React, Tailwind, vitest. No template was used.
-Most of the code was written by Claude (Anthropic) under the direction of Andrew Garretson, who set the
-product, architecture decisions and reviews; all of it was written in the hackathon window. The work was
-done in a scratch workspace during the hackathon and committed to this repo in sequence on Nov 7 2026, which
-is why the history is short. Baseline code: none. We will mark the submitted tree with the tag
-`hackathon-submission`.
+Third-party libraries (all from their package registries, none modified):
+
+- Contract (Rust): near-sdk 5.30, near-contract-standards 5.30, omni-transaction 0.5 (`evm`, `solana`), serde_json, hex.
+  Built with cargo-near 0.23.
+- Keeper and agent (TypeScript): near-api-js 6, commander, dotenv, picocolors; dev: tsx, TypeScript, vitest.
+- Dashboard: React 18, react-router-dom 7, @near-wallet-selector 10 (core, modal-ui, MyNearWallet, Meteor),
+  near-api-js 6, chainsig.js (address derivation in the browser), @auth0/auth0-spa-js (NEAR Auth login), qrcode,
+  @noble/hashes, bs58, buffer, @fontsource (Instrument Serif, Inter Tight, JetBrains Mono, OFL); dev: Vite 8,
+  Tailwind 4 with PostCSS, TypeScript, vitest.
+- Site: no runtime dependencies; the same three OFL fonts, self-hosted.
+- Tooling outside the shipped code: Playwright and ffmpeg (demo video, screenshots), Docker image
+  `sourcescan/cargo-near` (optional reproducible build).
+- External services on testnet: `v1.signer-prod.testnet` (MPC), `sputnik-v2.testnet`, the NEAR Auth shared testnet
+  Auth0 client, the NEAR faucet, and the public RPCs listed in `SPEC.md`.
+
+No template or boilerplate was used. Licences of bundled material: [`docs/THIRD_PARTY_NOTICES.md`](docs/THIRD_PARTY_NOTICES.md).
+
+**AI-generated code.** Almost all of the code, tests, scripts and docs in every directory were generated by Claude
+(Anthropic) agents, directed and reviewed by Andrew Garretson, who set the product and architecture decisions. Treat
+the whole repository as AI-generated. The two security reviews were also done by an AI agent.
+
+**Baseline.** None: no code predates the hackathon (the author's statement; the window opened with the 2026-10-19
+announcement). The work was done in a scratch workspace and committed to this repo in sequence on Nov 7 2026, which
+is why every commit carries that date. The submitted tree will be tagged `hackathon-submission`.
+
 The author leads no other hackathon project.
 
 ## Limits and what's next
 
 - Testnet only; three foreign chains (Base, Monad, Solana). Foreign payouts are signed by the MPC network, but none has been relayed yet:
   relaying needs the derived source addresses funded, and the faucets require a human login.
+- Not a reproducible build: the live code hash matches `make build` only with the same toolchain (see the table above).
+- The deployer's FullAccess key on `dmw-x8cx.testnet` can upgrade the contract and so move any vault's funds.
 - Not a legal instrument. The product configures alongside a will or trust; see the FAQ on the site.
 - Next: owner notifications at `Warning`, trust-owned vaults, production NEAR Auth credentials for heir sign-in
   with Google, Shade Agent attestation for the heartbeat, audit, mainnet.
 
 ## License
 
-MIT — see `LICENSE`. Security contact: security@deadmanswallet.dev or GitHub issues on this repo (details in `SECURITY.md`).
+MIT — see `LICENSE`. Security contact: GitHub issues on this repo (details in `SECURITY.md`). The
+`deadmanswallet.dev` domain did not resolve on Nov 7 2026 (NXDOMAIN), so its email addresses do not work yet.

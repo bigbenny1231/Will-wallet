@@ -1,32 +1,39 @@
 # Submission kit
 
 Everything needed to submit Dead Man's Wallet to the NEAR Hackathon. Placeholders are in double braces and are only
-for the payout account, the email and the demo link (the X post URL, which does not exist until you post).
+for the request id (a fresh lowercase UUID: `node -e 'console.log(crypto.randomUUID())'`, reused on retries), the payout
+account, the email, the demo link (the X post URL, which does not exist until you post) and, in the X posts, the site
+URL. `deadmanswallet.dev` did not resolve on Nov 7 2026 (NXDOMAIN), so `{{SITE_URL}}` must be the deployed Vercel site
+until that domain is registered.
 Rules this follows (nearhackathon.com `HACKATHON.md`): the demo post says it was built at NEAR Hackathon, tags
 @NEARProtocol and #NEARHackathon, attaches the video, leads with the user problem, shows one complete action, says what
 NEAR enables, and ends with links and a question.
 
 ## 1. Form payload
 
-Fields: project name, team lead, email, team size, tracks, NEAR mainnet payout account, repo link, demo link,
-description (20 to 2000 characters, this one is 1558), contact consent.
+`POST https://nearhackathon.com/api/applications` takes exactly these keys and no others (no `website` key: it is a
+spam trap): `requestId`, `projectName`, `leadName`, `email`, `size`, `tracks`, `nearAddress` (lowercase mainnet
+account), `projectUrl` (the public repo), `demoUrl` (the public X post), `idea` (20 to 2000 characters, this one is
+1698), `consent` (`true` only after the human agrees to the contact notice). The repo must be public by the deadline:
+on Nov 7 2026 this checkout had no git remote and the GitHub URL was not reachable from the audit session.
 
 ```json
 {
-  "project_name": "Dead Man's Wallet",
-  "team_lead": "Andrew Garretson",
+  "requestId": "{{REQUEST_ID}}",
+  "projectName": "Dead Man's Wallet",
+  "leadName": "Andrew Garretson",
   "email": "{{EMAIL}}",
-  "team_size": 1,
+  "size": "1",
   "tracks": [
     "security",
     "nfts",
     "open"
   ],
-  "near_mainnet_payout_account": "{{NEAR_MAINNET_PAYOUT_ACCOUNT}}",
-  "repo_url": "https://github.com/agarretson/deadmans-wallet",
-  "demo_url": "{{DEMO_URL}}",
-  "description": "Agents hold wallets, API budgets and treasuries. When their operator dies, loses access or is incapacitated, the agent keeps spending until it runs dry, and anything it held on other chains is gone. Existing dead-man's switches move one key or one file on one chain. None can disarm an agent or settle an estate across chains.\n\nDead Man's Wallet is a NEAR contract that does both. While you are alive, a phone key that can only call heartbeat says so. When the heartbeats stop, anyone can poke the contract, and it settles in five steps: heirs are paid on NEAR; the pulse and agent keys are deleted; NEAR's MPC network signs payouts on Base, Monad and Solana; a proposal is filed in the estate DAO; the Will NFT, which holds the funds and draws itself from state, goes to the primary heir. Heirs never touch a seed phrase.\n\nWhat NEAR enables: function-call access keys scoped to one method, so a stolen phone can only say alive and a compromised agent can only spend inside its policy; Chain Signatures, so no key exists for the foreign addresses until the trigger fires; NEP-171 with an on-chain SVG seal; permissionless keepers.\n\nShown on testnet: a prompt-injected agent refused by its wallet, then by the contract itself; a guardian pause that moves the deadline once; an independent review whose Critical and High findings are fixed. Foreign payouts are signed on chain; relay waits for funding of the derived addresses.\n\nTestnet only. Not a will, not a custodian, not audited. Built at NEAR Hackathon with Claude under the direction of the author. MIT.",
-  "contact_consent": true
+  "nearAddress": "{{NEAR_MAINNET_PAYOUT_ACCOUNT}}",
+  "projectUrl": "https://github.com/agarretson/deadmans-wallet",
+  "demoUrl": "{{DEMO_URL}}",
+  "idea": "Agents hold wallets, API budgets and treasuries. When their operator dies, loses access or is incapacitated, the agent keeps spending until it runs dry, and anything it held on other chains is gone. The dead-man's switches we found move one key or one file on one chain; none disarms an agent or settles an estate across chains.\n\nDead Man's Wallet is a NEAR contract that does both. While you are alive, a phone key that can only call heartbeat says so. When the heartbeats stop, anyone can poke the contract, and it settles in five steps: heirs are paid on NEAR, with nothing for them to sign; the pulse and agent keys are deleted; NEAR's MPC network signs payouts on Base, Monad and Solana; a proposal is filed in the estate DAO; the Will NFT, which draws itself from state and can claim what is left, goes to the primary heir.\n\nWhat NEAR enables: function-call access keys scoped to one method, so a stolen phone can only say alive and a compromised agent can only spend inside its policy; Chain Signatures, so no single party holds a key for the foreign addresses and the contract requests signatures only after the trigger; NEP-171 with an on-chain SVG seal; permissionless keepers.\n\nShown on testnet: an agent scripted to obey a planted prompt injection, refused by its wallet, then by the contract itself; a guardian pause that moves the deadline once; two review rounds by a separate AI agent, with every Critical and High finding fixed. Foreign payouts are signed on chain but none has been relayed: the derived addresses are unfunded.\n\nTestnet only. Not a will, not a custodian, not audited. Built at NEAR Hackathon, mostly AI-generated with Claude under the direction of the author. MIT.",
+  "consent": true
 }
 ```
 
@@ -40,18 +47,18 @@ Lengths use X's counting (a link is 23 characters whatever its length). Each is 
 Your AI agent keeps spending after you die.
 
 Dead Man's Wallet: miss the heartbeats and a NEAR contract kills the agent's key and pays heirs. Built at NEAR Hackathon @NEARProtocol #NEARHackathon
-deadmanswallet.dev
+{{SITE_URL}}
 github.com/agarretson/deadmans-wallet
 Who holds your agent's keys?
 ```
 
-**B. The heirs** (268)
+**B. The heirs** (275)
 
 ```text
 If you died tonight, could your family reach your crypto?
 
-Dead Man's Wallet: when your pulse stops, a NEAR contract pays them. No seed phrase for heirs. Built at NEAR Hackathon @NEARProtocol #NEARHackathon
-deadmanswallet.dev
+Dead Man's Wallet: when your pulse stops, a NEAR contract pays them. They sign nothing to receive it. Built at NEAR Hackathon @NEARProtocol #NEARHackathon
+{{SITE_URL}}
 github.com/agarretson/deadmans-wallet
 Who is yours?
 ```
@@ -59,10 +66,10 @@ Who is yours?
 **C. The attack** (277)
 
 ```text
-A prompt injection told our agent to send everything to a stranger. The wallet refused. With the wallet off, the contract refused.
+Our scripted agent obeyed a prompt injection: send everything to a stranger. The wallet refused. Wallet off: the contract refused.
 
 Dead Man's Wallet, built at NEAR Hackathon @NEARProtocol #NEARHackathon
-deadmanswallet.dev
+{{SITE_URL}}
 github.com/agarretson/deadmans-wallet
 What would you test next?
 ```
@@ -79,7 +86,7 @@ tweet 2 (use `docs/diagrams/settlement-sequence.png`) and tweet 5 (a crop of `do
 
 
 ```text
-1/6 Agents hold wallets and budgets. When the operator disappears, the agent keeps spending and other chains are lost. Dead Man's Wallet is a NEAR contract that settles it: five steps, three chains, one trigger. Built at NEAR Hackathon @NEARProtocol #NEARHackathon
+1/6 Agents hold wallets and budgets. When the operator disappears, the agent keeps spending and other chains are lost. Dead Man's Wallet is a NEAR contract that settles it: five steps, one trigger. Built at NEAR Hackathon @NEARProtocol #NEARHackathon
 ```
 
 ```text
@@ -91,22 +98,26 @@ tweet 2 (use `docs/diagrams/settlement-sequence.png`) and tweet 5 (a crop of `do
 ```
 
 ```text
-4/6 Chain Signatures: the contract asks NEAR's MPC network to sign. Base and Monad use secp256k1, Solana ed25519: two curves, three chains. The source addresses are derived, so no private key exists for them and no signature exists before the trigger.
+4/6 Chain Signatures: the contract asks NEAR's MPC network to sign. Base and Monad use secp256k1, Solana ed25519: two curves, three chains. The source addresses are derived: no one holds their private key, and the contract asks for signatures only after the trigger.
 ```
 
 ```text
-5/6 We planted a prompt injection in the agent's inbox: send the whole balance to a stranger. The wallet refused. With its checks off, the contract denied it and logged why. A guardian can pause the vault once per cycle, for a length the owner sets. Transcript in agent/.
+5/6 We planted a prompt injection (send the whole balance to a stranger) and scripted the agent to obey. The wallet refused. With its checks off, the contract denied it and logged why. A guardian can pause the vault once per cycle, for a length the owner sets.
 ```
 
 ```text
-6/6 Reproduce it: git clone, make check, make build, make test, make deploy, make demo. The live contract exposes NEP-330 metadata, so the code hash can be rebuilt from the tagged commit. Foreign payouts are signed; relay waits for funded addresses. github.com/agarretson/deadmans-wallet
+6/6 Reproduce it: git clone, make check, make build, make test, make deploy, make demo. make build matches the live code hash with the same toolchain (rustc 1.97, cargo-near 0.23). Foreign payouts are signed; relay waits for funded addresses. github.com/agarretson/deadmans-wallet
 ```
 
-Lengths: 264, 263, 258, 251, 271, 273.
+Lengths: 250, 263, 258, 266, 260, 266.
 
-Two corrections to keep the thread honest. Chain Signatures here use two curves (secp256k1 for Base and Monad,
-ed25519 for Solana) on three chains, so tweet 4 says that and not "three curves". And the foreign payouts are signed
-on chain but not yet relayed, so tweets 5 and 6 and the form description say so.
+What keeps the thread honest (see `docs/AUDIT_CLAIMS.md`). Chain Signatures here use two curves (secp256k1 for Base
+and Monad, ed25519 for Solana) on three chains, so tweet 4 says that and not "three curves". The foreign payouts are
+signed on chain but not yet relayed, so tweet 6 and the form description say so. The recorded agent runs use the
+scripted brain, written to obey the injection, so post C and tweet 5 say "scripted". The live contract is not a
+reproducible build (`build_info` is null), so tweet 6 claims only a same-toolchain hash match. Heirs need a NEAR account
+named in the plan; they sign nothing to receive NEAR, which is what post B and the description claim, not "no seed
+phrase".
 
 ## 4. Pre-submit checklist
 
@@ -125,7 +136,7 @@ git ls-remote --tags origin hackathon-submission    # one line
 # 2. fresh clone of the tag
 rm -rf /tmp/dmw-fresh && git clone --branch hackathon-submission https://github.com/agarretson/deadmans-wallet /tmp/dmw-fresh
 cd /tmp/dmw-fresh && make check                      # "All good."
-make build && make test                              # contract 95+, keeper 46, dashboard 67+, agent 37 passed (about 5 min)
+make build && make test                              # contract 99, keeper 46, dashboard 68, agent 37 passed (about 3 min)
 cd -
 
 # 3. Vercel (set the two URLs first)
@@ -137,15 +148,17 @@ curl -sI $DASH | head -1                             # 200
 curl -sI $DASH/vault/6 | head -1                     # 200 (SPA rewrite)
 curl -sI $DASH/pulse | head -1                       # 200
 curl -sI $SITE/assets/demo-720p.mp4 | head -1        # 200 only if the mp4 was in the deployed folder (site/README.md); it must be the v3 cut
+ffprobe -v error -show_entries format=duration -of csv=p=0 site/assets/demo-720p.mp4   # 170.41 (v3). design/build_site.py copies the v1 file (159.4 s): copy docs/video/dmw-demo-v3-720p.mp4 over it after running it
 
 # 4. NEP-330 link check
 curl -s https://rpc.testnet.near.org -H 'content-type: application/json' -d '{"jsonrpc":"2.0","id":1,"method":"query","params":{"request_type":"call_function","finality":"final","account_id":"dmw-x8cx.testnet","method_name":"contract_source_metadata","args_base64":"e30="}}' \
   | python3 -c 'import sys,json;print(bytes(json.load(sys.stdin)["result"]["result"]).decode())'
-#   -> "link" must be the repo URL; "version"/"build_info" name the commit
+#   -> "link" must be the repo URL. On Nov 7 2026 "build_info" is null: the live code (hash 13ug5kLS…fsqU, commit
+#      f0178de) came from `cargo near build non-reproducible-wasm`, so only a same-toolchain `make build` matches it
 curl -sI https://github.com/agarretson/deadmans-wallet | head -1            # 200 (repo is public)
 curl -sI https://github.com/agarretson/deadmans-wallet/tree/hackathon-submission | head -1           # 200
-# if the contract was redeployed after the build_info commit, the README code hash is stale:
-#   git checkout <build_info commit> && make build-reproducible && compare with `view_account dmw-x8cx.testnet` code_hash
+# compare: `make build` (rustc 1.97.0, cargo-near 0.23.0) prints the code hash; `view_account dmw-x8cx.testnet` code_hash
+# must be the same. If the contract is redeployed, update the README row "The live contract is this source".
 
 # 5. the video
 ffprobe -v error -show_entries format=duration,size -of csv=p=0 docs/video/dmw-demo-v3-720p.mp4   # 170 s, about 13 MB
@@ -162,10 +175,12 @@ python3 - <<'PY'
 import json,re
 t=open('docs/SUBMISSION.md').read()
 f=json.loads(re.search(r'```json\n(.*?)\n```',t,re.S).group(1))
-print(len(f['description']), '(20..2000)', sorted(re.findall(r'\{\{\w+\}\}',json.dumps(f))))
+assert set(f)=={'requestId','projectName','leadName','email','size','tracks','nearAddress','projectUrl','demoUrl','idea','consent'}
+print(len(f['idea']), '(20..2000)', sorted(re.findall(r'\{\{\w+\}\}',json.dumps(f))))
 PY
-#   -> a length between 20 and 2000, and exactly: {{DEMO_URL}} {{EMAIL}} {{NEAR_MAINNET_PAYOUT_ACCOUNT}}
+#   -> a length between 20 and 2000, and exactly: {{DEMO_URL}} {{EMAIL}} {{NEAR_MAINNET_PAYOUT_ACCOUNT}} {{REQUEST_ID}}
 ```
 
-Then, in order: post the demo with the video attached; copy its URL into `demo_url`; fill the email and the NEAR
-mainnet payout account (a mainnet account, not `.testnet`); tick contact consent; submit; post the thread.
+Then, in order: make the repo public; post the demo with the video attached (replace `{{SITE_URL}}` with the live
+site); copy its URL into `demoUrl`; fill `requestId`, the email and `nearAddress` (a lowercase mainnet account, not
+`.testnet`); set `consent` only after the human agrees; submit; post the thread.
