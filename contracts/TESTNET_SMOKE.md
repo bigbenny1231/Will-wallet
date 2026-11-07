@@ -399,3 +399,35 @@ a single key, the deployer's FullAccess key `ed25519:6fBT4G1E…GtC2`. Showcase 
    Check with `get_proposal {"id":0}` on `estate-82bd1f.sputnik-v2.testnet`.
 
 The ratification only records an event (SPEC §2.4): the DAO cannot change heirs, amounts or destinations.
+
+## Nov 7: guardian pause + Monad payout (vault 14)
+
+Contract redeployed (no init, state kept) with the guardian pause and the EVM chain registry (SPEC §2.8):
+[deploy](https://testnet.nearblocks.io/txns/AKr3F2jg76hmu1XUzTtZ2BbSd9AUeivq13KToeSmJCKc), code hash
+`BE7ZZrGs6WsmJaGpCo3nkHc9C5wtDk8BH1v3SY1Jkfyr` (`cargo near build non-reproducible-wasm`). An intermediate
+deploy of the same branch without the per-chain fee cap went out a few minutes earlier
+([tx](https://testnet.nearblocks.io/txns/ExfnvLx6DZfUZ4esT8tS9ZByAyXuQjYWUXDFqoSBm7dg)). After the deploy,
+`get_vault` for vaults 6 and 12 returns the same fields as before, plus `guardian_id: null`, `max_pause_s: 0`,
+`paused_until_ms: 0`. Vault 6 was not touched.
+
+Fresh faucet accounts `dmw-gd-{owner,guard,heir}-7d5ea4.testnet`. Vault 14: 2 NEAR, 30 s interval, grace 1
+(deadline = create + 60 s), one heir.
+
+| # | Call | Result |
+| --- | --- | --- |
+| 1 | [create_vault](https://testnet.nearblocks.io/txns/5WkKVwPaRXAm8rkiBW3Y2DhKDUU7XxpJ53iWhpxLMt9s) | token 14; log `vault_created` detail = `dmw-gd-owner-7d5ea4.testnet` |
+| 2 | [set_guardian](https://testnet.nearblocks.io/txns/HqomRLAzzUd6KYTuz2bsNU1qYEsuC9RyBQUtuToFShcG) `{guardian_id: dmw-gd-guard-7d5ea4.testnet, max_pause_s: 180}` | `guardian_set` |
+| 3 | [pause](https://testnet.nearblocks.io/txns/FNZntghrMV7pj2S5qLvqqu4zrpLKJZ933mNQSyMm163o) by the guardian | `trigger_at_ms` 1794070812987 → **1794070965882** (+153 s, = pause time + 180 s); state Alive → Warning |
+| 4 | [pause again](https://testnet.nearblocks.io/txns/Chnrufz6tF2Z6qrSijL9xPgRuoukz8oNDfKMxqddY7Ub) | rejected: `already_paused: a heartbeat must land before the next pause` |
+| 5 | [set_foreign_payouts](https://testnet.nearblocks.io/txns/9ape7mXUDKfMuZrzfbCgVTLuo3GPnisifr53VTbYwp9n) | one `monad` payout, 0.001 MON to `0x…dEaD`, from `monad-14` = `0x360D02320EBFF8439fe0D804e68DFc6976230e13` |
+| 6 | [poke](https://testnet.nearblocks.io/txns/31xYgVNdcpY2sqaT369SVVFDf5oohmry8ifjzN23qEDn) 38 s after the original deadline | rejected: `not_due` (the pause holds) |
+| 7 | [poke](https://testnet.nearblocks.io/txns/Bg52PDpYhP5Dne9YRZAicssWvkbxxecmhDwnPW2gNbrW) after the extended deadline | `triggered`, `trigger_at_ms` 1794070965882 |
+| 8 | [step 1](https://testnet.nearblocks.io/txns/DL6s9cPLLuuRfug2GiwAoVGW2L8o3LyDyBu6mCh5UTfH), [step 2](https://testnet.nearblocks.io/txns/HGnPtrfSWcDdLy9dH6eqnzSgvWyvBci527BZQsjXBaUu) | heir paid, no keys |
+| 9 | **[step 3](https://testnet.nearblocks.io/txns/DFmmyrRWNTUdsn3KLXuoHfjuaAcMoY7c71i2EUN3p976)** with `args.evm` from Monad RPC (`max_fee` 202 gwei, `prio` 2 gwei) | `v1.signer-prod.testnet` signs path `monad-14`, domain 0; `foreign_signed` tx id `0xbb3d639bddb0d6519c642d0349f6349aa263b3524f13fd06762e6f296d13df19` |
+| 10 | [step 4](https://testnet.nearblocks.io/txns/DWQjyXuKGL3to5PjCsHoDKhPEiv3Y29wEqaDknfFihHc), [step 5](https://testnet.nearblocks.io/txns/FShLBpMUybr55xdnUKDX4KLbhrzKU8LtGvoBAygwk5KR) | Settled; Will NFT to the heir; `log[0]` still names the original owner |
+
+The stored `signed_tx` decodes (RLP + secp256k1 recovery) to chain id **10143**, nonce 0, to `0x…dead`,
+value 10^15 wei, **from `0x360d02320ebff8439fe0d804e68dfc6976230e13`** (the derived `monad-14` address). Relaying
+it to `https://testnet-rpc.monad.xyz` returns `Signer had insufficient balance`, as expected for an unfunded
+address. Once `monad-14` holds about 0.005 MON, the same raw tx can be relayed. It would then appear at
+`https://testnet.monadexplorer.com/tx/0xbb3d639bddb0d6519c642d0349f6349aa263b3524f13fd06762e6f296d13df19`.
