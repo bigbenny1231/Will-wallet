@@ -19,7 +19,7 @@ npm test                    # vitest: call builders vs lib.rs arg names, gas, de
 VITE_DMW_MOCK=1 npm run dev
 ```
 
-A fake vault `#1` owned by `demo.testnet` cycles Alive, Warning, Triggered, Settled every 20 s, with the SPEC 2.5 SVG.
+A fake vault `#1` owned by `demo.testnet` cycles Alive, Warning, Triggered, Settled every 20 s, with the same seal SVG the contract draws.
 Vaults 2 and 3 exist so the Heir page has content. In the browser console, `__dmwMock.jumpTo("Warning")` jumps the cycle.
 
 ## Env
@@ -37,6 +37,15 @@ Vaults 2 and 3 exist so the Heir page has content. In the browser console, `__dm
 ## Routes
 
 `/` my vaults, `/create` wizard, `/vault/:id` live vault, `/heir` vaults where the connected account is an heir.
+
+## Design
+
+Follows `DESIGN.md`. Tokens are CSS variables in `src/index.css` (Tailwind is themed to them); fonts are self-hosted
+through `@fontsource` (Instrument Serif, Inter Tight, JetBrains Mono). The vault seal is the contract's on-chain
+`media` SVG with a client overlay (`components/Seal.tsx`) that sweeps the trace and flashes on every new
+`last_beat_ms`. The pulse strip (`components/PulseStrip.tsx`) flatlines into the settlement timeline. Trace geometry
+is shared with `contracts/dmw/src/nft.rs` through `src/lib/pulse.ts`; `src/lib/seal.ts` ports the seal for mock mode.
+The heir page uses the inverted (bone) palette. Screenshots: `shots/v2-*.png`.
 
 ## Notes
 

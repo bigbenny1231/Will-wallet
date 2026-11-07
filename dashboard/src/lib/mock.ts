@@ -1,6 +1,7 @@
 // Mock backend: a fake vault cycling Alive -> Warning -> Triggered -> Settled, 20 s per phase.
 import type { CallArgs, ForeignPayout, LogEntry, NftToken, VaultState, VaultView } from "../types";
 import { CONTRACT } from "../config";
+import { fmtSecs, sealDataUri } from "./seal";
 
 export const MOCK_ACCOUNT = "demo.testnet";
 const PHASE_MS = 20_000;
@@ -26,25 +27,11 @@ const STATIC_FOREIGN: Omit<ForeignPayout, "status" | "tx_hash" | "signed_tx">[] 
   { chain: "solana", to: "9xQeWvG816bUx9EPjHmaT23yvVM2ZWbrrpZb9PusVFin", amount: "50000000", from_address: "F7Zk3xq2nWb8PpVd1sA9mYtRu6HcLe4JgNvQoXiK2BaT" },
 ];
 
-function ringColor(state: VaultState) {
-  return { Alive: "#2ecc71", Warning: "#f39c12", Triggered: "#e74c3c", Settled: "#7f8c8d" }[state];
-}
-
-/** SPEC 2.5: 400x400 SVG, dark background, state-coloured ring, vault id, state word, next beat / settled, heir count. */
+/** The seal (same drawing as the contract's render_svg). */
 export function willSvgDataUri(id: string, state: VaultState, nextBeatS: number | null, heirs: number): string {
-  const sub = state === "Settled" ? "settled" : nextBeatS === null ? "" : `next beat in ${nextBeatS}s`;
-  const c = ringColor(state);
-  const svg =
-    `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400">` +
-    `<rect width="400" height="400" fill="#0b0f14"/>` +
-    `<circle cx="200" cy="190" r="120" fill="none" stroke="#1b232d" stroke-width="14"/>` +
-    `<circle cx="200" cy="190" r="120" fill="none" stroke="${c}" stroke-width="14" stroke-linecap="round"/>` +
-    `<text x="200" y="120" text-anchor="middle" font-family="monospace" font-size="20" fill="#8b98a5">vault #${id}</text>` +
-    `<text x="200" y="205" text-anchor="middle" font-family="sans-serif" font-size="42" font-weight="700" fill="${c}">${state}</text>` +
-    `<text x="200" y="245" text-anchor="middle" font-family="sans-serif" font-size="18" fill="#c9d1d9">${sub}</text>` +
-    `<text x="200" y="360" text-anchor="middle" font-family="sans-serif" font-size="18" fill="#8b98a5">${heirs} heir${heirs === 1 ? "" : "s"}</text>` +
-    `</svg>`;
-  return `data:image/svg+xml;base64,${btoa(svg)}`;
+  const status =
+    state === "Settled" ? "settled" : state === "Triggered" ? "settling" : nextBeatS === null ? "" : state === "Warning" ? `overdue, settles in ${fmtSecs(nextBeatS)}` : `next beat in ${fmtSecs(nextBeatS)}`;
+  return sealDataUri(id, state, status, heirs);
 }
 
 function phaseOf(now: number): { state: VaultState; t: number } {

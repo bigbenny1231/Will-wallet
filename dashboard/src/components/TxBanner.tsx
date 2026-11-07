@@ -15,21 +15,21 @@ export default function TxBanner() {
   };
   if (err) {
     return (
-      <div className="mb-6 flex items-start justify-between gap-4">
+      <div className="flex items-baseline justify-between gap-6">
         <ErrorNote>Wallet reported: {decodeURIComponent(err)}</ErrorNote>
-        <button className="btn" onClick={clear}>Dismiss</button>
+        <button className="tl" onClick={clear}>Dismiss</button>
       </div>
     );
   }
   return (
-    <div className="mb-6 flex items-center justify-between gap-4 rounded-xl border border-accent/40 bg-accent/10 px-4 py-3">
+    <div className="flex flex-wrap items-baseline justify-between gap-6 border-l border-brass py-1 pl-4 text-[15px]">
       <div>
         Transaction sent:{" "}
         {hashes!.split(",").map((h) => (
           <span key={h} className="mr-3"><ExtLink href={links.nearTx(h)}>{h.slice(0, 10)}…</ExtLink></span>
         ))}
       </div>
-      <button className="btn !py-1.5" onClick={clear}>Dismiss</button>
+      <button className="tl" onClick={clear}>Dismiss</button>
     </div>
   );
 }

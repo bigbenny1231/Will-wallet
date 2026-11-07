@@ -2,7 +2,7 @@ import { links } from "../config";
 import { fmtTime, humanizeYocto, shortAddr, unitsFor } from "../lib/format";
 import { lastEvent, parseStep1Detail } from "../lib/logparse";
 import type { ForeignPayout, VaultView } from "../types";
-import { ExtLink } from "./ui";
+import { ExtLink, ROMAN } from "./ui";
 
 type StepStatus = "pending" | "active" | "done";
 
@@ -14,11 +14,12 @@ function statusOf(v: VaultView, n: number): StepStatus {
   return "pending";
 }
 
-const DOT: Record<StepStatus, string> = {
-  pending: "border-line text-mute",
-  active: "border-dead bg-dead/15 text-dead animate-pulse",
-  done: "border-alive bg-alive/15 text-alive",
+const MARK: Record<StepStatus, string> = {
+  pending: "text-text-2/50",
+  active: "text-dead active-tick",
+  done: "text-brass",
 };
+const WORD: Record<StepStatus, string> = { pending: "", active: "now", done: "done" };
 
 function payoutLink(p: ForeignPayout) {
   if (!p.tx_hash) return null;
@@ -26,9 +27,9 @@ function payoutLink(p: ForeignPayout) {
 }
 
 const PAYOUT_TONE: Record<ForeignPayout["status"], string> = {
-  pending: "text-mute",
+  pending: "text-text-2",
   signed: "text-warn",
-  broadcast: "text-alive",
+  broadcast: "text-life",
   failed: "text-dead",
 };
 
@@ -44,7 +45,7 @@ export default function Timeline({ v, contract, onRelay, relayBusy }: Props) {
   const ev = (n: number) => lastEvent(v.log, `step_${n}`);
   const at = (n: number) => {
     const e = ev(n);
-    return e ? <span className="ml-3 font-mono text-sm text-mute">{fmtTime(e.ms)}</span> : null;
+    return e ? <span className="num mono ml-3 !text-[12px] text-text-2">{fmtTime(e.ms)}</span> : null;
   };
   const trig = lastEvent(v.log, "triggered");
   const step1 = parseStep1Detail(ev(1)?.detail);
@@ -58,15 +59,15 @@ export default function Timeline({ v, contract, onRelay, relayBusy }: Props) {
           <ul className="space-y-1">
             {step1.map((p) => (
               <li key={p.account}>
-                <span className="font-semibold">{p.amount} NEAR</span> <span className="text-mute">to</span>{" "}
-                <ExtLink href={links.nearAddress(p.account)}>{p.account}</ExtLink>
+                <span className="num">{p.amount} NEAR</span> <span className="text-text-2">to</span>{" "}
+                <a className="mono !text-[14px] text-text underline decoration-rule underline-offset-4" href={links.nearAddress(p.account)} target="_blank" rel="noreferrer">{p.account}</a>
               </li>
             ))}
           </ul>
         ) : ev(1)?.detail ? (
           <span className="mono">{humanizeYocto(ev(1)!.detail)}</span>
         ) : (
-          <ExtLink href={links.nearAddress(contract)}>Contract on nearblocks</ExtLink>
+          <ExtLink href={links.nearAddress(contract)}>contract on nearblocks</ExtLink>
         ),
     },
     {
@@ -75,7 +76,7 @@ export default function Timeline({ v, contract, onRelay, relayBusy }: Props) {
       body: (
         <span>
           {ev(2)?.detail && <span className="mr-3">{humanizeYocto(ev(2)!.detail)}</span>}
-          <ExtLink href={links.nearAddress(contract)}>Access keys on nearblocks</ExtLink>
+          <ExtLink href={links.nearAddress(contract)}>access keys on nearblocks</ExtLink>
         </span>
       ),
     },
@@ -84,20 +85,20 @@ export default function Timeline({ v, contract, onRelay, relayBusy }: Props) {
       title: "Foreign payouts signed by MPC",
       body:
         v.foreign.length === 0 ? (
-          <span className="text-mute">No foreign payouts configured</span>
+          <span className="text-text-2">No foreign payouts configured</span>
         ) : (
           <ul className="space-y-2">
             {v.foreign.map((p, i) => {
               const href = payoutLink(p);
               return (
-                <li key={i} className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                  <span className="rounded-md border border-line px-2 py-0.5 text-xs uppercase tracking-wider text-mute">{p.chain}</span>
-                  <span>{unitsFor(p.chain, p.amount)}</span>
-                  <span className="mono text-mute">to {shortAddr(p.to)}</span>
-                  <span className={`text-sm font-semibold ${PAYOUT_TONE[p.status]}`}>{p.status}</span>
+                <li key={i} className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+                  <span className="sc w-16 !text-text-2">{p.chain === "base" ? "Base" : "Solana"}</span>
+                  <span className="num">{unitsFor(p.chain, p.amount)}</span>
+                  <span className="mono !text-[13px] text-text-2">to {shortAddr(p.to)}</span>
+                  <span className={`display text-[17px] italic ${PAYOUT_TONE[p.status]}`}>{p.status}</span>
                   {href && <ExtLink href={href}>tx</ExtLink>}
                   {onRelay && p.status === "signed" && (
-                    <button className="btn !px-3 !py-1 text-sm" disabled={relayBusy} onClick={() => onRelay(i)}>
+                    <button className="tl !text-[14px]" disabled={relayBusy} onClick={() => onRelay(i)}>
                       Broadcast and record
                     </button>
                   )}
@@ -113,42 +114,40 @@ export default function Timeline({ v, contract, onRelay, relayBusy }: Props) {
       body: v.dao_id ? (
         <span>
           <ExtLink href={links.dao(v.dao_id)}>{v.dao_id}</ExtLink>
-          {v.dao_proposal_id !== null && v.dao_proposal_id !== undefined && <span className="ml-3 text-mute">proposal #{v.dao_proposal_id}</span>}
+          {v.dao_proposal_id !== null && v.dao_proposal_id !== undefined && <span className="ml-3 text-text-2">proposal {v.dao_proposal_id}</span>}
         </span>
       ) : (
-        <span className="text-mute">{ev(4)?.detail ? humanizeYocto(ev(4)!.detail) : "No DAO set, step is skipped"}</span>
+        <span className="text-text-2">{ev(4)?.detail ? humanizeYocto(ev(4)!.detail) : "No DAO set, step is skipped"}</span>
       ),
     },
     {
       n: 5,
       title: "Will NFT sent to primary heir",
-      body: ev(5)?.detail ? <span className="mono">{humanizeYocto(ev(5)!.detail)}</span> : <ExtLink href={links.nearAddress(contract)}>Contract on nearblocks</ExtLink>,
+      body: ev(5)?.detail ? <span className="mono">{humanizeYocto(ev(5)!.detail)}</span> : <ExtLink href={links.nearAddress(contract)}>contract on nearblocks</ExtLink>,
     },
   ];
 
   return (
     <div>
       {trig && (
-        <p className="mb-5 text-mute">
-          Triggered at <span className="font-mono">{fmtTime(trig.ms)}</span>: <span className="mono">{humanizeYocto(trig.detail)}</span>
+        <p className="mb-6 text-[15px] text-text-2">
+          Triggered at <span className="num mono !text-[13px] text-text">{fmtTime(trig.ms)}</span>, <span>{humanizeYocto(trig.detail)}</span>.
         </p>
       )}
-      <ol className="space-y-0">
+      <ol>
         {steps.map((s, i) => {
           const st = statusOf(v, s.n);
           return (
-            <li key={s.n} className="relative flex gap-5 pb-7 last:pb-0">
-              {i < steps.length - 1 && <span className="absolute left-[19px] top-10 h-[calc(100%-2.5rem)] w-px bg-line" />}
-              <span className={`z-10 flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-2 text-base font-bold ${DOT[st]}`}>
-                {st === "done" ? "✓" : s.n}
-              </span>
-              <div className="pt-1">
-                <div className={`text-lg font-semibold ${st === "pending" ? "text-mute" : "text-ink"}`}>
+            <li key={s.n} className={`grid grid-cols-[3rem_1fr] gap-x-4 py-5 sm:grid-cols-[3rem_1fr_4rem] ${i ? "border-t border-rule" : ""}`}>
+              <span className={`display text-[26px] italic leading-none ${MARK[st]}`}>{ROMAN[s.n]}</span>
+              <div className="min-w-0">
+                <div className={`text-[17px] ${st === "pending" ? "text-text-2" : "text-text"}`}>
                   {s.title}
                   {at(s.n)}
                 </div>
-                <div className="mt-1 text-base">{s.body}</div>
+                <div className={`mt-2 text-[15px] ${st === "pending" ? "opacity-60" : ""}`}>{s.body}</div>
               </div>
+              <span className={`hidden text-right text-[13px] sm:block ${st === "active" ? "text-dead" : "text-text-2"}`}>{WORD[st]}</span>
             </li>
           );
         })}

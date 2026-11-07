@@ -7,9 +7,17 @@ import { createVaultCall, type CreateDraft, type ForeignDraft } from "../lib/cal
 import { PENDING_KEY, type Pending } from "../components/PendingCreate";
 import { bpsToPct, fmtInterval, nearToYocto, toSmallest, unitsFor } from "../lib/format";
 import { CONTRACT, MOCK, links } from "../config";
-import { ErrorNote, ExtLink, Field } from "../components/ui";
+import { ErrorNote, ExtLink, Field, Label, ROMAN } from "../components/ui";
 
-const STEPS = ["Timing", "Heirs", "Policy", "Foreign payouts", "DAO", "Deposit"] as const;
+const STEPS = ["Timing", "Heirs", "Agent policy", "Foreign payouts", "DAO", "Deposit"] as const;
+const INTRO = [
+  "How often you check in, and how much silence is allowed before the vault settles.",
+  "Who receives what. Shares must add up to 100%.",
+  "What an AI agent may spend from this vault while you are alive. In Warning it is disarmed.",
+  "Payouts on Base Sepolia and Solana devnet, signed by NEAR Chain Signatures at settlement.",
+  "An optional Sputnik DAO that receives a proposal at step four of settlement.",
+  "Fund the vault and read it through once before you sign.",
+];
 const UNITS = { seconds: 1, minutes: 60, hours: 3600, days: 86400 } as const;
 type Unit = keyof typeof UNITS;
 
@@ -134,113 +142,143 @@ export default function Create() {
     }
   };
 
+  const summary = [
+    Number.isFinite(intervalS) && intervalS > 0 ? `Every ${fmtInterval(intervalS)}, ${graceN} missed allowed` : "Not set",
+    heirs.some((h) => h.account_id.trim()) ? heirs.map((h, i) => `${h.account_id || "?"} ${bpsToPct(bpsRows[i] || 0)}`).join(", ") : "No heirs named yet",
+    `${perTx} NEAR a payment, ${daily} NEAR a day`,
+    foreign.length ? `${foreign.length} payout${foreign.length === 1 ? "" : "s"}` : "None",
+    dao.trim() || "None",
+    `${deposit} NEAR, bounty ${bounty}`,
+  ];
+
   return (
-    <div className="mx-auto max-w-3xl space-y-8">
-      <h1 className="text-4xl font-semibold">Create vault</h1>
+    <div className="wrap pb-24">
+      <div className="pb-14 pt-14">
+        <Label>New vault on {CONTRACT}</Label>
+        <h1 className="display mt-4 text-[48px] md:text-[72px]">A vault, in six parts.</h1>
+      </div>
 
-      <ol className="flex flex-wrap gap-2">
-        {STEPS.map((s, i) => (
-          <li key={s}>
-            <button
-              type="button"
-              onClick={() => setStep(i)}
-              className={`rounded-full border px-4 py-1.5 text-base ${i === step ? "border-accent bg-accent/15 text-ink" : stepOk(i) ? "border-line text-mute hover:text-ink" : "border-dead/50 text-dead"}`}
-            >
-              {i + 1}. {s}
-            </button>
-          </li>
-        ))}
-      </ol>
+      <div className="grid gap-12 border-t border-rule pt-10 lg:grid-cols-12 lg:gap-10">
+        <nav className="lg:col-span-4" aria-label="Sections">
+          <ol className="lg:sticky lg:top-8">
+            {STEPS.map((s, i) => {
+              const bad = !stepOk(i);
+              return (
+                <li key={s}>
+                  <button
+                    type="button"
+                    onClick={() => setStep(i)}
+                    aria-current={i === step ? "step" : undefined}
+                    className={`group grid w-full grid-cols-[2.75rem_1fr] gap-x-2 border-b border-rule py-4 text-left transition-colors duration-700 ${i === step ? "text-text" : "text-text-2 hover:text-text"}`}
+                  >
+                    <span className={`display text-[22px] italic leading-tight ${i === step ? "text-brass" : bad ? "text-warn" : "text-brass-2"}`}>{ROMAN[i + 1]}.</span>
+                    <span>
+                      <span className="display block text-[24px] leading-tight">{s}</span>
+                      <span className={`mt-1 block truncate text-[13px] ${bad && i !== step ? "text-warn" : "text-text-2"}`}>{bad && i < step ? "Needs attention" : summary[i]}</span>
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
+          </ol>
+        </nav>
 
-      <div className="panel space-y-6">
+        <div className="min-w-0 space-y-8 lg:col-span-8">
+          <header>
+            <div className="display text-[44px] leading-none md:text-[56px]">
+              <span className="italic text-brass">{ROMAN[step + 1]}.</span> {STEPS[step]}
+            </div>
+            <p className="mt-4 max-w-[56ch] text-[17px] leading-relaxed text-text-2">{INTRO[step]}</p>
+          </header>
         {step === 0 && (
           <>
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-10 sm:grid-cols-2">
               <Field label="Heartbeat interval">
-                <div className="flex gap-3">
-                  <input className="input" inputMode="numeric" value={intervalN} onChange={(e) => setIntervalN(e.target.value)} />
-                  <select className="input !w-40" value={unit} onChange={(e) => setUnit(e.target.value as Unit)}>
+                <div className="flex gap-6">
+                  <input className="field num" inputMode="numeric" value={intervalN} onChange={(e) => setIntervalN(e.target.value)} />
+                  <select className="field !w-36" value={unit} onChange={(e) => setUnit(e.target.value as Unit)}>
                     {Object.keys(UNITS).map((u) => <option key={u}>{u}</option>)}
                   </select>
                 </div>
               </Field>
               <Field label="Missed beats allowed (grace)" hint={`Triggers after ${graceN + 1} intervals without a heartbeat.`}>
-                <input className="input" inputMode="numeric" value={grace} onChange={(e) => setGrace(e.target.value)} />
+                <input className="field num" inputMode="numeric" value={grace} onChange={(e) => setGrace(e.target.value)} />
               </Field>
             </div>
-            <p className="text-mute">
-              Warning after {Number.isFinite(intervalS) ? fmtInterval(intervalS) : "?"}, triggered after {Number.isFinite(intervalS) ? fmtInterval(intervalS * (graceN + 1)) : "?"} of silence.
+            <p className="display max-w-[30ch] text-[28px] leading-snug">
+              Warning after {Number.isFinite(intervalS) ? fmtInterval(intervalS) : "?"}, settlement after {Number.isFinite(intervalS) ? fmtInterval(intervalS * (graceN + 1)) : "?"} of silence.
             </p>
           </>
         )}
 
         {step === 1 && (
           <>
-            <div className="space-y-3">
+            <div>
               {heirs.map((h, i) => (
-                <div key={i} className="flex gap-3">
-                  <input className="input" placeholder="sarah.testnet" value={h.account_id} onChange={(e) => setHeirs(heirs.map((x, j) => (j === i ? { ...x, account_id: e.target.value } : x)))} />
-                  <div className="relative w-36 shrink-0">
-                    <input className="input pr-9" inputMode="decimal" value={h.pct} onChange={(e) => setHeirs(heirs.map((x, j) => (j === i ? { ...x, pct: e.target.value } : x)))} />
-                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-mute">%</span>
+                <div key={i} className="grid grid-cols-[2rem_1fr_7rem_auto] items-end gap-6 py-2">
+                  <span className="display pb-2 text-[20px] italic text-brass-2">{i + 1}.</span>
+                  <input className="field mono" aria-label={`Heir ${i + 1} account`} placeholder="sarah.testnet" value={h.account_id} onChange={(e) => setHeirs(heirs.map((x, j) => (j === i ? { ...x, account_id: e.target.value } : x)))} />
+                  <div className="relative">
+                    <input className="field num pr-6 text-right" aria-label={`Heir ${i + 1} share`} inputMode="decimal" value={h.pct} onChange={(e) => setHeirs(heirs.map((x, j) => (j === i ? { ...x, pct: e.target.value } : x)))} />
+                    <span className="absolute bottom-2.5 right-0 text-text-2">%</span>
                   </div>
-                  <button className="btn !px-4" disabled={heirs.length === 1} onClick={() => setHeirs(heirs.filter((_, j) => j !== i))} aria-label="Remove heir">✕</button>
+                  <button className="tl !text-[14px]" disabled={heirs.length === 1} onClick={() => setHeirs(heirs.filter((_, j) => j !== i))} aria-label="Remove heir">Remove</button>
                 </div>
               ))}
             </div>
-            <div className="flex items-center justify-between">
-              <button className="btn" onClick={() => setHeirs([...heirs, { account_id: "", pct: "0" }])}>Add heir</button>
-              <span className={`text-lg font-semibold ${bpsSum === 10000 ? "text-alive" : "text-warn"}`}>Total {bpsToPct(bpsSum)}</span>
+            <div className="flex items-baseline justify-between border-t border-rule pt-4">
+              <button className="tl" onClick={() => setHeirs([...heirs, { account_id: "", pct: "0" }])}>Add heir</button>
+              <span className={`num text-[17px] ${bpsSum === 10000 ? "text-text" : "text-warn"}`}>Total {bpsToPct(bpsSum)}</span>
             </div>
-            <p className="text-mute">The heir with the largest share also receives the Will NFT.</p>
+            <p className="text-[15px] text-text-2">The heir with the largest share also receives the Will NFT.</p>
           </>
         )}
 
         {step === 2 && (
           <>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Per transaction max (NEAR)"><input className="input" value={perTx} onChange={(e) => setPerTx(e.target.value)} /></Field>
-              <Field label="Daily max (NEAR)"><input className="input" value={daily} onChange={(e) => setDaily(e.target.value)} /></Field>
+            <div className="grid gap-10 sm:grid-cols-2">
+              <Field label="Per payment, at most (NEAR)"><input className="field num" value={perTx} onChange={(e) => setPerTx(e.target.value)} /></Field>
+              <Field label="Per day, at most (NEAR)"><input className="field num" value={daily} onChange={(e) => setDaily(e.target.value)} /></Field>
             </div>
             <Field label="Allowlist" hint="Receiver accounts, separated by commas or spaces. Empty allows any receiver.">
-              <textarea className="input min-h-24 font-mono" value={allow} onChange={(e) => setAllow(e.target.value)} placeholder="api.provider.testnet" />
+              <textarea className="field mono min-h-20 resize-y" value={allow} onChange={(e) => setAllow(e.target.value)} placeholder="api.provider.testnet" />
             </Field>
           </>
         )}
 
         {step === 3 && (
           <>
-            {foreign.length === 0 && <p className="text-mute">No foreign payouts. Add one to send Base Sepolia ETH or Solana devnet SOL at settlement.</p>}
+            {foreign.length === 0 && <p className="text-[15px] text-text-2">No foreign payouts. Add one to send Base Sepolia ETH or Solana devnet SOL at settlement.</p>}
             {foreign.map((f, i) => {
               const src = f.chain === "base" ? derived?.base : derived?.solana;
               return (
-                <div key={i} className="space-y-3 rounded-xl border border-line p-4">
-                  <div className="grid gap-3 sm:grid-cols-[10rem_1fr_11rem]">
-                    <select className="input" value={f.chain} onChange={(e) => setForeign(foreign.map((x, j) => (j === i ? { ...x, chain: e.target.value as "base" | "solana", to: "" } : x)))}>
+                <div key={i} className="space-y-4 border-t border-rule pt-5">
+                  <div className="grid gap-6 sm:grid-cols-[10rem_1fr_9rem]">
+                    <select className="field" value={f.chain} onChange={(e) => setForeign(foreign.map((x, j) => (j === i ? { ...x, chain: e.target.value as "base" | "solana", to: "" } : x)))}>
                       <option value="base">Base Sepolia</option>
                       <option value="solana">Solana devnet</option>
                     </select>
-                    <input className="input font-mono" placeholder={f.chain === "base" ? "0x…" : "base58 address"} value={f.to} onChange={(e) => setForeign(foreign.map((x, j) => (j === i ? { ...x, to: e.target.value } : x)))} />
+                    <input className="field mono" placeholder={f.chain === "base" ? "0x…" : "base58 address"} value={f.to} onChange={(e) => setForeign(foreign.map((x, j) => (j === i ? { ...x, to: e.target.value } : x)))} />
                     <div className="relative">
-                      <input className="input pr-14" inputMode="decimal" placeholder="0.01" value={f.amount} onChange={(e) => setForeign(foreign.map((x, j) => (j === i ? { ...x, amount: e.target.value } : x)))} />
-                      <span className="absolute right-4 top-1/2 -translate-y-1/2 text-mute">{f.chain === "base" ? "ETH" : "SOL"}</span>
+                      <input className="field num pr-12" inputMode="decimal" placeholder="0.01" value={f.amount} onChange={(e) => setForeign(foreign.map((x, j) => (j === i ? { ...x, amount: e.target.value } : x)))} />
+                      <span className="absolute bottom-2.5 right-0 text-[14px] text-text-2">{f.chain === "base" ? "ETH" : "SOL"}</span>
                     </div>
                   </div>
-                  <div className="text-sm text-mute">
-                    Funded from derived address{expectedId ? ` for vault #${expectedId}` : ""}:{" "}
-                    {src ? <span className="mono text-ink">{src}</span> : <span>{deriveErr ? "derivation failed, run `npm run derive`" : "computing…"}</span>}
+                  <div className="text-[14px] text-text-2">
+                    Funded from the derived address{expectedId ? ` for vault ${expectedId}` : ""}:{" "}
+                    {src ? <span className="mono !text-[13px] text-text">{src}</span> : <span>{deriveErr ? "derivation failed, run `npm run derive`" : "computing…"}</span>}
                     {src && (
                       <span className="ml-3">
                         <ExtLink href={f.chain === "base" ? links.baseFaucet : links.solFaucet}>faucet</ExtLink>
                       </span>
                     )}
                   </div>
-                  <button className="btn !py-1.5 text-sm" onClick={() => setForeign(foreign.filter((_, j) => j !== i))}>Remove</button>
+                  <button className="tl !text-[14px]" onClick={() => setForeign(foreign.filter((_, j) => j !== i))}>Remove</button>
                 </div>
               );
             })}
-            <button className="btn" onClick={() => setForeign([...foreign, { chain: "base", to: "", amount: "" }])}>Add foreign payout</button>
-            <p className="text-sm text-mute">
+            <button className="tl" onClick={() => setForeign([...foreign, { chain: "base", to: "", amount: "" }])}>Add foreign payout</button>
+            <p className="max-w-[62ch] text-[14px] text-text-2">
               The source address depends on the vault id. It is shown for the next expected id and recomputed with the real id after creation. Fund it while you are alive; nobody holds its key.
             </p>
           </>
@@ -248,18 +286,18 @@ export default function Create() {
 
         {step === 4 && (
           <Field label="Sputnik DAO account (optional)" hint="At step 4 of settlement a proposal is added here. Create one with `npm run dao -- create` in keeper/.">
-            <input className="input font-mono" placeholder="estate-1.sputnik-v2.testnet" value={dao} onChange={(e) => setDao(e.target.value)} />
+            <input className="field mono" placeholder="estate-1.sputnik-v2.testnet" value={dao} onChange={(e) => setDao(e.target.value)} />
           </Field>
         )}
 
         {step === 5 && (
           <>
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-10 sm:grid-cols-2">
               <Field label="Initial deposit (NEAR)" hint="0.1 NEAR is kept for storage; the rest is the vault balance. Each pulse or agent key later reserves 1 NEAR of it as gas allowance.">
-                <input className="input" value={deposit} onChange={(e) => setDeposit(e.target.value)} />
+                <input className="field num" value={deposit} onChange={(e) => setDeposit(e.target.value)} />
               </Field>
               <Field label="Keeper bounty (NEAR)" hint="Paid to whoever pokes the vault.">
-                <input className="input" value={bounty} onChange={(e) => setBounty(e.target.value)} />
+                <input className="field num" value={bounty} onChange={(e) => setBounty(e.target.value)} />
               </Field>
             </div>
             <Review
@@ -276,19 +314,20 @@ export default function Create() {
         )}
 
         {problems[step].length > 0 && (
-          <ul className="space-y-1 text-warn">{problems[step].map((m) => <li key={m}>{m}</li>)}</ul>
+          <ul className="space-y-1 border-l border-warn pl-4 text-[15px] text-warn">{problems[step].map((m) => <li key={m}>{m}</li>)}</ul>
         )}
         {err && <ErrorNote>{err}</ErrorNote>}
 
-        <div className="flex justify-between pt-2">
-          <button className="btn" disabled={step === 0} onClick={() => setStep(step - 1)}>Back</button>
+        <div className="flex items-center justify-between border-t border-rule pt-8">
+          <button className="tl" disabled={step === 0} onClick={() => setStep(step - 1)}>Back</button>
           {step < STEPS.length - 1 ? (
-            <button className="btn btn-primary" onClick={() => setStep(step + 1)}>Next</button>
+            <button className="pill" onClick={() => setStep(step + 1)}>Next: {STEPS[step + 1]}</button>
           ) : accountId ? (
-            <button className="btn btn-primary" disabled={!allOk || busy} onClick={submit}>{busy ? "Waiting for wallet…" : "Create vault"}</button>
+            <button className="pill" disabled={!allOk || busy} onClick={submit}>{busy ? "Waiting for wallet…" : "Create vault"}</button>
           ) : (
-            <button className="btn btn-primary" onClick={connect}>Connect wallet</button>
+            <button className="pill" onClick={connect}>Connect wallet</button>
           )}
+        </div>
         </div>
       </div>
     </div>
@@ -301,11 +340,11 @@ function safeSmallest(f: ForeignRow): string {
 
 function Review({ rows }: { rows: [string, string][] }) {
   return (
-    <dl className="divide-y divide-line rounded-xl border border-line">
+    <dl className="border-t border-rule">
       {rows.map(([k, v]) => (
-        <div key={k} className="flex gap-4 px-4 py-3">
-          <dt className="w-32 shrink-0 text-mute">{k}</dt>
-          <dd className="break-all">{v}</dd>
+        <div key={k} className="grid grid-cols-[9rem_1fr] gap-6 border-b border-rule py-3">
+          <dt className="sc pt-1">{k}</dt>
+          <dd className="break-all text-[15px]">{v}</dd>
         </div>
       ))}
     </dl>

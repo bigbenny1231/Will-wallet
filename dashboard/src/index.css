@@ -1,54 +1,308 @@
 @import "tailwindcss";
 
+/* DESIGN.md tokens, exactly. */
+:root {
+  --ink: #0b0c0f;
+  --ink-2: #121419;
+  --ink-3: #1a1d24;
+  --bone: #ede7dc;
+  --bone-2: #a9a399;
+  --brass: #c8a96a;
+  --brass-2: #8c7446;
+  --life: #3ddc84;
+  --warn: #f5b942;
+  --dead: #ff4d4d;
+  --still: #7a7f87;
+  --hair: rgb(26 29 36 / 1);
+  --hair-strong: rgb(169 163 153 / 0.18);
+  --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 1 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  --ease: cubic-bezier(0.22, 1, 0.36, 1); /* ease-out-quint */
+  /* Page-level roles; the heir page swaps them. */
+  --page: var(--ink);
+  --text: var(--bone);
+  --text-2: var(--bone-2);
+  --accent: var(--brass);
+  --rule: var(--hair-strong);
+  color-scheme: dark;
+}
+
+.inverted {
+  --page: var(--bone);
+  --text: var(--ink);
+  --text-2: #5d574d;
+  --accent: #7a6234;
+  --rule: rgb(11 12 15 / 0.16);
+  color-scheme: light;
+}
+
 @theme {
-  --color-bg: #0b0f14;
-  --color-panel: #121821;
-  --color-panel2: #18202b;
-  --color-line: #232d3a;
-  --color-ink: #e6edf3;
-  --color-mute: #8b98a5;
-  --color-accent: #7c9cff;
-  --color-alive: #2ecc71;
-  --color-warn: #f39c12;
-  --color-dead: #e74c3c;
-  --color-settled: #7f8c8d;
-  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --color-ink: #0b0c0f;
+  --color-ink-2: #121419;
+  --color-ink-3: #1a1d24;
+  --color-bone: #ede7dc;
+  --color-bone-2: #a9a399;
+  --color-brass: #c8a96a;
+  --color-brass-2: #8c7446;
+  --color-life: #3ddc84;
+  --color-warn: #f5b942;
+  --color-dead: #ff4d4d;
+  --color-still: #7a7f87;
+  --color-page: var(--page);
+  --color-text: var(--text);
+  --color-text-2: var(--text-2);
+  --color-accent: var(--accent);
+  --color-rule: var(--rule);
+  --font-serif: "Instrument Serif", Georgia, serif;
+  --font-sans: "Inter Tight", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+  --radius-sm: 4px;
 }
 
 html {
-  font-size: 18px;
+  font-size: 17px;
 }
 body {
-  background: var(--color-bg);
-  color: var(--color-ink);
+  margin: 0;
+  background: var(--page);
+  color: var(--text);
   font-family: var(--font-sans);
+  font-feature-settings: "ss01", "cv11";
+  line-height: 1.55;
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  transition: background-color 700ms var(--ease), color 700ms var(--ease);
+}
+::selection {
+  background: var(--brass);
+  color: var(--ink);
+}
+
+/* 3% grain over everything; fixed, inert. */
+.grain {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 50;
+  background-image: var(--grain);
+  opacity: 0.035;
+  mix-blend-mode: overlay;
+}
+.inverted .grain {
+  opacity: 0.06;
+  mix-blend-mode: multiply;
+}
+
+:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: 3px;
 }
 
 @layer components {
-  .panel {
-    @apply rounded-2xl border border-line bg-panel p-6;
+  .wrap {
+    @apply mx-auto w-full max-w-[1200px] px-6 md:px-10;
   }
-  .h-section {
-    @apply mb-4 text-sm font-semibold uppercase tracking-widest text-mute;
+  .display {
+    font-family: var(--font-serif);
+    font-weight: 400;
+    letter-spacing: -0.01em;
+    line-height: 1;
   }
-  .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl border border-line bg-panel2 px-5 py-3 text-base font-semibold text-ink transition hover:border-accent disabled:cursor-not-allowed disabled:opacity-40;
+  /* 12 px small caps, brass, 0.12em: the only label style. */
+  .sc {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--accent);
+    font-weight: 500;
+    line-height: 1.2;
   }
-  .btn-primary {
-    @apply border-accent bg-accent text-bg hover:brightness-110;
-  }
-  .input {
-    @apply w-full rounded-xl border border-line bg-bg px-4 py-3 text-base text-ink outline-none focus:border-accent;
-  }
-  .label {
-    @apply mb-1 block text-sm text-mute;
+  .num {
+    font-variant-numeric: tabular-nums lining-nums;
   }
   .mono {
-    @apply font-mono text-sm break-all;
+    font-family: var(--font-mono);
+    font-size: 14px;
+    overflow-wrap: anywhere;
+  }
+  .rule {
+    border-top: 1px solid var(--rule);
+  }
+
+  /* The single primary action. */
+  .pill {
+    @apply inline-flex items-center justify-center rounded-full px-6 py-2.5 text-[15px] font-medium;
+    background: var(--text);
+    color: var(--page);
+    transition: opacity 600ms var(--ease), transform 600ms var(--ease);
+  }
+  .pill:hover:not(:disabled) {
+    opacity: 0.88;
+  }
+  .pill:disabled {
+    opacity: 0.28;
+    cursor: not-allowed;
+  }
+
+  /* Every other action: text with a hairline underline. */
+  .tl {
+    @apply inline-flex items-baseline gap-1 text-[15px];
+    color: var(--text);
+    background: none;
+    border: 0;
+    padding: 0 0 2px;
+    border-bottom: 1px solid var(--rule);
+    transition: border-color 600ms var(--ease), color 600ms var(--ease);
+    cursor: pointer;
+  }
+  .tl:hover:not(:disabled) {
+    border-color: var(--accent);
+  }
+  .tl:disabled {
+    color: var(--text-2);
+    opacity: 0.5;
+    border-bottom-style: dotted;
+    cursor: not-allowed;
+  }
+
+  /* Brass small-caps link (explorers). */
+  a.xl,
+  .xl {
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    font-size: 11.5px;
+    font-weight: 500;
+    color: var(--accent);
+    border-bottom: 1px solid transparent;
+    transition: border-color 600ms var(--ease);
+  }
+  a.xl:hover {
+    border-color: var(--accent);
   }
   a.link {
-    @apply text-accent underline-offset-4 hover:underline;
+    color: var(--accent);
+    border-bottom: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
   }
+
+  /* Inputs read as lines on a form, not boxes. */
+  .field {
+    @apply w-full bg-transparent py-2 text-[17px] outline-none;
+    color: var(--text);
+    border: 0;
+    border-bottom: 1px solid var(--rule);
+    border-radius: 0;
+    transition: border-color 600ms var(--ease);
+  }
+  .field:focus {
+    border-color: var(--accent);
+  }
+  .field::placeholder {
+    color: var(--text-2);
+    opacity: 0.55;
+  }
+  select.field {
+    appearance: none;
+    background-image: linear-gradient(45deg, transparent 50%, var(--text-2) 50%), linear-gradient(135deg, var(--text-2) 50%, transparent 50%);
+    background-position: calc(100% - 10px) 55%, calc(100% - 5px) 55%;
+    background-size: 5px 5px;
+    background-repeat: no-repeat;
+    padding-right: 24px;
+  }
+  select.field option {
+    background: var(--ink-2);
+    color: var(--bone);
+  }
+}
+
+/* ---------- pulse motion ---------- */
+@keyframes sweep {
+  from {
+    stroke-dashoffset: var(--len);
+  }
+  to {
+    stroke-dashoffset: calc(var(--len) * -0.15);
+  }
+}
+@keyframes breathe {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: scale(0.96);
+  }
+  50% {
+    opacity: 0.75;
+    transform: scale(1.02);
+  }
+}
+@keyframes beat {
+  0% {
+    opacity: 1;
+    stroke-width: 3.4;
+  }
+  100% {
+    opacity: 0;
+    stroke-width: 2.25;
+  }
+}
+@keyframes tick-on {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes active-tick {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+.sweep {
+  stroke-dasharray: var(--seg) var(--len);
+  animation: sweep var(--dur, 3.6s) linear infinite;
+}
+.breathe {
+  animation: breathe 4.8s var(--ease) infinite;
+  transform-origin: center;
+  transform-box: fill-box;
+}
+.beat {
+  animation: beat 900ms var(--ease) forwards;
+}
+.tick-on {
+  animation: tick-on 800ms var(--ease) both;
+}
+.active-tick {
+  animation: active-tick 1.8s ease-in-out infinite;
+}
+.fade-in {
+  animation: tick-on 900ms var(--ease) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sweep,
+  .breathe,
+  .beat,
+  .tick-on,
+  .active-tick,
+  .fade-in {
+    animation: none !important;
+  }
+  .sweep {
+    stroke-dasharray: none;
+    opacity: 0;
+  }
+  body {
+    transition: none;
+  }
+}
+
+/* wallet-selector modal: keep it on-palette */
+#near-wallet-selector-modal .modal {
+  font-family: var(--font-sans);
 }

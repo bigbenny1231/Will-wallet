@@ -77,65 +77,76 @@ export default function KeysPanel({ v, isOwner }: { v: VaultView; isOwner: boole
     }
   };
 
+  const lowWhy = lowBalance ? "The vault balance must cover the 1 NEAR key gas allowance" : undefined;
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap gap-3">
-        <button className="btn btn-primary" disabled={!isOwner || locked || busy || lowBalance} title={lowBalance ? "The vault balance must cover the 1 NEAR key gas allowance" : undefined} onClick={() => add("pulse")}>
+    <div className="space-y-10">
+      <KeyList n="I" title="Pulse keys" what="May only call heartbeat." keys={v.pulse_keys} canRemove={isOwner && !locked} onRemove={remove} />
+      <KeyList n="II" title="Agent keys" what="May only call agent_pay, within the policy above." keys={v.agent_keys} canRemove={isOwner && !locked} onRemove={remove} />
+
+      <div className="flex flex-wrap items-baseline gap-x-8 gap-y-3">
+        <button className="tl" disabled={!isOwner || locked || busy || lowBalance} title={lowWhy} onClick={() => add("pulse")}>
           Add pulse key
         </button>
-        <button className="btn" disabled={!isOwner || locked || busy || lowBalance} title={lowBalance ? "The vault balance must cover the 1 NEAR key gas allowance" : undefined} onClick={() => add("agent")}>
+        <button className="tl" disabled={!isOwner || locked || busy || lowBalance} title={lowWhy} onClick={() => add("agent")}>
           Add agent key
         </button>
-        {!isOwner && <span className="self-center text-mute">Connect as the vault owner to add keys.</span>}
+        {!isOwner && <span className="text-[14px] text-text-2">Connect as the vault owner to add keys.</span>}
         {isOwner && !locked && lowBalance && (
-          <span className="self-center text-mute">Each key reserves 1 NEAR of gas allowance from the vault balance ({yoctoToNear(v.balance)} NEAR now). Deposit more first.</span>
+          <span className="text-[14px] text-text-2">Each key reserves 1 NEAR of gas allowance from the vault balance ({yoctoToNear(v.balance)} NEAR now). Deposit more first.</span>
         )}
-        {isOwner && locked && <span className="self-center text-mute">Keys are locked once the vault is triggered.</span>}
+        {isOwner && locked && <span className="text-[14px] text-text-2">Keys are locked once the vault is triggered.</span>}
       </div>
 
       {err && <ErrorNote>{err}</ErrorNote>}
 
       {fresh && !registered && (
-        <div className="rounded-xl border border-line bg-bg p-4 text-mute">
+        <div className="flex flex-wrap items-baseline gap-x-6 gap-y-2 border-l border-rule pl-4 text-[15px] text-text-2">
           Waiting for the {fresh.kind} key transaction to land. The private key will appear here once it has.
-          <button className="btn ml-4 !py-1.5" onClick={dismiss}>Discard</button>
+          <button className="tl" onClick={dismiss}>Discard</button>
         </div>
       )}
 
       {fresh && registered && (
-        <div className="space-y-4 rounded-xl border border-warn/50 bg-warn/5 p-5">
-          <div className="text-lg font-semibold text-warn">Private key, shown once</div>
-          <p className="text-mute">
-            This key is only in this browser tab. It is removed when you press the button below, and it is never stored on the contract.
-          </p>
+        <div className="space-y-6 border-l-2 border-warn pl-6">
+          <div>
+            <div className="display text-[32px]">Private key, shown once.</div>
+            <p className="mt-2 max-w-[60ch] text-[15px] text-text-2">
+              This key is only in this browser tab. It is removed when you press the button below, and it is never stored on the contract.
+            </p>
+          </div>
           <CopyBox label="Private key" value={fresh.priv} />
           <CopyBox label={`Run in keeper/ (${fresh.kind === "pulse" ? "heartbeat daemon" : "agent demo"})`} value={cliCommand(fresh)} />
-          <button className="btn btn-primary" onClick={dismiss}>I saved it, hide the key</button>
+          <button className="pill" onClick={dismiss}>I saved it, hide the key</button>
         </div>
       )}
-
-      <KeyList title="Pulse keys (heartbeat only)" keys={v.pulse_keys} canRemove={isOwner && !locked} onRemove={remove} />
-      <KeyList title="Agent keys (agent_pay only)" keys={v.agent_keys} canRemove={isOwner && !locked} onRemove={remove} />
     </div>
   );
 }
 
-function KeyList({ title, keys, canRemove, onRemove }: { title: string; keys: string[]; canRemove: boolean; onRemove: (k: string) => void }) {
+function KeyList({ n, title, what, keys, canRemove, onRemove }: { n: string; title: string; what: string; keys: string[]; canRemove: boolean; onRemove: (k: string) => void }) {
   return (
-    <div>
-      <div className="h-section !mb-2">{title}</div>
-      {keys.length === 0 ? (
-        <p className="text-mute">None</p>
-      ) : (
-        <ul className="space-y-2">
-          {keys.map((k) => (
-            <li key={k} className="flex items-center justify-between gap-3 rounded-xl border border-line px-4 py-2">
-              <span className="font-mono text-sm" title={k}>{shortKey(k, 14)}</span>
-              {canRemove && <button className="btn !px-3 !py-1 text-sm" onClick={() => onRemove(k)}>Remove</button>}
-            </li>
-          ))}
-        </ul>
-      )}
+    <div className="grid grid-cols-[3rem_1fr] gap-x-4">
+      <span className="display text-[26px] italic leading-none text-brass">{n}</span>
+      <div className="min-w-0">
+        <div className="text-[17px]">
+          {title}<span className="ml-3 text-[15px] text-text-2">{what}</span>
+        </div>
+        {keys.length === 0 ? (
+          <p className="mt-2 text-[15px] text-text-2">None registered.</p>
+        ) : (
+          <ol className="mt-3">
+            {keys.map((k, i) => (
+              <li key={k} className="flex items-baseline justify-between gap-4 border-t border-rule py-2.5">
+                <span className="mono !text-[13px]" title={k}>
+                  <span className="num mr-4 text-text-2">{String(i + 1).padStart(2, "0")}</span>
+                  {shortKey(k, 14)}
+                </span>
+                {canRemove && <button className="tl !text-[14px]" onClick={() => onRemove(k)}>Remove</button>}
+              </li>
+            ))}
+          </ol>
+        )}
+      </div>
     </div>
   );
 }

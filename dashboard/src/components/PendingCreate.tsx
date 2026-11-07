@@ -88,19 +88,21 @@ export default function PendingCreate() {
     };
   }, [pending, accountId, call, nav]);
 
-  if (!pending) return err ? <div className="mb-6"><ErrorNote>{err}</ErrorNote></div> : null;
+  if (!pending) return err ? <div className="wrap pt-6"><ErrorNote>{err}</ErrorNote></div> : null;
   return (
-    <div className="mb-6 flex items-center justify-between gap-4 rounded-xl border border-accent/40 bg-accent/10 px-4 py-3">
-      <div>{err ? <span className="text-dead">{err}</span> : status}</div>
-      <button
-        className="btn !py-1.5"
-        onClick={() => {
-          localStorage.removeItem(PENDING_KEY);
-          setPending(null);
-        }}
-      >
-        Cancel
-      </button>
+    <div className="wrap pt-6">
+      <div className="flex items-baseline justify-between gap-6 border-l border-brass py-1 pl-4 text-[15px]">
+        <div>{err ? <span className="text-dead">{err}</span> : status}</div>
+        <button
+          className="tl"
+          onClick={() => {
+            localStorage.removeItem(PENDING_KEY);
+            setPending(null);
+          }}
+        >
+          Cancel
+        </button>
+      </div>
     </div>
   );
 }
