@@ -15,9 +15,21 @@
 //! that reverts the in-flight guard, so a permissionless caller can't burn a payout by
 //! leaving out its args.
 //!
-//! `resign_foreign` re-requests a signature for a payout step 3 already handled
-//! (`failed`, or `signed` but not broadcast, e.g. an expired Solana blockhash or a stale
-//! EVM nonce). It never touches `foreign_index`/`step`.
+//! `resign_foreign` re-requests a signature for a payout step 3 already handled. It never
+//! touches `foreign_index`/`step`. Every extra signature over a payout is a potential
+//! second payment, so re-signing is constrained (docs/SECURITY_REVIEW.md C-1):
+//!
+//! - **EVM**: the nonce is never taken from the caller. Base payout `i` always uses nonce
+//!   = number of Base payouts before it (the derived address has no other signer, so its
+//!   nonce starts at 0). Every signature for a payout shares one nonce, so at most one
+//!   of them can ever be mined. A re-sign of a `signed`/`broadcast` payout must raise
+//!   both fee fields by >= 10% (no downgrade griefing); fees and gas are capped.
+//! - **Solana**: there is no nonce, so two signatures with two live blockhashes are two
+//!   payments. Every Solana re-sign waits `RESIGN_COOLDOWN_MS` after the last request, so
+//!   the old blockhash has expired. Anyone may then re-sign a `failed` payout; a
+//!   `signed`/`broadcast` one may be re-signed only by the contract owner or the configured
+//!   keeper, who must first check off-chain that the old signature never landed.
+//! - One re-sign per payout may be in flight at a time.
 //!
 //! Wire format verified against live `v1.signer-prod.testnet` 3.18.0; see
 //! docs/chainsig-notes.md. The unsigned tx params are held in a raw storage slot between
@@ -43,6 +55,17 @@ pub const GAS_DERIVED_KEY: Gas = Gas::from_tgas(10);
 pub const GAS_ON_SOL_KEY: Gas = Gas::from_tgas(100);
 /// Gas for the self-call that records an unbuildable payout as failed.
 const GAS_FOREIGN_FAIL: Gas = Gas::from_tgas(10);
+/// Cap on caller-supplied EIP-1559 fees (100 gwei). Bounds how much of the derived
+/// address's ETH a permissionless caller can burn as gas (H-2).
+pub const MAX_EVM_FEE_PER_GAS: u128 = 100_000_000_000;
+/// Caller-supplied gas limit range for a native transfer.
+pub const MIN_EVM_GAS_LIMIT: u128 = 21_000;
+pub const MAX_EVM_GAS_LIMIT: u128 = 100_000;
+/// Re-signing a `signed`/`broadcast` EVM payout needs both fee fields >= 110% of the last request.
+pub const EVM_FEE_BUMP_PCT: u128 = 110;
+/// Minimum age of the last signature request before a `signed`/`broadcast` payout may be
+/// re-signed (Solana: the old blockhash is long expired; EVM: rate limit on status flips).
+pub const RESIGN_COOLDOWN_MS: u64 = 5 * 60 * 1000;
 /// MPC signer contract (SPEC §1).
 pub const MPC_SIGNER: &str = "v1.signer-prod.testnet";
 /// Deposit required by the MPC `sign` method.
@@ -161,6 +184,80 @@ fn take_pending(token_id: u64, index: usize) -> Option<PendingTx> {
     near_sdk::borsh::from_slice(&raw).ok()
 }
 
+/// Per-payout signing record, kept in a raw storage slot so the stored `Vault` layout of
+/// existing vaults is unchanged. A payout with no record reads as `SignTrack::default()`.
+#[near(serializers = [borsh, json])]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct SignTrack {
+    /// Block time (ms) of the most recent signature request (step 3 or re-sign).
+    pub last_request_ms: u64,
+    /// A `resign_foreign` request is outstanding.
+    pub inflight: bool,
+    /// EVM fees of the most recent request (0 for Solana).
+    pub max_fee_per_gas: u128,
+    pub max_priority_fee_per_gas: u128,
+}
+
+fn track_key(token_id: u64, index: usize) -> Vec<u8> {
+    format!("chainsig:track:{token_id}:{index}").into_bytes()
+}
+
+pub fn read_track(token_id: u64, index: usize) -> SignTrack {
+    env::storage_read(&track_key(token_id, index))
+        .and_then(|raw| near_sdk::borsh::from_slice(&raw).ok())
+        .unwrap_or_default()
+}
+
+fn write_track(token_id: u64, index: usize, t: &SignTrack) {
+    env::storage_write(&track_key(token_id, index), &near_sdk::borsh::to_vec(t).unwrap());
+}
+
+/// The EVM nonce of Base payout `index`: the number of Base payouts before it. The
+/// derived `base-<id>` address can only be signed for by this contract, and only in
+/// settlement, so its nonce starts at 0 and payouts consume nonces in list order.
+pub fn evm_nonce_for(foreign: &[ForeignPayout], index: usize) -> u64 {
+    foreign[..index].iter().filter(|p| p.chain == ForeignChain::Base).count() as u64
+}
+
+/// Reject out-of-range caller-supplied EVM params (panics, so nothing is burned or stored).
+pub fn validate_evm_args(a: &EvmArgs) {
+    require!(
+        (MIN_EVM_GAS_LIMIT..=MAX_EVM_GAS_LIMIT).contains(&a.gas_limit.0),
+        "evm gas_limit out of range (21000..=100000)"
+    );
+    require!(
+        a.max_fee_per_gas.0 > 0 && a.max_fee_per_gas.0 <= MAX_EVM_FEE_PER_GAS,
+        "evm max_fee_per_gas out of range (1..=100 gwei)"
+    );
+    require!(
+        a.max_priority_fee_per_gas.0 <= a.max_fee_per_gas.0,
+        "evm max_priority_fee_per_gas above max_fee_per_gas"
+    );
+}
+
+/// The chain's transaction id for a stored `signed_tx`: EVM `0x` + keccak256(raw) (lower
+/// hex), Solana base58 of the first signature. `mark_broadcast` only accepts this value.
+pub fn expected_tx_id(chain: ForeignChain, signed_tx: &str) -> Result<String, String> {
+    match chain {
+        ForeignChain::Base => {
+            let h = signed_tx.strip_prefix("0x").unwrap_or(signed_tx);
+            let raw = hex::decode(h).map_err(|_| "signed_tx is not hex".to_string())?;
+            Ok(format!("0x{}", hex::encode(keccak256(&raw))))
+        }
+        ForeignChain::Solana => {
+            use near_sdk::base64::Engine;
+            let raw = near_sdk::base64::engine::general_purpose::STANDARD
+                .decode(signed_tx)
+                .map_err(|_| "signed_tx is not base64".to_string())?;
+            // compact-u16 signature count (1 => one byte 0x01), then 64-byte signatures.
+            if raw.len() < 65 || raw[0] != 1 {
+                return Err("unexpected solana tx layout".into());
+            }
+            Ok(near_sdk::bs58::encode(&raw[1..65]).into_string())
+        }
+    }
+}
+
 /// Build the EVM transfer for `payout` from keeper-supplied chain params.
 pub fn evm_transfer_for(payout: &ForeignPayout, a: &EvmArgs) -> Result<(EvmTransfer, [u8; 32]), String> {
     let t = EvmTransfer {
@@ -252,6 +349,14 @@ fn derived_key_call(path: &str) -> Promise {
     )
 }
 
+fn clear_inflight(token_id: u64, index: usize, req_ms: Option<u64>) {
+    let mut t = read_track(token_id, index);
+    if t.inflight && req_ms.is_none_or(|r| r == t.last_request_ms) {
+        t.inflight = false;
+        write_track(token_id, index, &t);
+    }
+}
+
 fn require_blockhash(a: &SolanaArgs) {
     if omni_transaction::solana::types::Blockhash::from_base58(&a.recent_blockhash).is_err() {
         env::panic_str("args.solana.recent_blockhash is not a base58 32-byte hash");
@@ -267,14 +372,24 @@ impl Contract {
         index: usize,
         args: Option<StepArgs>,
     ) -> Promise {
-        let payout = self.vault(token_id).foreign[index].clone();
+        let foreign = self.vault(token_id).foreign;
+        let payout = foreign[index].clone();
         let me = env::current_account_id();
         let path = derivation_path(payout.chain, token_id);
+        let now = env::block_timestamp_ms();
         match payout.chain {
             ForeignChain::Base => {
-                let a = args
+                let mut a = args
                     .and_then(|a| a.evm)
                     .unwrap_or_else(|| env::panic_str("step 3: args.evm is required for a base payout"));
+                validate_evm_args(&a);
+                a.nonce = evm_nonce_for(&foreign, index);
+                write_track(token_id, index, &SignTrack {
+                    last_request_ms: now,
+                    inflight: false,
+                    max_fee_per_gas: a.max_fee_per_gas.0,
+                    max_priority_fee_per_gas: a.max_priority_fee_per_gas.0,
+                });
                 match evm_transfer_for(&payout, &a) {
                     Err(e) => self.fail_later(token_id, index, &e),
                     Ok((t, hash)) => {
@@ -297,11 +412,12 @@ impl Contract {
                 if let Err(e) = solana_transfer_for(&payout, SYSTEM_PROGRAM_B58.into(), a.recent_blockhash.clone()) {
                     return self.fail_later(token_id, index, &e);
                 }
+                write_track(token_id, index, &SignTrack { last_request_ms: now, ..Default::default() });
                 derived_key_call(&path).then(
                     Self::ext(me)
                         .with_static_gas(GAS_ON_SOL_KEY)
                         .with_unused_gas_weight(1)
-                        .on_foreign_sol_key(token_id, index, a.recent_blockhash, None),
+                        .on_foreign_sol_key(token_id, index, a.recent_blockhash, None, None),
                 )
             }
         }
@@ -331,6 +447,7 @@ impl Contract {
         index: usize,
         recent_blockhash: String,
         resign: Option<bool>,
+        req_ms: Option<u64>,
         #[callback_result] key: Result<String, PromiseError>,
     ) -> PromiseOrValue<u8> {
         let resign = resign.unwrap_or(false);
@@ -348,6 +465,7 @@ impl Contract {
             Ok(x) => x,
             Err(e) if resign => {
                 env::log_str(&format!("resign #{index} failed: {e}"));
+                clear_inflight(token_id, index, req_ms);
                 return PromiseOrValue::Value(v.step);
             }
             Err(e) => {
@@ -363,7 +481,7 @@ impl Contract {
             Self::ext(me)
                 .with_static_gas(GAS_ON_FOREIGN_SIGNED)
                 .with_unused_gas_weight(0)
-                .on_foreign_resigned(token_id, index, PendingTx::Solana(t))
+                .on_foreign_resigned(token_id, index, PendingTx::Solana(t), req_ms)
         } else {
             write_pending(token_id, index, &PendingTx::Solana(t));
             Self::ext(me)
@@ -396,9 +514,13 @@ impl Contract {
         }
     }
 
-    /// Anyone: request a fresh signature for a payout that step 3 already handled and
-    /// that is `failed` or `signed` (not yet broadcast), e.g. after a Solana blockhash
-    /// expired or an EVM nonce went stale. Does not change `step`/`foreign_index`.
+    /// Request a fresh signature for a payout that step 3 already handled (expired Solana
+    /// blockhash, underpriced EVM tx, MPC failure). Does not change `step`/`foreign_index`.
+    /// Rules (see module docs): EVM nonce is fixed per payout and a re-sign of a
+    /// `signed`/`broadcast` payout must bump fees >= 10% (`broadcast`: also after the
+    /// cooldown); Solana always waits for the cooldown, and `signed`/`broadcast` Solana
+    /// payouts can only be re-signed by the contract owner or keeper. One re-sign per
+    /// payout in flight at a time.
     pub fn resign_foreign(&mut self, token_id: TokenRef, index: u32, args: StepArgs) -> Promise {
         let id = token_id.id();
         let v = self.vault(id);
@@ -407,36 +529,83 @@ impl Contract {
         require!(i < v.foreign.len(), "index out of range");
         require!(v.step > 3 || (v.step == 3 && i < v.foreign_index as usize), "payout not processed yet");
         let payout = v.foreign[i].clone();
+        require!(payout.status != ForeignStatus::Pending, "payout is pending");
+        let now = env::block_timestamp_ms();
+        let track = read_track(id, i);
         require!(
-            matches!(payout.status, ForeignStatus::Failed | ForeignStatus::Signed),
-            "payout is not failed/signed"
+            !(track.inflight && now < track.last_request_ms.saturating_add(crate::FOREIGN_INFLIGHT_TIMEOUT_MS)),
+            "a re-sign for this payout is already in flight"
         );
+        let has_sig = matches!(payout.status, ForeignStatus::Signed | ForeignStatus::Broadcast);
+        let cooled = now >= track.last_request_ms.saturating_add(RESIGN_COOLDOWN_MS);
         let me = env::current_account_id();
         let path = derivation_path(payout.chain, id);
         match payout.chain {
             ForeignChain::Base => {
-                let a = args.evm.unwrap_or_else(|| env::panic_str("args.evm is required for a base payout"));
+                let mut a = args.evm.unwrap_or_else(|| env::panic_str("args.evm is required for a base payout"));
+                validate_evm_args(&a);
+                if has_sig {
+                    require!(
+                        a.max_fee_per_gas.0 * 100 >= track.max_fee_per_gas * EVM_FEE_BUMP_PCT
+                            && a.max_priority_fee_per_gas.0 * 100 >= track.max_priority_fee_per_gas * EVM_FEE_BUMP_PCT,
+                        "re-sign of a signed evm payout must raise both fees by >= 10%"
+                    );
+                }
+                if payout.status == ForeignStatus::Broadcast {
+                    require!(cooled, "resign cooldown: wait 5 min after the last request");
+                }
+                a.nonce = evm_nonce_for(&v.foreign, i);
                 let (t, hash) = evm_transfer_for(&payout, &a).unwrap_or_else(|e| env::panic_str(&e));
+                write_track(id, i, &SignTrack {
+                    last_request_ms: now,
+                    inflight: true,
+                    max_fee_per_gas: a.max_fee_per_gas.0,
+                    max_priority_fee_per_gas: a.max_priority_fee_per_gas.0,
+                });
                 sign_call(&sign_args_ecdsa(&path, &hash)).then(
                     Self::ext(me)
                         .with_static_gas(GAS_ON_FOREIGN_SIGNED)
                         .with_unused_gas_weight(0)
-                        .on_foreign_resigned(id, i, PendingTx::Evm(t)),
+                        .on_foreign_resigned(id, i, PendingTx::Evm(t), Some(now)),
                 )
             }
             ForeignChain::Solana => {
+                // Even a `failed` payout may have a signature out there (e.g. the MPC answered
+                // but assembly failed), so always wait until the last blockhash has expired.
+                require!(cooled, "resign cooldown: wait 5 min after the last request");
+                if has_sig {
+                    let pred = env::predecessor_account_id();
+                    require!(
+                        pred == self.owner_id || Some(&pred) == self.keeper().as_ref(),
+                        "only the contract owner or keeper may re-sign a signed solana payout"
+                    );
+                }
                 let a = args.solana.unwrap_or_else(|| env::panic_str("args.solana is required for a solana payout"));
                 require_blockhash(&a);
                 solana_transfer_for(&payout, SYSTEM_PROGRAM_B58.into(), a.recent_blockhash.clone())
                     .unwrap_or_else(|e| env::panic_str(&e));
+                write_track(id, i, &SignTrack { last_request_ms: now, inflight: true, ..Default::default() });
                 derived_key_call(&path).then(
                     Self::ext(me)
                         .with_static_gas(GAS_ON_SOL_KEY)
                         .with_unused_gas_weight(1)
-                        .on_foreign_sol_key(id, i, a.recent_blockhash, Some(true)),
+                        .on_foreign_sol_key(id, i, a.recent_blockhash, Some(true), Some(now)),
                 )
             }
         }
+    }
+
+    /// View: signing record of a payout (keeper uses it to size an EVM fee bump and to
+    /// know when the re-sign cooldown ends).
+    pub fn get_sign_track(&self, token_id: TokenRef, index: u32) -> serde_json::Value {
+        let t = read_track(token_id.id(), index as usize);
+        json!({
+            "last_request_ms": t.last_request_ms,
+            "inflight": t.inflight,
+            "max_fee_per_gas": U128(t.max_fee_per_gas),
+            "max_priority_fee_per_gas": U128(t.max_priority_fee_per_gas),
+            "resign_allowed_after_ms": t.last_request_ms.saturating_add(RESIGN_COOLDOWN_MS),
+        })
     }
 
     /// Callback for `resign_foreign`. Returns the payout's resulting status.
@@ -446,12 +615,19 @@ impl Contract {
         token_id: u64,
         index: usize,
         pending: PendingTx,
+        req_ms: Option<u64>,
         #[callback_result] result: Result<serde_json::Value, PromiseError>,
     ) -> String {
         let mut v = self.vault(token_id);
         let current = v.foreign[index].status;
-        if current == ForeignStatus::Broadcast || current == ForeignStatus::Pending {
-            env::log_str("resign result ignored: payout already broadcast");
+        // Only the latest request may land (a request that timed out and was superseded is stale).
+        if req_ms.is_some() && read_track(token_id, index).last_request_ms != req_ms.unwrap_or_default() {
+            env::log_str("stale resign result ignored");
+            return current.as_str().to_string();
+        }
+        clear_inflight(token_id, index, req_ms);
+        if current == ForeignStatus::Pending {
+            env::log_str("resign result ignored: payout pending");
             return current.as_str().to_string();
         }
         let outcome = result
@@ -462,6 +638,7 @@ impl Contract {
             Ok((raw, txid)) => {
                 v.foreign[index].status = ForeignStatus::Signed;
                 v.foreign[index].signed_tx = Some(raw);
+                v.foreign[index].tx_hash = None;
                 let data = json!({"token_id": token_id.to_string(), "index": index, "chain": chain, "status": "signed", "detail": format!("resigned {txid}")});
                 record(&mut v, token_id, "foreign_signed", &format!("#{index} resigned {txid}"), data);
             }

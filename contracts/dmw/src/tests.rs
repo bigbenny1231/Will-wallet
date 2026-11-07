@@ -107,7 +107,7 @@ fn setup() -> Contract {
 
 fn confirm_key(c: &mut Contract, k: PublicKey, kind: KeyKind) {
     Ctx::new().by("dmw.testnet").set_with_result(PromiseResult::Successful(vec![]));
-    assert!(c.on_key_added(1, k, kind));
+    assert!(c.on_key_added(1, k, kind, Some(owner())));
 }
 
 fn with_agent_key(c: &mut Contract) {
@@ -238,7 +238,7 @@ fn add_key_reserves_allowance_and_failure_refunds() {
     assert_eq!(v(&c).balance, 10 * NEAR1 - KEY_ALLOWANCE);
     assert!(v(&c).pulse_keys.is_empty(), "not usable until AddKey confirmed");
     Ctx::new().by("dmw.testnet").set_with_result(PromiseResult::Failed);
-    assert!(!c.on_key_added(1, pk(1), KeyKind::Pulse));
+    assert!(!c.on_key_added(1, pk(1), KeyKind::Pulse, Some(owner())));
     assert_eq!(v(&c).balance, 10 * NEAR1);
     assert!(!c.key_index.contains_key(&pk(1)));
 }
@@ -645,14 +645,24 @@ fn mark_broadcast_requires_signed() {
         chain: ForeignChain::Base, to: format!("0x{}", "cd".repeat(20)), amount: U128(1),
         from_address: String::new(), status: ForeignStatus::Pending, signed_tx: None, tx_hash: None,
     }]);
+    // not signed yet -> rejected
+    Ctx::new().by("keeper.testnet").set();
+    let r = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        c.mark_broadcast(1.into(), 0, "0xhash".into());
+    }));
+    assert!(r.is_err(), "pending payout cannot be marked");
     // simulate a signed payout
+    let raw = "0x02f8aabbcc";
+    let real = format!("0x{}", hex::encode(foreign::chainsig::keccak256(&hex::decode(&raw[2..]).unwrap())));
     let mut vault = v(&c);
     vault.foreign[0].status = ForeignStatus::Signed;
+    vault.foreign[0].signed_tx = Some(raw.into());
     c.vaults.insert(&1, &vault);
-    Ctx::new().by("keeper.testnet").set();
-    c.mark_broadcast(1.into(), 0, "0xhash".into());
+    c.mark_broadcast(1.into(), 0, real.to_uppercase().replace("0X", "0x"));
     assert_eq!(v(&c).foreign[0].status, ForeignStatus::Broadcast);
-    assert_eq!(v(&c).foreign[0].tx_hash.as_deref(), Some("0xhash"));
+    assert_eq!(v(&c).foreign[0].tx_hash.as_deref(), Some(real.as_str()));
+    // re-reporting the same hash is a no-op; a different one is rejected
+    c.mark_broadcast(1.into(), 0, real.clone());
     let r = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         c.mark_broadcast(1.into(), 0, "0xother".into());
     }));
@@ -874,7 +884,7 @@ fn step3_solana_flow_stores_base64_tx() {
     // signer answered derived_public_key for sol-1 -> sign request scheduled
     Ctx::new().by("dmw.testnet").at(T0 + 41_500).set();
     let key = format!("ed25519:{SOL_FROM}");
-    assert!(matches!(c.on_foreign_sol_key(1, 0, SOL_BH.into(), None, Ok(key)), PromiseOrValue::Promise(_)));
+    assert!(matches!(c.on_foreign_sol_key(1, 0, SOL_BH.into(), None, None, Ok(key)), PromiseOrValue::Promise(_)));
     let s = c.on_foreign_signed(1, 0, Ok(mpc_ed_response(SOL_SIG)));
     assert_eq!(s, 4);
     let p = &v(&c).foreign[0];
@@ -894,7 +904,7 @@ fn step3_mpc_error_fails_payout_and_advances() {
     Ctx::new().by("keeper.testnet").at(T0 + 42_000).set();
     let _ = c.execute_step(1.into(), Some(sol_args()));
     Ctx::new().by("dmw.testnet").at(T0 + 42_500).set();
-    let r = c.on_foreign_sol_key(1, 1, SOL_BH.into(), None, Err(near_sdk::PromiseError::Failed));
+    let r = c.on_foreign_sol_key(1, 1, SOL_BH.into(), None, None, Err(near_sdk::PromiseError::Failed));
     assert!(matches!(r, PromiseOrValue::Value(4)));
     assert_eq!(v(&c).foreign[1].status, ForeignStatus::Failed);
 }
@@ -927,7 +937,7 @@ fn resign_after_failure_stores_new_tx_without_moving_steps() {
     let payout = v(&c).foreign[0].clone();
     let (t, _) = foreign::evm_transfer_for(&payout, base_args().evm.as_ref().unwrap()).unwrap();
     Ctx::new().by("dmw.testnet").at(T0 + 42_500).set();
-    let st = c.on_foreign_resigned(1, 0, foreign::PendingTx::Evm(t), Ok(mpc_secp_response()));
+    let st = c.on_foreign_resigned(1, 0, foreign::PendingTx::Evm(t), Some(T0 + 42_000), Ok(mpc_secp_response()));
     assert_eq!(st, "signed");
     let vault = v(&c);
     assert!(vault.foreign[0].signed_tx.as_deref().unwrap().starts_with("0x02f8"));
@@ -964,4 +974,341 @@ fn step1_detail_lists_heir_amounts() {
     // balance 10 - 0.01 bounty = 9.99; minus 0.1 reserve = 9.89 distributable
     let d = v(&c).log.last().unwrap().detail.clone();
     assert_eq!(d, "sarah.testnet 5.934 NEAR, tom.testnet 3.956 NEAR");
+}
+
+// ---------------------------------------------------------------- security review regressions
+// See docs/SECURITY_REVIEW.md. Each test names the finding it pins down.
+
+use near_sdk::mock::MockAction;
+
+/// JSON args of every FunctionCall receipt for `method` created in the current context.
+fn created_calls(method: &str) -> Vec<serde_json::Value> {
+    near_sdk::test_utils::get_created_receipts()
+        .into_iter()
+        .flat_map(|r| r.actions)
+        .filter_map(|a| match a {
+            MockAction::FunctionCallWeight { method_name, args, .. } if method_name == method.as_bytes() => {
+                serde_json::from_slice(&args).ok()
+            }
+            _ => None,
+        })
+        .collect()
+}
+
+fn deleted_keys() -> Vec<PublicKey> {
+    near_sdk::test_utils::get_created_receipts()
+        .into_iter()
+        .flat_map(|r| r.actions)
+        .filter_map(|a| match a {
+            MockAction::DeleteKey { public_key, .. } => public_key.to_string().parse().ok(),
+            _ => None,
+        })
+        .collect()
+}
+
+fn evm(nonce: u64, max_fee: u128, prio: u128, gas: u128) -> StepArgs {
+    StepArgs {
+        evm: Some(EvmArgs {
+            nonce,
+            max_fee_per_gas: U128(max_fee),
+            max_priority_fee_per_gas: U128(prio),
+            gas_limit: U128(gas),
+        }),
+        solana: None,
+    }
+}
+
+fn pending_slot(index: usize) -> foreign::PendingTx {
+    let raw = env::storage_read(format!("chainsig:pending:1:{index}").as_bytes()).expect("pending tx");
+    near_sdk::borsh::from_slice(&raw).unwrap()
+}
+
+fn panics(f: impl FnOnce()) -> String {
+    let r = std::panic::catch_unwind(std::panic::AssertUnwindSafe(f));
+    match r {
+        Ok(()) => panic!("expected a panic"),
+        Err(e) => e
+            .downcast_ref::<String>()
+            .cloned()
+            .or_else(|| e.downcast_ref::<&str>().map(|s| s.to_string()))
+            .unwrap_or_default(),
+    }
+}
+
+/// Vault 1 at step 3 with [base, sol, base] payouts; payout 0 signed via the MPC callback.
+fn evm_signed() -> Contract {
+    let mut c = at_step3(vec![base_payout(), sol_payout(5), base_payout()]);
+    let _ = c.execute_step(1.into(), Some(base_args()));
+    Ctx::new().by("dmw.testnet").at(T0 + 41_500).set();
+    assert_eq!(c.on_foreign_signed(1, 0, Ok(mpc_secp_response())), 3);
+    assert_eq!(v(&c).foreign[0].status, ForeignStatus::Signed);
+    c
+}
+
+/// Vault 1 with one Solana payout signed at T0 + 41_000 (step 4 next).
+fn sol_signed() -> Contract {
+    let mut c = at_step3(vec![sol_payout(1_000_000)]);
+    let _ = c.execute_step(1.into(), Some(sol_args()));
+    Ctx::new().by("dmw.testnet").at(T0 + 41_500).set();
+    let _ = c.on_foreign_sol_key(1, 0, SOL_BH.into(), None, None, Ok(format!("ed25519:{SOL_FROM}")));
+    assert_eq!(c.on_foreign_signed(1, 0, Ok(mpc_ed_response(SOL_SIG))), 4);
+    c
+}
+
+#[test]
+fn c1_evm_nonce_is_pinned_per_payout_not_caller_chosen() {
+    let mut c = at_step3(vec![base_payout(), sol_payout(5), base_payout()]);
+    // caller asks for nonce 999; the contract uses 0 (first base payout)
+    let _ = c.execute_step(1.into(), Some(evm(999, 1_500_000_000, 1_000_000, 21_000)));
+    match pending_slot(0) {
+        foreign::PendingTx::Evm(t) => assert_eq!(t.nonce, 0),
+        _ => panic!("expected evm"),
+    }
+    assert_eq!(foreign::evm_nonce_for(&v(&c).foreign, 2), 1, "third payout is the 2nd base payout");
+}
+
+#[test]
+fn c1_evm_resign_reuses_nonce_and_requires_fee_bump() {
+    let mut c = evm_signed();
+    // same fees: rejected (no downgrade/same-fee resign of a signed payout)
+    Ctx::new().by("mallory.testnet").at(T0 + 42_000).set();
+    let m = panics(|| { let _ = c.resign_foreign(1.into(), 0, base_args()); });
+    assert!(m.contains("raise both fees"), "{m}");
+    // +10% on both fees with a different caller nonce: accepted, nonce still 0
+    Ctx::new().by("mallory.testnet").at(T0 + 42_000).set();
+    let _ = c.resign_foreign(1.into(), 0, evm(42, 1_650_000_000, 1_100_000, 21_000));
+    let calls = created_calls("on_foreign_resigned");
+    assert_eq!(calls.len(), 1);
+    assert_eq!(calls[0]["pending"]["Evm"]["nonce"], 0);
+    assert_eq!(calls[0]["req_ms"], T0 + 42_000);
+    let t = c.get_sign_track(1.into(), 0);
+    assert_eq!(t["max_fee_per_gas"], "1650000000");
+    assert_eq!(t["inflight"], true);
+}
+
+#[test]
+fn h2_evm_fee_and_gas_caps() {
+    for args in [
+        evm(0, 101_000_000_000, 1, 21_000),   // > 100 gwei
+        evm(0, 1_500_000_000, 1, 20_999),     // below intrinsic gas
+        evm(0, 1_500_000_000, 1, 100_001),    // above cap
+        evm(0, 1_000, 2_000, 21_000),         // priority > max fee
+        evm(0, 0, 0, 21_000),                 // zero fee
+    ] {
+        // fresh thread = fresh mocked blockchain per case
+        let m = std::thread::spawn(move || {
+            let mut c = at_step3(vec![base_payout()]);
+            panics(|| { let _ = c.execute_step(1.into(), Some(args)); })
+        })
+        .join()
+        .unwrap();
+        // On chain the panic reverts the whole call (incl. the in-flight guard), so the
+        // payout is neither burned nor signed with out-of-range params.
+        assert!(m.contains("evm "), "{m}");
+    }
+}
+
+#[test]
+fn c1_solana_signed_resign_only_by_operator_after_cooldown() {
+    let mut c = sol_signed();
+    // anyone, even after the cooldown: rejected (a second live signature = second payment)
+    Ctx::new().by("heir.testnet").at(T0 + 41_000 + foreign::RESIGN_COOLDOWN_MS).set();
+    let m = panics(|| { let _ = c.resign_foreign(1.into(), 0, sol_args()); });
+    assert!(m.contains("only the contract owner or keeper"), "{m}");
+    // contract owner configures a keeper
+    Ctx::new().by("deployer.testnet").set();
+    c.set_keeper(Some(acc("keeper.testnet")));
+    assert_eq!(c.get_config()["keeper"], "keeper.testnet");
+    // keeper before the cooldown: rejected
+    Ctx::new().by("keeper.testnet").at(T0 + 60_000).set();
+    let m = panics(|| { let _ = c.resign_foreign(1.into(), 0, sol_args()); });
+    assert!(m.contains("cooldown"), "{m}");
+    // keeper after the cooldown: accepted, and a second request while in flight is rejected
+    let t = T0 + 41_000 + foreign::RESIGN_COOLDOWN_MS;
+    Ctx::new().by("keeper.testnet").at(t).set();
+    let _ = c.resign_foreign(1.into(), 0, sol_args());
+    assert_eq!(created_calls("on_foreign_sol_key")[0]["req_ms"], t);
+    Ctx::new().by("keeper.testnet").at(t + 1).set();
+    let m = panics(|| { let _ = c.resign_foreign(1.into(), 0, sol_args()); });
+    assert!(m.contains("cooldown") || m.contains("in flight"), "{m}");
+}
+
+#[test]
+#[should_panic(expected = "only the contract owner")]
+fn set_keeper_is_owner_only() {
+    let mut c = setup();
+    Ctx::new().by("mallory.testnet").set();
+    c.set_keeper(Some(acc("mallory.testnet")));
+}
+
+#[test]
+fn c1_solana_failed_resign_waits_for_cooldown_then_anyone() {
+    let mut c = at_step3(vec![sol_payout(1_000_000)]);
+    let _ = c.execute_step(1.into(), Some(sol_args()));
+    Ctx::new().by("dmw.testnet").at(T0 + 41_500).set();
+    let _ = c.on_foreign_sol_key(1, 0, SOL_BH.into(), None, None, Ok(format!("ed25519:{SOL_FROM}")));
+    assert_eq!(c.on_foreign_signed(1, 0, Err(near_sdk::PromiseError::Failed)), 4);
+    Ctx::new().by("heir.testnet").at(T0 + 42_000).set();
+    let m = panics(|| { let _ = c.resign_foreign(1.into(), 0, sol_args()); });
+    assert!(m.contains("cooldown"), "{m}");
+    Ctx::new().by("heir.testnet").at(T0 + 41_000 + foreign::RESIGN_COOLDOWN_MS).set();
+    let _ = c.resign_foreign(1.into(), 0, sol_args());
+}
+
+#[test]
+fn c1_inflight_resign_blocks_second_and_stale_callback_ignored() {
+    let mut c = evm_signed();
+    Ctx::new().by("keeper.testnet").at(T0 + 42_000).set();
+    let _ = c.resign_foreign(1.into(), 0, evm(0, 2_000_000_000, 2_000_000, 21_000));
+    Ctx::new().by("keeper.testnet").at(T0 + 43_000).set();
+    let m = panics(|| { let _ = c.resign_foreign(1.into(), 0, evm(0, 3_000_000_000, 3_000_000, 21_000)); });
+    assert!(m.contains("in flight"), "{m}");
+    // after the in-flight timeout a new request supersedes the lost one...
+    let t2 = T0 + 42_000 + FOREIGN_INFLIGHT_TIMEOUT_MS;
+    Ctx::new().by("keeper.testnet").at(t2).set();
+    let _ = c.resign_foreign(1.into(), 0, evm(0, 3_000_000_000, 3_000_000, 21_000));
+    // ...and the late callback of the old one is ignored
+    let before = v(&c).foreign[0].clone();
+    let payout = before.clone();
+    let (t, _) = foreign::evm_transfer_for(&payout, base_args().evm.as_ref().unwrap()).unwrap();
+    Ctx::new().by("dmw.testnet").at(t2 + 10).set();
+    assert_eq!(c.on_foreign_resigned(1, 0, foreign::PendingTx::Evm(t), Some(T0 + 42_000), Ok(mpc_secp_response())), "signed");
+    assert_eq!(v(&c).foreign[0], before);
+    assert!(foreign::read_track(1, 0).inflight, "current request still in flight");
+}
+
+#[test]
+fn h1_mark_broadcast_rejects_fake_hash_and_resign_still_possible() {
+    let mut c = sol_signed();
+    let raw = v(&c).foreign[0].signed_tx.clone().unwrap();
+    let real = near_sdk::bs58::encode(hex::decode(SOL_SIG).unwrap()).into_string();
+    assert_eq!(foreign::expected_tx_id(ForeignChain::Solana, &raw).unwrap(), real);
+    Ctx::new().by("mallory.testnet").at(T0 + 42_000).set();
+    let m = panics(|| c.mark_broadcast(1.into(), 0, "5fakeSignature".into()));
+    assert!(m.contains("does not match"), "{m}");
+    assert_eq!(v(&c).foreign[0].status, ForeignStatus::Signed);
+    // the real id is accepted (anyone may report it; the tx itself is public in state)
+    c.mark_broadcast(1.into(), 0, real.clone());
+    assert_eq!(v(&c).foreign[0].tx_hash.as_deref(), Some(real.as_str()));
+    // a `broadcast` payout whose tx never landed is not bricked: the keeper can re-sign
+    Ctx::new().by("deployer.testnet").set();
+    c.set_keeper(Some(acc("keeper.testnet")));
+    Ctx::new().by("keeper.testnet").at(T0 + 41_000 + foreign::RESIGN_COOLDOWN_MS).set();
+    let _ = c.resign_foreign(1.into(), 0, sol_args());
+}
+
+#[test]
+fn h1_evm_broadcast_resign_needs_cooldown_and_clears_hash() {
+    let mut c = evm_signed();
+    let raw = v(&c).foreign[0].signed_tx.clone().unwrap();
+    let id = foreign::expected_tx_id(ForeignChain::Base, &raw).unwrap();
+    Ctx::new().by("mallory.testnet").at(T0 + 42_000).set();
+    c.mark_broadcast(1.into(), 0, id);
+    let bump = evm(0, 2_000_000_000, 2_000_000, 21_000);
+    let m = panics(|| { let _ = c.resign_foreign(1.into(), 0, bump.clone()); });
+    assert!(m.contains("cooldown"), "{m}");
+    let t = T0 + 41_000 + foreign::RESIGN_COOLDOWN_MS;
+    Ctx::new().by("keeper.testnet").at(t).set();
+    let _ = c.resign_foreign(1.into(), 0, bump.clone());
+    let payout = v(&c).foreign[0].clone();
+    let (tx, _) = foreign::evm_transfer_for(&payout, bump.evm.as_ref().unwrap()).unwrap();
+    Ctx::new().by("dmw.testnet").at(t + 10).set();
+    assert_eq!(c.on_foreign_resigned(1, 0, foreign::PendingTx::Evm(tx), Some(t), Ok(mpc_secp_response())), "signed");
+    assert_eq!(v(&c).foreign[0].tx_hash, None);
+    assert!(!foreign::read_track(1, 0).inflight);
+}
+
+#[test]
+fn h3_nft_transfer_revokes_previous_owner_keys() {
+    let mut c = setup();
+    with_agent_key(&mut c);
+    Ctx::new().set();
+    let _ = c.add_pulse_key(1.into(), pk(1));
+    confirm_key(&mut c, pk(1), KeyKind::Pulse);
+    Ctx::new().dep(1).set();
+    c.nft_transfer(acc("bob.testnet"), "1".into(), None, None);
+    let mut del = deleted_keys();
+    del.sort_by_key(|k| k.as_bytes().to_vec());
+    assert_eq!(del, vec![pk(1), pk(2)]);
+    let vault = v(&c);
+    assert!(vault.pulse_keys.is_empty() && vault.agent_keys.is_empty());
+    assert!(!c.key_index.contains_key(&pk(2)));
+    // the seller's agent key can no longer spend the buyer's vault
+    Ctx::new().key(pk(2)).at(T0 + 1_000).set();
+    let m = panics(|| { let _ = c.agent_pay(1.into(), acc("api.provider.testnet"), U128(NEAR1 / 10), None); });
+    assert!(m.contains("unauthorized"), "{m}");
+}
+
+#[test]
+fn h3_key_add_landing_after_transfer_is_revoked() {
+    let mut c = setup();
+    Ctx::new().set();
+    let _ = c.add_agent_key(1.into(), pk(3));
+    Ctx::new().dep(1).set();
+    c.nft_transfer(acc("bob.testnet"), "1".into(), None, None);
+    // AddKey succeeded, but the requester (alice) no longer owns the vault
+    Ctx::new().by("dmw.testnet").set_with_result(PromiseResult::Successful(vec![]));
+    assert!(!c.on_key_added(1, pk(3), KeyKind::Agent, Some(owner())));
+    assert!(v(&c).agent_keys.is_empty());
+    assert!(!c.key_index.contains_key(&pk(3)));
+    assert_eq!(deleted_keys(), vec![pk(3)]);
+}
+
+#[test]
+#[should_panic(expected = "unauthorized: not owner or pulse key")]
+fn l4_pulse_key_must_be_signed_by_contract_account() {
+    let mut c = setup();
+    Ctx::new().set();
+    let _ = c.add_pulse_key(1.into(), pk(1));
+    confirm_key(&mut c, pk(1), KeyKind::Pulse);
+    // same public key, but the tx signer is some other account
+    let mut ctx = Ctx::new().key(pk(1));
+    ctx.signer = acc("mallory.testnet");
+    ctx.set();
+    c.heartbeat(1.into());
+}
+
+#[test]
+#[should_panic(expected = "receiver cannot be the dmw contract")]
+fn l5_agent_pay_to_contract_rejected() {
+    let mut c = setup();
+    with_agent_key(&mut c);
+    Ctx::new().key(pk(2)).at(T0 + 1_000).set();
+    let _ = c.agent_pay(1.into(), contract_id(), U128(1), None);
+}
+
+#[test]
+fn m1_storage_of_a_full_vault_vs_flat_fee() {
+    // Documents finding M-1: worst-case bytes of one vault vs the 0.1 NEAR (10 kB) fee.
+    Ctx::new().set();
+    let mut c = Contract::new(acc("deployer.testnet"));
+    let before = env::storage_usage();
+    Ctx::new().dep(100 * NEAR1).set();
+    let heirs: Vec<Heir> = (0..10)
+        .map(|i| Heir { account_id: acc(&format!("{}{i}.testnet", "h".repeat(54))), bps: 1000 })
+        .collect();
+    let pol = Policy {
+        per_tx_max: U128(1),
+        daily_max: U128(1),
+        allowlist: (0..10).map(|i| acc(&format!("{}{i}.testnet", "a".repeat(54)))).collect(),
+    };
+    c.create_vault(60, 1, heirs, Some(pol), None);
+    let mut vault = c.vaults.get(&1).unwrap();
+    vault.foreign = (0..4)
+        .map(|_| ForeignPayout {
+            chain: ForeignChain::Solana, to: "x".repeat(64), amount: U128(u128::MAX), from_address: "y".repeat(64),
+            status: ForeignStatus::Signed, signed_tx: Some("z".repeat(300)), tx_hash: Some("t".repeat(128)),
+        })
+        .collect();
+    vault.pulse_keys = (0..5).map(|i| pk(10 + i)).collect();
+    vault.agent_keys = (0..5).map(|i| pk(20 + i)).collect();
+    vault.log = (0..MAX_LOG)
+        .map(|_| LogEntry { ms: 0, event: "agent_pay_denied".into(), detail: "d".repeat(150) })
+        .collect();
+    c.vaults.insert(&1, &vault);
+    let used = env::storage_usage() - before;
+    println!("full vault storage: {used} bytes");
+    // > 10 kB: the flat fee under-collects for a maxed-out vault
+    assert!(used > 10_000, "used {used}");
+    assert!(used < 20_000, "used {used}");
 }

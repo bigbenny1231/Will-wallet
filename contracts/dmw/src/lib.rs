@@ -59,6 +59,9 @@ const GAS_ON_DAO: Gas = Gas::from_tgas(10);
 const GAS_ON_TRANSFER: Gas = Gas::from_tgas(5);
 const GAS_ON_KEY: Gas = Gas::from_tgas(10);
 const GAS_MARK_BROADCAST_DAO: u64 = 10_000_000_000_000;
+/// Raw storage slot for the optional keeper account (kept out of `Contract` so the
+/// stored contract layout is unchanged across this upgrade).
+const KEEPER_SLOT: &[u8] = b"cfg:keeper";
 
 pub const EVENT_STANDARD: &str = "dmw";
 pub const EVENT_VERSION: &str = "1.0.0";
@@ -199,8 +202,7 @@ impl Contract {
         let id = token_id.id();
         let mut v = self.vault(id);
         let pred = env::predecessor_account_id();
-        let via_key = pred == env::current_account_id()
-            && v.pulse_keys.contains(&env::signer_account_pk());
+        let via_key = signed_by_own_key(&pred) && v.pulse_keys.contains(&env::signer_account_pk());
         require!(pred == v.owner_id || via_key, "unauthorized: not owner or pulse key");
         require!(v.stored == StoredState::Live, "vault_triggered");
         let now = env::block_timestamp_ms();
@@ -252,11 +254,12 @@ impl Contract {
         let id = token_id.id();
         let mut v = self.vault(id);
         require!(
-            env::predecessor_account_id() == env::current_account_id()
-                && v.agent_keys.contains(&env::signer_account_pk()),
+            signed_by_own_key(&env::predecessor_account_id()) && v.agent_keys.contains(&env::signer_account_pk()),
             "unauthorized: not an agent key of this vault"
         );
         require!(amount.0 > 0, "amount must be > 0");
+        // A transfer to the contract itself would move vault NEAR into the unallocated pool.
+        require!(receiver_id != env::current_account_id(), "receiver cannot be the dmw contract");
         let now = env::block_timestamp_ms();
         if now >= v.daily_window_start_ms.saturating_add(DAY_MS) {
             v.daily_window_start_ms = now;
@@ -434,20 +437,13 @@ impl Contract {
                 PromiseOrValue::Value(2)
             }
             2 => {
-                let keys: Vec<PublicKey> =
-                    v.pulse_keys.drain(..).chain(v.agent_keys.drain(..)).collect();
-                for k in &keys {
-                    self.key_index.remove(k);
-                }
+                let keys = self.take_keys(&mut v);
                 v.step = 3;
                 v.foreign_index = 0;
                 let data = json!({"token_id": id.to_string(), "deleted_keys": keys});
                 record(&mut v, id, "step_2", &format!("{} keys deleted", keys.len()), data);
                 self.vaults.insert(&id, &v);
-                // One promise per key so a single failure cannot block the others.
-                for k in keys {
-                    Promise::new(me.clone()).delete_key(k).detach();
-                }
+                delete_keys(keys);
                 PromiseOrValue::Value(3)
             }
             3 => {
@@ -560,7 +556,18 @@ impl Contract {
         }
         let i = index as usize;
         require!(i < v.foreign.len(), "index out of range");
-        require!(v.foreign[i].status == ForeignStatus::Signed, "payout is not signed");
+        let p = &v.foreign[i];
+        if p.status == ForeignStatus::Broadcast && p.tx_hash.as_deref() == Some(tx_hash.as_str()) {
+            return; // idempotent re-report
+        }
+        require!(p.status == ForeignStatus::Signed, "payout is not signed");
+        // The hash must be the id of the stored signed tx (H-1): nobody can record a fake
+        // hash. "broadcast" means "relayed", not "confirmed"; the signed tx stays public and
+        // relayable, and `resign_foreign` still works from `broadcast` after the cooldown.
+        let signed = p.signed_tx.as_deref().unwrap_or_else(|| env::panic_str("payout has no signed tx"));
+        let expected = foreign::expected_tx_id(p.chain, signed).unwrap_or_else(|e| env::panic_str(&e));
+        let tx_hash = if p.chain == ForeignChain::Base { tx_hash.to_ascii_lowercase() } else { tx_hash };
+        require!(tx_hash == expected, "tx_hash does not match the signed tx");
         v.foreign[i].status = ForeignStatus::Broadcast;
         v.foreign[i].tx_hash = Some(tx_hash.clone());
         let data = json!({"token_id": id.to_string(), "index": index, "chain": v.foreign[i].chain, "tx_hash": tx_hash, "by": pred});
@@ -622,7 +629,24 @@ impl Contract {
             "reserve_no_dao": yocto(RESERVE_NO_DAO),
             "dao_bond": yocto(DAO_BOND),
             "mpc_signer": foreign::MPC_SIGNER,
+            "keeper": self.keeper(),
         })
+    }
+
+    /// Contract owner only: set (or clear) the keeper account. Besides the contract owner,
+    /// only the keeper may re-sign a Solana payout that already has a signature, because
+    /// that is only safe after checking off-chain that the old signature never landed.
+    pub fn set_keeper(&mut self, account_id: Option<AccountId>) {
+        require!(env::predecessor_account_id() == self.owner_id, "only the contract owner");
+        match &account_id {
+            Some(a) => {
+                env::storage_write(KEEPER_SLOT, a.as_bytes());
+            }
+            None => {
+                env::storage_remove(KEEPER_SLOT);
+            }
+        }
+        emit("keeper_set", json!({"keeper": account_id}));
     }
 
     // -----------------------------------------------------------------------
@@ -631,7 +655,13 @@ impl Contract {
 
     /// After AddKey: confirm the key into the vault list, or release the reservation.
     #[private]
-    pub fn on_key_added(&mut self, token_id: u64, public_key: PublicKey, kind: KeyKind) -> bool {
+    pub fn on_key_added(
+        &mut self,
+        token_id: u64,
+        public_key: PublicKey,
+        kind: KeyKind,
+        owner: Option<AccountId>,
+    ) -> bool {
         let ok = promise_ok();
         let Some(mut v) = self.vaults.get(&token_id) else { return false };
         let pk_str = String::from(&public_key);
@@ -642,9 +672,13 @@ impl Contract {
             self.vaults.insert(&token_id, &v);
             return false;
         }
-        if v.stored != StoredState::Live {
-            // Vault triggered while the key was being added: delete it right away.
+        let owner_changed = owner.as_ref().is_some_and(|o| o != &v.owner_id);
+        if v.stored != StoredState::Live || owner_changed {
+            // Vault triggered, or the Will NFT changed hands, while the key was being
+            // added: the requester no longer controls the vault, so delete it right away.
             self.key_index.remove(&public_key);
+            let why = if owner_changed { "owner changed" } else { "vault triggered" };
+            record(&mut v, token_id, "key_add_revoked", &format!("{pk_str} {why}"), json!({"token_id": token_id.to_string(), "public_key": pk_str, "reason": why}));
             self.vaults.insert(&token_id, &v);
             Promise::new(env::current_account_id()).delete_key(public_key).detach();
             return false;
@@ -731,7 +765,7 @@ impl Contract {
             .unwrap_or_else(|| env::panic_str("zero allowance"));
         Promise::new(me.clone())
             .add_access_key_allowance(pk.clone(), allowance, me.clone(), kind.method())
-            .then(Self::ext(me).with_static_gas(GAS_ON_KEY).on_key_added(id, pk, kind))
+            .then(Self::ext(me).with_static_gas(GAS_ON_KEY).on_key_added(id, pk, kind, Some(v.owner_id.clone())))
     }
 
     fn transfer_with_refund(&self, id: u64, to: &AccountId, amount: u128, kind: &str) {
@@ -778,6 +812,19 @@ impl Contract {
         v.step
     }
 
+    /// Drain both key lists and release them from the global registry.
+    fn take_keys(&mut self, v: &mut Vault) -> Vec<PublicKey> {
+        let keys: Vec<PublicKey> = v.pulse_keys.drain(..).chain(v.agent_keys.drain(..)).collect();
+        for k in &keys {
+            self.key_index.remove(k);
+        }
+        keys
+    }
+
+    pub(crate) fn keeper(&self) -> Option<AccountId> {
+        env::storage_read(KEEPER_SLOT).and_then(|b| String::from_utf8(b).ok()?.parse().ok())
+    }
+
     fn index_add(&mut self, owner: &AccountId, id: u64) {
         let mut ids = self.owner_index.get(owner).unwrap_or_default();
         if !ids.contains(&id) {
@@ -797,15 +844,32 @@ impl Contract {
     }
 
     /// Move NFT ownership (used by NEP-171 transfers and their resolution).
+    /// While Live, every pulse/agent key is revoked: keys belong to whoever set them up,
+    /// and must not keep heartbeat/spend power over a vault the NFT buyer now owns (H-3).
     pub(crate) fn move_owner(&mut self, id: u64, v: &mut Vault, to: &AccountId, memo: Option<&str>) {
         let old = v.owner_id.clone();
         v.owner_id = to.clone();
-        record(v, id, "owner_changed", &format!("{old} -> {to}"), json!({"token_id": id.to_string(), "old_owner_id": old, "new_owner_id": to}));
+        let revoked = if v.stored == StoredState::Live { self.take_keys(v) } else { vec![] };
+        record(v, id, "owner_changed", &format!("{old} -> {to}"), json!({"token_id": id.to_string(), "old_owner_id": old, "new_owner_id": to, "revoked_keys": revoked}));
         self.vaults.insert(&id, v);
+        delete_keys(revoked);
         self.index_remove(&old, id);
         self.index_add(to, id);
         nft::emit_transfer(&old, to, id, memo);
     }
+}
+
+/// One DeleteKey promise per key so a single failure cannot block the others.
+fn delete_keys(keys: Vec<PublicKey>) {
+    for k in keys {
+        Promise::new(env::current_account_id()).delete_key(k).detach();
+    }
+}
+
+/// A tx signed by a function-call key that lives on this contract's own account.
+fn signed_by_own_key(pred: &AccountId) -> bool {
+    let me = env::current_account_id();
+    pred == &me && env::signer_account_id() == me
 }
 
 /// Order matters: the first failing rule is the reported reason.

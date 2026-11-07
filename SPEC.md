@@ -119,7 +119,7 @@ for them exists anywhere; the contract requests signatures at settlement time.
 | `set_heirs`, `set_policy`, `set_foreign_payouts`, `set_dao({token_id, dao_id})`, `set_timing({token_id, heartbeat_interval_s, grace_missed})` | owner, while not Triggered | — | update |
 | `poke({token_id})` | anyone | — | if deadline passed: state=Triggered, step=1, pay `bounty` to predecessor from balance, event `triggered`. Else panic `not_due` |
 | `execute_step({token_id, args?})` | anyone | — | runs the current step (see §2.4), advances `step`; idempotent on re-entry; panics if not Triggered or already Settled |
-| `mark_broadcast({token_id, index, tx_hash})` | anyone | — | sets foreign[index].status=broadcast, tx_hash |
+| `mark_broadcast({token_id, index, tx_hash})` | anyone | — | sets foreign[index].status=broadcast, tx_hash (must equal the stored signed tx's id; §2.7) |
 | `claim({token_id})` | current NFT owner, only when Settled | — | transfers remaining balance to caller |
 | `get_vault({token_id})` → VaultView | view | | |
 | `get_vaults({from_index, limit})` → [VaultView] | view | | for keeper polling |
@@ -170,7 +170,19 @@ These are the places where the shipped contract (`contracts/dmw`, deployed at `d
 - **Failed outgoing transfers** (heir, agent, bounty, claim) go back into the vault balance through a callback.
 - **`execute_step`** returns the new `step`. Steps 3 and 4 return it through their callback. Step 3 has an in-flight guard: calling it again while a signature is pending does nothing and returns 3. A request still pending after 10 min is marked `failed` and settlement moves on. With no foreign payouts, step 3 goes straight to 4. The keeper should attach **300 TGas** to every `execute_step`.
 - **Step 4** creates a Sputnik v2 `FunctionCall` proposal (text/`Vote` proposals are not valid in v2): `mark_broadcast({token_id, index: 0, tx_hash: "dao-ratified"})` on this contract, 1 NEAR bond, 100 TGas. The proposal id is stored. If it fails, the bond goes back to the vault and settlement continues. `mark_broadcast` with `tx_hash == "dao-ratified"` is accepted only from the vault's `dao_id` and only logs `dao_ratified`.
-- **`mark_broadcast`** otherwise requires `status == "signed"`, so a recorded hash cannot be overwritten.
+- **`mark_broadcast`** otherwise requires `status == "signed"`, so a recorded hash cannot be overwritten. It is still permissionless, but `tx_hash` must equal the id of the stored `signed_tx` (EVM `0x`+keccak256(raw), Solana base58 of the first signature). Re-reporting the same hash is a no-op. "broadcast" means relayed, not confirmed.
+- **Security review changes (2026-11-07, docs/SECURITY_REVIEW.md):**
+  - **EVM nonce is set by the contract.** Base payout `i` uses nonce = the number of Base payouts before it. `args.evm.nonce` is ignored.
+  - **EVM fee and gas caps.** `gas_limit` must be 21000..=100000, `max_fee_per_gas` 1..=100 gwei, and `max_priority_fee_per_gas` ≤ `max_fee_per_gas`.
+  - **`resign_foreign` rules:**
+    - One re-sign per payout in flight (a request counts as lost after 10 min).
+    - EVM `signed`/`broadcast`: both fees must be ≥ 110% of the last request.
+    - EVM `broadcast`: also only ≥ 5 min after the last request.
+    - Solana: always ≥ 5 min after the last request. `signed`/`broadcast` Solana payouts may only be re-signed by the contract `owner_id` or the keeper set with `set_keeper({account_id})`, after checking that the old signature never landed.
+    - The view `get_sign_track({token_id, index})` shows the last request time, the last fees and `resign_allowed_after_ms`.
+  - **Keys follow the NFT owner.** Changing the Will NFT owner while Alive/Warning revokes every pulse and agent key. A key whose AddKey lands after an owner change is deleted.
+  - **Key auth checks the signer account.** Key auth also requires `signer_account_id == contract`.
+  - **No `agent_pay` to the contract.** `agent_pay` panics if `receiver_id` is the contract itself.
 - **Limits:** ≤ 10 heirs, ≤ 5 keys per kind, ≤ 4 foreign payouts, ≤ 10 allowlist entries, interval 10 s..10 y, `grace_missed` ≤ 1000. The log keeps the last 40 entries.
 - **Defaults:** bounty 0.01 NEAR; storage fee 0.1 NEAR flat. `set_dao({token_id, dao_id: null})` clears the DAO. `set_foreign_payouts({token_id, payouts})` forces `status: "pending"`.
 - **NFT:** approvals (NEP-178) are not supported (`approval_id` must be null). `nft_transfer_call` reverts if the receiver returns `true`. `extra.heirs` is the heir count.
