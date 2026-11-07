@@ -3,8 +3,9 @@
 #
 #   make kill   (or ./scripts/kill.sh)
 #
-# Expect: "owner is gone", then about 2-3 minutes later (poke is legal 120 s after the last beat,
-# each settlement step takes ~15 s) the keeper log shows poke, steps 1-5 and "Settled".
+# Expect: "owner is gone", then the keeper log shows poke (legal 120 s after the last beat), steps 1-5
+# and "Settled". Blocks for about 4 minutes in total (each settlement step is one or two testnet txs).
+# The keeper keeps running afterwards to retry unfunded foreign relays: `make stop` ends it.
 set -uo pipefail
 cd "$(dirname "$0")/.."
 D=.demo
@@ -30,5 +31,5 @@ sleep 4   # let the relay lines for the foreign payouts print
 kill $(cat $D/tail.pid) 2>/dev/null; wait $TAILER 2>/dev/null
 rm -f $D/tail.pid
 echo
-echo "Settled. The keeper keeps running to retry any unfunded relay: stop it with  pkill -f 'src/cli.ts keeper'"
+echo "Settled. The keeper keeps running to retry any unfunded relay: stop it with  make stop"
 (cd keeper && npx tsx src/cli.ts status --token "$(cat ../$D/vault_id)") 2>/dev/null || true

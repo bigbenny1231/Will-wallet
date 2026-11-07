@@ -3,26 +3,24 @@
 #
 #   make demo   (or ./scripts/demo.sh)
 #
-# What happens: checks .env, makes faucet accounts if missing, creates a vault (60 s interval, grace 1,
+# What happens: checks .env (run `make deploy` first), installs keeper deps if missing, makes faucet
+# accounts, creates a vault (60 s interval, grace 1,
 # two heirs, agent policy, one Base and one Solana payout), adds a pulse key and an agent key, runs the
 # agent guard-rail demo (one allowed, one denied), then starts the pulse daemon and the keeper in the
 # background (logs in .demo/). Finish with `make kill`.
 # Expect: a vault id, a dashboard URL, and a hint to run `make kill`.
 set -euo pipefail
 cd "$(dirname "$0")/.."
-ROOT=$PWD
-[ -f .env ] && set -a && . ./.env && set +a
+. scripts/lib.sh
+load_env
 D=.demo; mkdir -p $D
 ADMIN="node scripts/near-admin.mjs"; TX="node contracts/tools/tx.mjs"
 
-say() { printf '\033[1m== %s\033[0m\n' "$*"; }
-die() { printf '\033[31merror: %s\033[0m\n' "$*" >&2; exit 1; }
-
-# 1. env checks
-for v in DMW_CONTRACT KEEPER_ACCOUNT_ID KEEPER_PRIVATE_KEY; do
-  [ -n "${!v:-}" ] || die "$v is not set in .env (see keeper/.env.example; create a keeper with: node scripts/near-admin.mjs create dmw-keeper-<rand>.testnet)"
-done
-[ -d keeper/node_modules ] || die "run: cd keeper && npm install"
+# 1. env + deps: the contract comes from `make deploy`; a keeper account is created here if .env has none
+ensure_deps keeper
+[ -n "${DMW_CONTRACT:-}" ] || die "DMW_CONTRACT is not set: run 'make deploy' first (it creates and deploys a contract account and writes .env)"
+ensure_keeper
+if [ "${KEEPER_CREATED:-0}" = 1 ]; then register_keeper "$DMW_CONTRACT"; fi
 C=$DMW_CONTRACT
 
 # a previous demo still running? stop it so two pulses/keepers do not fight
@@ -78,12 +76,15 @@ say "agent-demo: one allowed, one denied"
 (cd keeper; nohup ./node_modules/.bin/tsx src/cli.ts keeper --poll 5 --token $TOKEN > ../$D/keeper.log 2>&1 & echo $! > ../$D/keeper.pid)
 say "keeper started (pid $(cat $D/keeper.pid)) -> $D/keeper.log"
 
+# 9. point the dashboard at this contract (dashboard/.env.local is gitignored)
+printf 'VITE_DMW_CONTRACT=%s\nVITE_NEAR_NETWORK=testnet\n' "$C" > dashboard/.env.local
+
 cat <<MSG
 
   vault id      $TOKEN   (owner $OWNER, heirs $HEIR1 / $HEIR2)
-  dashboard     http://localhost:5173/vault/$TOKEN   (cd dashboard && npm run dev)
+  dashboard     http://localhost:5173/vault/$TOKEN   (cd dashboard && npm ci && npm run dev; dashboard/.env.local points it at $C)
   explorer      https://testnet.nearblocks.io/address/$C
   watch         tail -f $D/pulse.log   |   tail -f $D/keeper.log   |   make status
 
-  Vault is alive and beating. When you are ready:   make kill
+  Vault is alive and beating. When you are ready:   make kill    (afterwards: make stop)
 MSG

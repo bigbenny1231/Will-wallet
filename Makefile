@@ -1,34 +1,56 @@
 SHELL := /bin/bash
 .DEFAULT_GOAL := help
--include .env
-export
+# .env is read by the scripts themselves (scripts/lib.sh, keeper/src/config.ts); it is not exported into
+# every make recipe, so cargo and npm never see KEEPER_PRIVATE_KEY.
 
 TOKEN ?= $(shell cat .demo/vault_id 2>/dev/null || echo 1)
+KEEPER_DEPS := keeper/node_modules/.package-lock.json
+DASHBOARD_DEPS := dashboard/node_modules/.package-lock.json
 
 help: ## List targets
-	@grep -hE '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
+	@grep -hE '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-18s\033[0m %s\n", $$1, $$2}'
 
-check: ## Verify toolchain (Rust, wasm target, cargo-near, near-cli-rs, Node 22)
+check: ## Verify toolchain (required: Rust + wasm32, Node >= 22, openssl, curl; optional: cargo-near, near-cli-rs, docker)
 	@./scripts/check.sh
 
-build: ## Build the contract to WASM (cargo-near if installed, else plain cargo with --cfg near)
+$(KEEPER_DEPS): keeper/package-lock.json
+	cd keeper && npm ci --no-audit --no-fund --loglevel=error
+	@touch $@
+
+$(DASHBOARD_DEPS): dashboard/package-lock.json
+	cd dashboard && npm ci --no-audit --no-fund --loglevel=error
+	@touch $@
+
+install: $(KEEPER_DEPS) $(DASHBOARD_DEPS) ## npm ci in keeper/ and dashboard/ (run automatically by the targets that need it)
+
+build: ## Build the contract to WASM (cargo-near -> target/near/dmw.wasm, else plain cargo with --cfg near)
 	./contracts/dmw/build.sh
 
-test: ## Run contract unit tests + keeper tests
-	cd contracts/dmw && cargo test
-	cd keeper && npm test --silent
+build-reproducible: ## Reproducible build of the committed tree in the pinned Docker image (needs docker + cargo-near)
+	REPRODUCIBLE=1 ./contracts/dmw/build.sh
 
-deploy: ## Deploy + init the contract to the account in .env (DMW_CONTRACT)
+test: $(KEEPER_DEPS) $(DASHBOARD_DEPS) ## Contract unit tests (76), keeper typecheck + tests (44), dashboard tests (32)
+	cd contracts/dmw && cargo test --locked
+	cd keeper && npm run --silent typecheck && npm test --silent
+	cd dashboard && npm test --silent
+
+deploy: $(KEEPER_DEPS) ## Faucet account + keeper account, build, deploy, init, set_keeper; writes .env (NEW=1: ignore DMW_CONTRACT)
 	./scripts/deploy.sh
 
-demo: ## One-command testnet demo: new vault (60 s interval), keys, agent allowed+denied, pulse + keeper in background
+demo: $(KEEPER_DEPS) ## Testnet demo on the .env contract: new vault (60 s), keys, agent allowed+denied, pulse + keeper in background
 	./scripts/demo.sh
 
-kill: ## Stop the pulse daemon = the owner disappears. Watch the keeper settle the estate.
+kill: ## Stop the pulse daemon = the owner disappears. Follows the keeper log until Settled (~4 min)
 	./scripts/kill.sh
 
-status: ## Print a vault's state (TOKEN=<id>, default: the last `make demo` vault)
+stop: ## Stop the background pulse and keeper started by make demo
+	@pkill -f 'src/cli.ts (pulse|keeper)' && echo "stopped pulse/keeper" || echo "nothing running"
+	@rm -f .demo/pulse.pid .demo/keeper.pid .demo/tail.pid
+
+status: $(KEEPER_DEPS) ## Print a vault's state (TOKEN=<id>, default: the last make demo vault)
 	@cd keeper && ./node_modules/.bin/tsx src/cli.ts status --token $(TOKEN)
 
-clean: ## Remove build artifacts
+clean: ## Remove build artifacts and node_modules
 	rm -rf contracts/dmw/target keeper/node_modules keeper/dist dashboard/node_modules dashboard/dist
+
+.PHONY: help check install build build-reproducible test deploy demo kill stop status clean
