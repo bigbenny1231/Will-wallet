@@ -34,7 +34,7 @@ build: ## Build the contract to WASM (cargo-near -> target/near/dmw.wasm, else p
 build-reproducible: ## Reproducible build of the committed tree in the pinned Docker image (needs docker + cargo-near)
 	REPRODUCIBLE=1 ./contracts/dmw/build.sh
 
-test: $(KEEPER_DEPS) $(DASHBOARD_DEPS) $(AGENT_DEPS) ## Contract unit tests (76), keeper typecheck + tests (44), dashboard tests (32), agent typecheck + tests
+test: $(KEEPER_DEPS) $(DASHBOARD_DEPS) $(AGENT_DEPS) ## Contract unit tests (95), keeper typecheck + tests (46), dashboard tests (67), agent typecheck + tests (37)
 	cd contracts/dmw && cargo test --locked
 	cd keeper && npm run --silent typecheck && npm test --silent
 	cd dashboard && npm test --silent
