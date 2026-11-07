@@ -10,8 +10,27 @@ dist/
 *.key
 keys/
 .DS_Store
-keys/
 .demo/
 docs/video/*.mp4
 # demo video copied into the site by design/build_site.py; too large for git, see site/README.md
 site/assets/*.mp4
+
+# --- added in the pre-publication sweep (docs/AUDIT_REPO_HYGIENE.md) ---
+# rendered video, anywhere in the tree
+*.mp4
+*.mov
+# screenshots / scratch output
+shots/
+# key material under any name
+*.key.json
+*.testnet.json
+*.pem
+*.keystore
+.near/
+.near-credentials/
+# runtime logs and per-machine state
+*.log
+.mock-state.json
+.vercel/
+.env.local
+.env.*.local
