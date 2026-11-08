@@ -34,3 +34,6 @@ shots/
 .vercel/
 .env.local
 .env.*.local
+
+# the 720p demo ships with the live site (Vercel serves it from site/assets)
+!site/assets/demo-720p.mp4
