@@ -65,34 +65,56 @@ async function scrollThrough(page) {
         p{font-size:22px;color:var(--bone-2);margin:0;max-width:20em;line-height:1.45}
         .k{margin-top:40px;font:500 12px/1 var(--font-text);letter-spacing:.12em;text-transform:uppercase;color:var(--brass);padding-top:16px;border-top:1px solid var(--hair-strong);max-width:420px}
       </style></head><body><div class="s">${seal}</div>
-      <div><h1>Dead Man&#8217;s Wallet</h1><p>A vault is created. The heartbeats stop. Sarah and Ben are paid on NEAR testnet.</p><div class="k">The demo, 2 minutes 39 seconds</div></div></body></html>`, { waitUntil: 'networkidle' });
+      <div><h1>Dead Man&#8217;s Wallet</h1><p>A vault is created. Its agent is refused. The heartbeats stop, and settlement runs on NEAR testnet.</p><div class="k">The demo, 2 minutes 50 seconds, vault 17</div></div></body></html>`, { waitUntil: 'networkidle' });
     await page.evaluate(async () => { await Promise.all(['400 40px "Instrument Serif"', 'italic 400 40px "Instrument Serif"', '400 16px "Inter Tight"', '500 16px "Inter Tight"', '400 14px "JetBrains Mono"'].map(f => document.fonts.load(f))); await document.fonts.ready; });
     await page.waitForTimeout(300);
     await page.screenshot({ path: path.join(ROOT, 'site', 'assets', 'poster.jpg'), type: 'jpeg', quality: 86 });
     await page.close();
   }
 
-  // Open Graph card: the seal and the headline, 1200x630 PNG (site/assets/og.png).
+  // Open Graph card, v4: the WebGL seal (site/js/seal3d.bundle.js; the SVG seal if WebGL is unavailable), the
+  // headline, and the line: heartbeats that flatline into the five settlement ticks. 1200x630 PNG (site/assets/og.png).
   if (!only || only === 'og') {
     const seal = fs.readFileSync(path.join(__dirname, 'seal.svg'), 'utf8');
+    const P = require(path.join(__dirname, 'pulse.js'));
+    let line = '';
+    for (let i = 0; i < 4; i++) line += P.complex(40 + i * 120, 60, 0.8).replace(/^M/, i ? 'L' : 'M') + ' L' + (40 + i * 120 + 120) + ',60';
+    const ticks = ['I', 'II', 'III', 'IV', 'V'].map((n, i) => { const x = 610 + i * 104; return `<path d="M${x},50V70" stroke="#C8A96A" stroke-width="1.2"/><text x="${x}" y="96" text-anchor="middle" fill="#C8A96A" font-family="Instrument Serif" font-size="19">${n}</text>`; }).join('');
     const page = await browser.newPage({ viewport: { width: 1200, height: 630 }, deviceScaleFactor: 1 });
     await page.goto(`${base}/design/tokens.css`);
     await page.setContent(`<!doctype html><html><head>
       <link rel="stylesheet" href="${base}/design/tokens.css">
       <link rel="stylesheet" href="${base}/site/styles.css">
       <style>
-        body{margin:0;width:1200px;height:630px;overflow:hidden;display:grid;grid-template-columns:1fr 440px;align-items:center;padding:0 88px 0 80px;gap:48px}
+        body{margin:0;width:1200px;height:630px;overflow:hidden;position:relative;background:radial-gradient(640px 520px at 905px 270px, rgba(61,220,132,.075), transparent 70%), #0B0C0F}
         body::after{opacity:.05}
-        .s{width:440px;height:440px}
+        .t{position:absolute;left:80px;top:96px;width:620px}
+        h1{font-size:104px;line-height:.95;letter-spacing:-.02em;margin:0 0 30px}
+        p{font-size:25px;color:var(--bone-2);margin:0;max-width:19em;line-height:1.42}
+        .s{position:absolute;right:66px;top:34px;width:430px;height:430px}
+        .s canvas{position:absolute;inset:-8%;width:116%;height:116%}
+        .s .seal{width:100%;height:100%}
         .s .trace-hi,.s .glow{animation-play-state:paused!important;animation-delay:-0.62s!important}
-        h1{font-size:96px;line-height:1;letter-spacing:-.015em;margin:0 0 26px}
-        p{font-size:26px;color:var(--bone-2);margin:0;max-width:19em;line-height:1.4}
-        .k{margin-top:44px;font:500 14px/1 var(--font-text);letter-spacing:.12em;text-transform:uppercase;color:var(--brass);padding-top:18px;border-top:1px solid var(--hair-strong);max-width:520px}
+        .s.is-3d .seal{opacity:0}
+        .l{position:absolute;left:0;right:0;bottom:22px;height:120px}
+        .k{position:absolute;left:80px;bottom:150px;font:400 16px/1 var(--font-text);color:var(--bone-2);max-width:none;white-space:nowrap}
       </style></head><body>
-      <div><h1>Crypto that <em>arrives.</em></h1><p>While you are alive, nothing happens. When you are not, this executes.</p><div class="k">Dead Man&#8217;s Wallet &middot; NEAR</div></div>
-      <div class="s">${seal}</div></body></html>`, { waitUntil: 'networkidle' });
-    await page.evaluate(async () => { await Promise.all(['400 40px "Instrument Serif"', 'italic 400 40px "Instrument Serif"', '400 16px "Inter Tight"', '500 16px "Inter Tight"', '400 14px "JetBrains Mono"'].map(f => document.fonts.load(f))); await document.fonts.ready; });
-    await page.waitForTimeout(300);
+      <div class="t"><h1>Crypto that arrives.</h1><p>While you are alive, nothing happens. When you are not, this executes.</p></div>
+      <div class="s" id="s">${seal}<canvas id="c"></canvas></div>
+      <p class="k">Dead Man&#8217;s Wallet. A testnet NEAR contract, meant to sit alongside a will.</p>
+      <svg class="l" viewBox="0 0 1200 120"><path d="${line} L560,60" fill="none" stroke="#3DDC84" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+        <path d="M560,60 H1160" fill="none" stroke="#7A7F87" stroke-width="1.6"/>${ticks}</svg>
+      <script type="module">
+        try {
+          const m = await import('${base}/site/js/seal3d.bundle.js');
+          if (m.supportsWebGL()) { const s = m.createSeal3D(document.getElementById('c'), { state: 'alive', vaultNo: '0042', heir: 'Sarah', autoBeat: 0 }); await s.ready; s.setPointer(-0.35, -0.2); s.beat(); await new Promise(r => setTimeout(r, 900)); document.getElementById('s').classList.add('is-3d'); }
+        } catch (e) { console.log('og: SVG seal', e); }
+        window.__ogReady = true;
+      </script></body></html>`, { waitUntil: 'networkidle' });
+    await page.evaluate(async () => { await Promise.all(['400 40px "Instrument Serif"', 'italic 400 40px "Instrument Serif"', '400 16px "Inter Tight"', '500 16px "Inter Tight"'].map(f => document.fonts.load(f))); await document.fonts.ready; });
+    await page.waitForFunction(() => window.__ogReady, null, { timeout: 20000 }).catch(() => {});
+    await page.waitForTimeout(400);
+    console.log('og: 3D seal', await page.evaluate(() => document.getElementById('s').classList.contains('is-3d')));
     await page.screenshot({ path: path.join(ROOT, 'site', 'assets', 'og.png'), type: 'png' });
     await page.close();
   }

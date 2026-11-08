@@ -6,9 +6,8 @@ run this after editing anything in design/ and commit the result.
 
 - copies design/tokens.css and design/pulse.js to site/assets/
 - inlines design/seal.svg into site/index.html between <!-- seal --> and <!-- /seal -->
-- pre-renders the pulse strip (via design/pulse.js, using node) between <!-- strip --> and <!-- /strip -->
 - inlines a second copy of the seal (ids suffixed, so its gradient and clip paths stay its own) between
-  <!-- seal2 --> and <!-- /seal2 --> for the pinned seal of the three-act story
+  <!-- seal2 --> and <!-- /seal2 --> for the pinned clock seal of the vault 17 story (aria-hidden)
 - renders a QR code for the phone pulse page (design/qr.js) between <!-- qr --> and <!-- /qr -->
 
 The demo video is committed as site/assets/demo-720p.mp4 (the v3 cut, re-encoded to about 2.8 MB):
@@ -40,17 +39,12 @@ def main() -> None:
     shutil.copyfile(DESIGN / "pulse.js", SITE / "assets" / "pulse.js")
 
     seal = (DESIGN / "seal.svg").read_text()
-    strip = subprocess.run(
-        ["node", "-e", "process.stdout.write(require(process.argv[1]).stripMarkup())", str(DESIGN / "pulse.js")],
-        check=True, capture_output=True, text=True,
-    ).stdout
-
     # Second seal for the story: suffix every id and every reference to it.
     ids = re.findall(r'id="([^"]+)"', seal)
     seal2 = seal
     for i in ids:
         seal2 = re.sub(r'(id="|#|url\(#)%s\b' % re.escape(i), lambda m: m.group(1) + i + "-s", seal2)
-    seal2 = seal2.replace('aria-labelledby="seal-title-s seal-desc-s"', 'aria-hidden="true" focusable="false"')
+    seal2 = re.sub(r'role="img" aria-labelledby="[^"]*"', 'aria-hidden="true" focusable="false"', seal2)
 
     qr = subprocess.run(
         ["node", "-e", "process.stdout.write(require(process.argv[1]).svg(process.argv[2], {label: process.argv[3]}))",
@@ -62,7 +56,6 @@ def main() -> None:
     html = index.read_text()
     html = splice(html, "seal", seal)
     html = splice(html, "seal2", seal2)
-    html = splice(html, "strip", strip)
     html = splice(html, "qr", qr)
     index.write_text(html)
 

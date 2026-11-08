@@ -1,4 +1,4 @@
-# Dead Man's Wallet: landing page
+# Dead Man's Wallet: landing page (v4)
 
 Static, build-free site: `index.html`, `styles.css`, `js/`, `fonts/`, `assets/`. No CDN, no runtime
 dependencies. Design rules are in [`../DESIGN.md`](../DESIGN.md) (binding); every sentence is held to
@@ -6,40 +6,45 @@ dependencies. Design rules are in [`../DESIGN.md`](../DESIGN.md) (binding); ever
 
 | File | What it does |
 |---|---|
-| `js/main.js` | fills `[data-link]` anchors, starts the hero, lazy-loads the rest when it nears the viewport, demo player |
-| `js/hero.js` | "Hold to stop your heartbeat": 1.5 s press-and-hold (pointer, touch, Space; Enter starts at once), then an 11 s client-side simulation of example vault 0042 with invented, labelled hashes. Nothing is sent. `?sim=run` / `?sim=settled` for screenshots |
-| `js/story.js` | the three acts: the pinned seal follows the act in the middle of the screen; act III's strip flatlines into the five steps |
-| `js/live.js` | "Live from NEAR testnet": read-only JSON-RPC `query` / `call_function` to `dmw-x8cx.testnet` (`nft_total_supply`, `get_vault` 6 and 17), fastnear first, then near.org; a fallback line if both fail |
-| `js/quiz.js` | "Would your crypto arrive?": four single-tap questions scored in the page, "Copy result" copies a text summary and the site link |
-| `js/seal.js` | sets a seal's state, word, inscription and title |
+| `js/main.js` | fills `[data-link]` anchors, starts the hero, the pointer light, the sound toggle, loads the WebGL seal on first interaction, lazy-loads the rest near the viewport, demo player |
+| `js/hero.js` | "Hold to stop your heartbeat": 1.5 s press-and-hold (pointer, touch, Space; Enter starts at once), then an 11 s client-side simulation of example vault 0042 with invented, labelled hashes. "Who should it arrive to?" names the heir (localStorage key `dmw-heir`; never sent); the seal rim, the ledger and the last line use it. `?sim=run`, `?sim=settled`, `?heir=Maria` for screenshots |
+| `js/sealhost.js` | the hero seal: the SVG seal always (the accessible image and the fallback), the WebGL seal from `js/seal3d.bundle.js` over it when `<html data-seal3d="on">` and WebGL works. Pointer tilt on desktop; DeviceOrientation on phones after "Tilt the seal" (iOS permission). Both seals tilt |
+| `js/seal3d.bundle.js` | built by `node design/seal3d/build.mjs` from `design/seal3d/` (three.js, MIT). Contract: `createSeal3D(canvas, opts)` and `supportsWebGL()`. Loaded only after the first pointer, touch, key or scroll, so it never costs first paint (`?seal3d` loads it at once) |
+| `js/story.js` | "Vault 17, as it happened": the real run of vault 17 (7 Nov 2026, 18:35 to 18:44 UTC) as one vertical ECG line drawn by scroll. Events are vault 17's on-chain log entries, spaced by the time between them; the heartbeats are the beats on the trace; the clock shows the time at the pen; minute marks along the line. Silence thins the trace, the trigger flatlines it, the five steps tick onto it. The page background shifts life-green, amber, red, ash. Reduced motion: the line is drawn, nothing scrubs |
+| `js/graph.js` | "One estate, read live": vault 6 as a node graph (vault, chains, recipients) from read-only `get_vault` 6 calls, polled every 30 s on screen; edges pulse on load and when `last_beat_ms` changes. Select a node for its detail. Also the vault count, vault 6's last beat and vault 17's five steps, read now |
+| `js/sound.js` | opt-in sound (nav "Sound: off"), WebAudio only: a two-burst thump per beat, one 220 Hz tone with a slow decay at flatline, silence after settlement. Hidden with reduced motion |
+| `js/quiz.js` | "Would your crypto arrive?": four single-tap questions scored in the page; the verdict is drawn as a 1200x630 card on a canvas ("Download card", PNG) and can be copied as text |
+| `js/seal.js` | SVG seal helpers (state, word, rim inscription with the heir, title), reduced-motion check, `dmw:*` events |
 
-The whole page works without the RPC: the live strip then says the chain did not answer.
+Events between modules: `dmw:beat`, `dmw:flatline`, `dmw:settled` on `window` (the hero seal's beat loop, the
+story's crossings, a new heartbeat on chain). The sound module listens to them.
+
+The whole page works without the RPC: the estate section then says the chain did not answer.
 
 ## Run locally
 
-    cd site && python3 -m http.server 8080
+    node design/serve.cjs site 8091      # applies every vercel.json header block (CSP, caching)
 
 ## Shared design assets
 
-The seal, the pulse motif and the tokens live in [`../design/`](../design/) so the dashboard, NFT art and
-video can use the same source:
+The seal, the pulse motif and the tokens live in [`../design/`](../design/):
 
-- `design/seal.svg`: the Will seal (inlined into `index.html` between `<!-- seal -->` markers)
-- `design/pulse.js`: ECG geometry, the pulse strip, flatline-on-scroll, `beat()` for real heartbeat events
+- `design/seal.svg`: the Will seal (inlined into `index.html` between `<!-- seal -->` markers, and again, aria-hidden, as the story clock's seal)
+- `design/pulse.js`: ECG geometry (`complex()` is also the story line's beat), `beat()`, `setState()`
 - `design/tokens.css`: colour, type and motion tokens
+- `design/seal3d/`: the WebGL seal source and its build
 
-After editing any of them run `python3 design/build_site.py` from the repo root. It copies tokens and pulse
-into `site/assets/`, re-inlines the seal (twice: the hero, and the story's pinned copy with suffixed ids),
-re-renders the strip, and renders the phone-pulse QR code as inline SVG with `design/qr.js` (a small byte-mode
-encoder; `node design/qr.test.cjs` checks it module for module against npm `qrcode`). Commit the result.
+After editing any of them run `python3 design/build_site.py` from the repo root (copies tokens and pulse,
+re-inlines both seals, renders the phone-pulse QR code with `design/qr.js`). Commit the result.
 
-Check it with the real headers: `node design/serve.cjs site 8091` serves `site/` with the `vercel.json` headers
-(CSP included), and `node design/shoot-v3.cjs http://127.0.0.1:8091` writes `screenshots/v3-*.png` at 390 and
-1440 (hero idle, holding, mid-simulation, settled; acts II and III; live strip; quiz; builders).
-`screenshots/hero-sim.mp4` is a 12 s recording of the hero interaction.
+## Checks
 
-`node design/shoot.cjs` re-renders `assets/poster.jpg` and the screenshots in `screenshots/` (Playwright,
-Chromium, local server only).
+- `node design/shoot-v4.cjs http://127.0.0.1:8091` writes `screenshots/v4-*.png` at 390 and 1440: hero idle,
+  mid-simulation and settled with the heir "Maria"; the story at three scroll positions; the graph and a node's
+  detail; the quiz card (and `v4-quiz-card.png`, the canvas itself). Add `full` as the third argument for full pages.
+- `node design/tour-v4.cjs` records `screenshots/v4-tour.mp4` (19 s scroll through the page).
+- `node design/shoot.cjs og` renders `assets/og.png` (the WebGL seal, else the SVG); `poster` renders `assets/poster.jpg`.
+- Lighthouse and axe were run against `serve.cjs` (production headers); see the commit message for the numbers.
 
 Fonts are the `@fontsource` builds of Instrument Serif, Inter Tight (400/500/600) and JetBrains Mono, Latin
 subset, OFL (licences in `fonts/`).
@@ -47,21 +52,17 @@ subset, OFL (licences in `fonts/`).
 ## Demo video
 
 `assets/demo-720p.mp4` is the v3 cut (2:50, vault 17), re-encoded to about 2.8 MB so it can be committed and
-served by a git-triggered deploy. The command is in the docstring of `design/build_site.py`, which no longer
-copies a video.
+served by a git-triggered deploy. The command is in the docstring of `design/build_site.py`.
 
 ## Configure
 
 `CONFIG` at the top of `js/main.js` holds the dashboard, site and GitHub links (plain links; the site has no
 backend and collects nothing). `index.html` carries the same defaults so links work without JS.
-The canonical and Open Graph URLs assume `deadmanswallet.dev`, the intended production domain (not yet
-registered); change them if the domain differs. There is no waitlist form: the page points to GitHub releases
-until a mailing list exists.
+Canonical and Open Graph URLs point at the Vercel deployment until `deadmanswallet.dev` is registered.
 
 ## Content Security Policy
 
-`vercel.json` sets `script-src 'self'` with no hashes: the page has no inline scripts, only `assets/pulse.js` and
-the modules in `js/`. Keep it that way; an inline `<script>` would be blocked until its SHA-256 is added. The live
-strip needs `connect-src https://rpc.testnet.fastnear.com https://rpc.testnet.near.org`; add any other RPC there
-too. Inline styles are allowed (`style-src 'unsafe-inline'`), which the seal's embedded `<style>` and the
-`<noscript>` rule rely on. `dashboard/vercel.json` still uses the hash procedure for its own inline script.
+`vercel.json` sets `script-src 'self'` with no hashes: the page has no inline scripts. Keep it that way. The
+estate graph needs `connect-src https://rpc.testnet.fastnear.com https://rpc.testnet.near.org`. Inline styles
+are allowed (`style-src 'unsafe-inline'`) for the seal's embedded `<style>` and the `<noscript>` rule. Fonts are
+cached for a year (immutable); `js/`, `assets/` and `styles.css` for an hour with revalidation.
