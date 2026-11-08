@@ -1,7 +1,19 @@
 # Dead Man's Wallet: landing page
 
-Static, build-free site: `index.html`, `styles.css`, `app.js`, `fonts/`, `assets/`. No CDN, no runtime
-dependencies; it renders fully offline. Design rules are in [`../DESIGN.md`](../DESIGN.md) (binding).
+Static, build-free site: `index.html`, `styles.css`, `js/`, `fonts/`, `assets/`. No CDN, no runtime
+dependencies. Design rules are in [`../DESIGN.md`](../DESIGN.md) (binding); every sentence is held to
+[`../docs/AUDIT_CLAIMS.md`](../docs/AUDIT_CLAIMS.md).
+
+| File | What it does |
+|---|---|
+| `js/main.js` | fills `[data-link]` anchors, starts the hero, lazy-loads the rest when it nears the viewport, demo player |
+| `js/hero.js` | "Hold to stop your heartbeat": 1.5 s press-and-hold (pointer, touch, Space; Enter starts at once), then an 11 s client-side simulation of example vault 0042 with invented, labelled hashes. Nothing is sent. `?sim=run` / `?sim=settled` for screenshots |
+| `js/story.js` | the three acts: the pinned seal follows the act in the middle of the screen; act III's strip flatlines into the five steps |
+| `js/live.js` | "Live from NEAR testnet": read-only JSON-RPC `query` / `call_function` to `dmw-x8cx.testnet` (`nft_total_supply`, `get_vault` 6 and 17), fastnear first, then near.org; a fallback line if both fail |
+| `js/quiz.js` | "Would your crypto arrive?": four single-tap questions scored in the page, "Copy result" copies a text summary and the site link |
+| `js/seal.js` | sets a seal's state, word, inscription and title |
+
+The whole page works without the RPC: the live strip then says the chain did not answer.
 
 ## Run locally
 
@@ -17,7 +29,14 @@ video can use the same source:
 - `design/tokens.css`: colour, type and motion tokens
 
 After editing any of them run `python3 design/build_site.py` from the repo root. It copies tokens and pulse
-into `site/assets/`, re-inlines the seal, re-renders the strip, and copies the demo video. Commit the result.
+into `site/assets/`, re-inlines the seal (twice: the hero, and the story's pinned copy with suffixed ids),
+re-renders the strip, and renders the phone-pulse QR code as inline SVG with `design/qr.js` (a small byte-mode
+encoder; `node design/qr.test.cjs` checks it module for module against npm `qrcode`). Commit the result.
+
+Check it with the real headers: `node design/serve.cjs site 8091` serves `site/` with the `vercel.json` headers
+(CSP included), and `node design/shoot-v3.cjs http://127.0.0.1:8091` writes `screenshots/v3-*.png` at 390 and
+1440 (hero idle, holding, mid-simulation, settled; acts II and III; live strip; quiz; builders).
+`screenshots/hero-sim.mp4` is a 12 s recording of the hero interaction.
 
 `node design/shoot.cjs` re-renders `assets/poster.jpg` and the screenshots in `screenshots/` (Playwright,
 Chromium, local server only).
@@ -27,33 +46,22 @@ subset, OFL (licences in `fonts/`).
 
 ## Demo video
 
-`assets/demo-720p.mp4` is referenced by the page but not committed (`site/assets/*.mp4` is gitignored, like
-`docs/video/*.mp4`). `design/build_site.py` copies it from `docs/video/dead-mans-wallet-demo-720p.mp4`.
-Deploy from a local checkout that has the file (`python3 design/build_site.py && cd site && vercel deploy`);
-a git-triggered Vercel build will not have it, and the player then shows only the poster. Hosting the mp4 on
-a CDN or object store and changing the `<source>` is the alternative.
+`assets/demo-720p.mp4` is the v3 cut (2:50, vault 17), re-encoded to about 2.8 MB so it can be committed and
+served by a git-triggered deploy. The command is in the docstring of `design/build_site.py`, which no longer
+copies a video.
 
 ## Configure
 
-`CONFIG` at the top of `app.js` holds the dashboard, docs, one-pager, GitHub and contact links (all plain links;
-the site has no backend and collects nothing). `index.html` carries the same defaults so links work without JS.
+`CONFIG` at the top of `js/main.js` holds the dashboard, site and GitHub links (plain links; the site has no
+backend and collects nothing). `index.html` carries the same defaults so links work without JS.
 The canonical and Open Graph URLs assume `deadmanswallet.dev`, the intended production domain (not yet
 registered); change them if the domain differs. There is no waitlist form: the page points to GitHub releases
 until a mailing list exists.
 
-## Content Security Policy hash
+## Content Security Policy
 
-`vercel.json` allows exactly one inline script, the `<script>document.documentElement.classList.add('js')</script>`
-in `index.html`, by SHA-256 hash (`script-src 'self' 'sha256-...'`). Any edit to that script, even whitespace,
-breaks the page under the CSP until the hash is updated. After editing it, run from the repo root:
-
-    python3 design/build_site.py
-    python3 - <<'EOF'
-    import re, hashlib, base64
-    h = open('site/index.html').read()
-    for m in re.finditer(r'<script(?![^>]*\bsrc=)[^>]*>(.*?)</script>', h, re.S):
-        print('sha256-' + base64.b64encode(hashlib.sha256(m.group(1).encode()).digest()).decode())
-    EOF
-
-and paste the printed value into `site/vercel.json`. The same applies to `dashboard/index.html` and
-`dashboard/vercel.json`. Edits outside that one script (seal, copy, links) do not change the hash.
+`vercel.json` sets `script-src 'self'` with no hashes: the page has no inline scripts, only `assets/pulse.js` and
+the modules in `js/`. Keep it that way; an inline `<script>` would be blocked until its SHA-256 is added. The live
+strip needs `connect-src https://rpc.testnet.fastnear.com https://rpc.testnet.near.org`; add any other RPC there
+too. Inline styles are allowed (`style-src 'unsafe-inline'`), which the seal's embedded `<style>` and the
+`<noscript>` rule rely on. `dashboard/vercel.json` still uses the hash procedure for its own inline script.

@@ -7,12 +7,20 @@ run this after editing anything in design/ and commit the result.
 - copies design/tokens.css and design/pulse.js to site/assets/
 - inlines design/seal.svg into site/index.html between <!-- seal --> and <!-- /seal -->
 - pre-renders the pulse strip (via design/pulse.js, using node) between <!-- strip --> and <!-- /strip -->
-- copies docs/video/dmw-demo-v3-720p.mp4 to site/assets/demo-720p.mp4 if it exists (gitignored)
+- inlines a second copy of the seal (ids suffixed, so its gradient and clip paths stay its own) between
+  <!-- seal2 --> and <!-- /seal2 --> for the pinned seal of the three-act story
+- renders a QR code for the phone pulse page (design/qr.js) between <!-- qr --> and <!-- /qr -->
+
+The demo video is committed as site/assets/demo-720p.mp4 (the v3 cut, re-encoded to about 2.8 MB):
+  ffmpeg -i docs/video/dmw-demo-v3-720p.mp4 -an -c:v libx264 -preset slow -crf 30 -tune stillimage \
+         -pix_fmt yuv420p -movflags +faststart -r 24 site/assets/demo-720p.mp4
 """
 import pathlib
 import re
 import shutil
 import subprocess
+
+PULSE_URL = "https://will-wallet.vercel.app/pulse"
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 DESIGN = ROOT / "design"
@@ -37,18 +45,27 @@ def main() -> None:
         check=True, capture_output=True, text=True,
     ).stdout
 
+    # Second seal for the story: suffix every id and every reference to it.
+    ids = re.findall(r'id="([^"]+)"', seal)
+    seal2 = seal
+    for i in ids:
+        seal2 = re.sub(r'(id="|#|url\(#)%s\b' % re.escape(i), lambda m: m.group(1) + i + "-s", seal2)
+    seal2 = seal2.replace('aria-labelledby="seal-title-s seal-desc-s"', 'aria-hidden="true" focusable="false"')
+
+    qr = subprocess.run(
+        ["node", "-e", "process.stdout.write(require(process.argv[1]).svg(process.argv[2], {label: process.argv[3]}))",
+         str(DESIGN / "qr.js"), PULSE_URL, "QR code for " + PULSE_URL],
+        check=True, capture_output=True, text=True,
+    ).stdout
+
     index = SITE / "index.html"
     html = index.read_text()
     html = splice(html, "seal", seal)
+    html = splice(html, "seal2", seal2)
     html = splice(html, "strip", strip)
+    html = splice(html, "qr", qr)
     index.write_text(html)
 
-    video = ROOT / "docs" / "video" / "dead-mans-wallet-demo-720p.mp4"
-    if video.exists():
-        shutil.copyfile(video, SITE / "assets" / "demo-720p.mp4")
-        print("copied demo video to site/assets/demo-720p.mp4 (gitignored)")
-    else:
-        print("note: docs/video/dmw-demo-v3-720p.mp4 not found; the player will show the poster only")
     print("site synced")
 
 
