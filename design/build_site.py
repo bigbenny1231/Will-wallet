@@ -68,7 +68,7 @@ def export_mark() -> str:
         png(tile(512, 0.7, 0.5), icons / "seal-512.png")
         png(tile(512, 0.56, 0.5), icons / "seal-maskable-512.png")   # inside the 80% maskable safe zone
     body = re.sub(r"\s*\n\s*", "", mark_body())
-    return '<svg class="mark" viewBox="0 0 32 32" aria-hidden="true" focusable="false">' + body + "</svg>"
+    return '<svg class="mark" width="24" height="24" viewBox="0 0 32 32" aria-hidden="true" focusable="false">' + body + "</svg>"
 
 
 def main() -> None:
@@ -98,6 +98,14 @@ def main() -> None:
     mark = export_mark()
     html = splice(html, "mark", mark)
     html = splice(html, "mark-foot", mark)
+    # cache-busting: styles.css is served with max-age=3600 + stale-while-revalidate, so a
+    # phone that has visited before keeps the old stylesheet for up to a day. Version the URL
+    # by content hash so every deploy is picked up immediately.
+    import hashlib
+    css_hash = hashlib.sha1((SITE / "styles.css").read_bytes()).hexdigest()[:8]
+    js_hash = hashlib.sha1((SITE / "js" / "main.js").read_bytes()).hexdigest()[:8]
+    html = re.sub(r'href="styles\.css(\?v=[0-9a-f]+)?"', f'href="styles.css?v={css_hash}"', html)
+    html = re.sub(r'src="js/main\.js(\?v=[0-9a-f]+)?"', f'src="js/main.js?v={js_hash}"', html)
     index.write_text(html)
 
     print("site synced")

@@ -80,14 +80,15 @@ main, .footer { position: relative; z-index: 1; }
 .nav { position: sticky; top: 0; z-index: 50; background: rgba(11, 12, 15, .82); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid var(--hair); }
 .nav-inner { display: flex; align-items: center; gap: 32px; height: 68px; }
 /* the mark (design/logo.svg): ring brass, trace life, flat line bone. .mark-mono turns it one colour (currentColor). */
-.mark { display: block; flex: none; overflow: visible; }
+.mark { display: block; flex: none; overflow: visible; width: 24px; height: 24px; }
 .mark .r { stroke: var(--brass); }
 .mark .t { stroke: var(--life); }
 .mark .f { stroke: var(--bone); }
 .mark-mono .r, .mark-mono .t, .mark-mono .f { stroke: currentColor; }
 /* optical alignment: the ring (27 of the 32 units) matches the cap height (0.72em), centred on it */
-.brand { display: inline-flex; align-items: center; gap: 7px; text-decoration: none; color: var(--bone); font: 400 28px/1 var(--font-display); letter-spacing: -0.005em; }
-.brand .mark { width: 24px; height: 24px; margin-top: -0.1em; }
+.brand { display: inline-flex; align-items: center; flex: 0 0 auto; gap: 7px; text-decoration: none; color: var(--bone); font: 400 28px/1 var(--font-display); letter-spacing: -0.005em; white-space: nowrap; }
+.brand span { white-space: nowrap; }
+.brand .mark { width: 24px; height: 24px; flex: 0 0 24px; margin-top: -0.1em; }
 .nav nav { margin-left: auto; }
 .nav-links { display: flex; gap: 28px; list-style: none; margin: 0; padding: 0; }
 .nav-links a { color: var(--bone-2); text-decoration: none; font-size: 15px; transition: color 300ms var(--ease); }
@@ -102,11 +103,12 @@ main, .footer { position: relative; z-index: 1; }
 .sound-toggle[aria-pressed="true"] .sound-bars i:nth-child(3) { animation-delay: .3s; }
 @keyframes sound-bar { 0%, 100% { height: 4px; } 30% { height: 13px; } 60% { height: 6px; } }
 .no-audio .sound-toggle { display: none; }
-@media (max-width: 960px) { .nav nav { display: none; } .sound-toggle { margin-left: auto; } }
+@media (max-width: 960px) { .nav nav { display: none; } .sound-toggle { margin-left: auto; flex: 0 1 auto; min-width: 0; } .sound-label { white-space: nowrap; } }
 @media (min-width: 961px) { .sound-toggle { margin-left: 4px; } }
 @media (max-width: 520px) { .nav-cta { display: none; } }
-@media (max-width: 420px) { .brand { font-size: 25px; gap: 6px; } .brand .mark { width: 21px; height: 21px; } .nav-inner { gap: 16px; } }
-@media (max-width: 370px) { .brand { font-size: 23px; } .brand .mark { width: 20px; height: 20px; } .sound-label { font-size: 14px; } }
+@media (max-width: 420px) { .brand { font-size: 24px; gap: 6px; } .brand .mark { width: 21px; height: 21px; flex-basis: 21px; } .nav-inner { gap: 12px; } }
+@media (max-width: 370px) { .brand { font-size: 21px; } .brand .mark { width: 19px; height: 19px; flex-basis: 19px; } .sound-label { font-size: 13px; } }
+@media (max-width: 330px) { .sound-label { display: none; } .sound-toggle { gap: 0; padding: 0 8px; } }
 
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 
