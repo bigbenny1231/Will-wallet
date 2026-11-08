@@ -1,7 +1,7 @@
 // Dead Man's Wallet landing page. Vanilla JS, no dependencies besides assets/pulse.js (design/pulse.js).
 // No backend: every value here is a plain link. app.js only fills [data-link] anchors.
 const CONFIG = {
-  DASHBOARD_URL: 'https://app.deadmanswallet.dev',   // the dashboard is deployed separately; see dashboard/README.md
+  DASHBOARD_URL: 'https://will-wallet.vercel.app',   // the dashboard is deployed separately; see dashboard/README.md
   DOCS_URL: 'https://github.com/bigbenny1231/will-wallet#readme',
   ONE_PAGER_URL: 'assets/attorney-one-pager.pdf',
   GITHUB_URL: 'https://github.com/bigbenny1231/will-wallet',

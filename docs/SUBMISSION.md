@@ -31,7 +31,7 @@ on Nov 7 2026 this checkout had no git remote and the GitHub URL was not reachab
   ],
   "nearAddress": "{{NEAR_MAINNET_PAYOUT_ACCOUNT}}",
   "projectUrl": "https://github.com/bigbenny1231/will-wallet",
-  "demoUrl": "{{DEMO_URL}}",
+  "demoUrl": "https://will-wallet-site.vercel.app/#demo",
   "idea": "Agents hold wallets, API budgets and treasuries. When their operator dies, loses access or is incapacitated, the agent keeps spending until it runs dry, and anything it held on other chains is gone. The dead-man's switches we found move one key or one file on one chain; none disarms an agent or settles an estate across chains.\n\nDead Man's Wallet is a NEAR contract that does both. While you are alive, a phone key that can only call heartbeat says so. When the heartbeats stop, anyone can poke the contract, and it settles in five steps: heirs are paid on NEAR, with nothing for them to sign; the pulse and agent keys are deleted; NEAR's MPC network signs payouts on Base, Monad and Solana; a proposal is filed in the estate DAO; the Will NFT, which draws itself from state and can claim what is left, goes to the primary heir.\n\nWhat NEAR enables: function-call access keys scoped to one method, so a stolen phone can only say alive and a compromised agent can only spend inside its policy; Chain Signatures, so no single party holds a key for the foreign addresses and the contract requests signatures only after the trigger; NEP-171 with an on-chain SVG seal; permissionless keepers.\n\nShown on testnet: an agent scripted to obey a planted prompt injection, refused by its wallet, then by the contract itself; a guardian pause that moves the deadline once; two review rounds by a separate AI agent, with every Critical and High finding fixed. Foreign payouts are signed on chain but none has been relayed: the derived addresses are unfunded.\n\nTestnet only. Not a will, not a custodian, not audited. Built at NEAR Hackathon, mostly AI-generated with Claude under the direction of the author. MIT.",
   "consent": true
 }
@@ -178,7 +178,7 @@ f=json.loads(re.search(r'```json\n(.*?)\n```',t,re.S).group(1))
 assert set(f)=={'requestId','projectName','leadName','email','size','tracks','nearAddress','projectUrl','demoUrl','idea','consent'}
 print(len(f['idea']), '(20..2000)', sorted(re.findall(r'\{\{\w+\}\}',json.dumps(f))))
 PY
-#   -> a length between 20 and 2000, and exactly: {{DEMO_URL}} {{EMAIL}} {{NEAR_MAINNET_PAYOUT_ACCOUNT}} {{REQUEST_ID}}
+#   -> a length between 20 and 2000, and exactly: https://will-wallet-site.vercel.app/#demo {{EMAIL}} {{NEAR_MAINNET_PAYOUT_ACCOUNT}} {{REQUEST_ID}}
 ```
 
 Then, in order: make the repo public; post the demo with the video attached (replace `{{SITE_URL}}` with the live

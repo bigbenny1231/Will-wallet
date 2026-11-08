@@ -33,6 +33,7 @@ What is in the build:
 Built at NEAR Hackathon, Nov 1–14 2026. Tracks: `security` (06 AI Security & Defense), `nfts` (10), `open` (13).
 Testnet only. Not a will, not a custodian, not audited. MIT license.
 
+Live site: [will-wallet-site.vercel.app](https://will-wallet-site.vercel.app) · Live dashboard: [will-wallet.vercel.app](https://will-wallet.vercel.app) (try [/vault/6](https://will-wallet.vercel.app/vault/6), the showcase vault) ·
 Live contract: [`dmw-x8cx.testnet`](https://testnet.nearblocks.io/address/dmw-x8cx.testnet) ·
 Live keeper run (alive → settled, both foreign payouts signed, none relayed): [`keeper/LIVE_RUN.md`](keeper/LIVE_RUN.md) ·
 Showcase vault for the demo video: [`keeper/SHOWCASE.md`](keeper/SHOWCASE.md) ·
