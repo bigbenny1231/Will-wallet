@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Seal 3D — Dead Man's Wallet</title>
+<style>
+  @font-face { font-family: "Instrument Serif"; font-style: italic; font-weight: 400; font-display: swap; src: url(/site/fonts/instrument-serif-latin-400-italic.woff2) format("woff2"); }
+  @font-face { font-family: "Instrument Serif"; font-style: normal; font-weight: 400; font-display: swap; src: url(/site/fonts/instrument-serif-latin-400-normal.woff2) format("woff2"); }
+  @font-face { font-family: "Inter Tight"; font-weight: 400; font-display: swap; src: url(/site/fonts/inter-tight-latin-400-normal.woff2) format("woff2"); }
+  @font-face { font-family: "Inter Tight"; font-weight: 500; font-display: swap; src: url(/site/fonts/inter-tight-latin-500-normal.woff2) format("woff2"); }
+  :root { --ink:#0B0C0F; --ink-3:#1A1D24; --bone:#EDE7DC; --bone-2:#A9A399; --brass:#C8A96A; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--ink); color: var(--bone); font: 17px/1.5 "Inter Tight", system-ui, sans-serif; display: grid; place-items: center; min-height: 100vh; }
+  main { display: grid; gap: 28px; justify-items: center; padding: 40px 20px; }
+  h1 { font: italic 400 32px/1.1 "Instrument Serif", Georgia, serif; margin: 0; }
+  .stage { width: 480px; height: 480px; max-width: 92vw; max-height: 92vw; position: relative; }
+  .stage canvas, .stage svg { width: 100%; height: 100%; display: block; }
+  .controls { display: flex; flex-wrap: wrap; gap: 6px 20px; justify-content: center; align-items: center; max-width: 560px; }
+  button { background: none; border: 0; border-bottom: 1px solid rgba(200,169,106,.4); color: var(--brass); font: 500 12px "Inter Tight", sans-serif; letter-spacing: .12em; text-transform: uppercase; padding: 6px 0; cursor: pointer; }
+  button[aria-pressed="true"] { color: var(--bone); border-color: var(--bone); }
+  button.primary { background: var(--bone); color: var(--ink); border: 0; border-radius: 999px; padding: 8px 18px; }
+  label { font: 500 12px "Inter Tight", sans-serif; letter-spacing: .12em; text-transform: uppercase; color: var(--bone-2); display: flex; gap: 10px; align-items: center; }
+  input { background: transparent; border: 0; border-bottom: 1px solid var(--ink-3); color: var(--bone); font: 400 15px "Inter Tight", sans-serif; padding: 4px 2px; width: 160px; outline: none; }
+  input:focus { border-color: var(--brass); }
+  #stats { font: 400 12px "JetBrains Mono", ui-monospace, monospace; color: var(--bone-2); min-height: 1.5em; }
+</style>
+</head>
+<body>
+<main>
+  <h1>The will seal</h1>
+  <div class="stage" id="stage"><canvas id="seal3d" aria-label="Will seal, vault 0042: alive" role="img"></canvas></div>
+  <div class="controls" role="group" aria-label="State">
+    <button data-state="alive" aria-pressed="true">Alive</button>
+    <button data-state="warning" aria-pressed="false">Warning</button>
+    <button data-state="triggered" aria-pressed="false">Triggered</button>
+    <button data-state="settled" aria-pressed="false">Settled</button>
+    <button class="primary" id="beat">Beat</button>
+  </div>
+  <div class="controls">
+    <label>Heir <input id="heir" value="" placeholder="Sarah" maxlength="28" autocomplete="off"></label>
+    <label>Vault <input id="vault" value="0042" maxlength="8" autocomplete="off"></label>
+  </div>
+  <div id="stats"></div>
+</main>
+<script type="module" src="/design/seal3d/demo.js"></script>
+</body>
+</html>

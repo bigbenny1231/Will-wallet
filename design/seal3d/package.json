@@ -1,0 +1,14 @@
+{
+  "name": "dmw-seal3d",
+  "version": "1.0.0",
+  "description": "WebGL will seal for the landing site",
+  "scripts": {
+    "build": "node build.mjs"
+  },
+  "dependencies": {
+    "esbuild": "^0.28.2",
+    "three": "^0.187.0"
+  },
+  "private": true,
+  "type": "module"
+}
