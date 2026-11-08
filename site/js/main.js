@@ -93,3 +93,28 @@ if (video && play) {
     video.focus();
   });
 }
+
+// ?debug=1 — on-screen diagnostics so a phone screenshot tells us what the device is actually doing.
+if (location.search.includes('debug')) {
+  const show = () => {
+    const q = s => document.querySelector(s);
+    const r = s => { const e = q(s); if (!e) return 'none'; const b = e.getBoundingClientRect(); return `${Math.round(b.width)}x${Math.round(b.height)} @${Math.round(b.left)},${Math.round(b.top)}`; };
+    const css = [...document.styleSheets].map(s => (s.href || 'inline').replace(location.origin, '')).join(' | ');
+    const brand = q('.brand');
+    const cs = brand ? getComputedStyle(brand) : null;
+    const lines = [
+      'UA ' + navigator.userAgent,
+      `viewport ${innerWidth}x${innerHeight} dpr ${devicePixelRatio} docW ${document.documentElement.scrollWidth} zoom ${(visualViewport ? visualViewport.scale : 1).toFixed(2)}`,
+      'css ' + css,
+      'brand ' + r('.brand') + ' font ' + (cs ? cs.fontSize + ' ' + cs.fontFamily.split(',')[0] + ' ws=' + cs.whiteSpace + ' disp=' + cs.display : ''),
+      'mark ' + r('.brand .mark') + ' span ' + r('.brand span') + ' sound ' + r('.sound-toggle') + ' nav ' + r('.nav-inner'),
+      'markCS ' + (q('.brand .mark') ? getComputedStyle(q('.brand .mark')).width + '/' + getComputedStyle(q('.brand .mark')).height : ''),
+      'html font-size ' + getComputedStyle(document.documentElement).fontSize + ' body ' + getComputedStyle(document.body).fontSize,
+    ];
+    let box = q('#dmw-debug');
+    if (!box) { box = document.createElement('pre'); box.id = 'dmw-debug'; document.body.appendChild(box); }
+    box.style.cssText = 'position:fixed;left:0;right:0;bottom:0;z-index:9999;margin:0;padding:8px;background:#000;color:#3DDC84;font:11px/1.35 monospace;white-space:pre-wrap;word-break:break-all;max-height:60vh;overflow:auto';
+    box.textContent = lines.join('\n');
+  };
+  show(); setTimeout(show, 1500); addEventListener('resize', show);
+}
