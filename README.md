@@ -297,3 +297,4 @@ The author leads no other hackathon project.
 
 MIT — see `LICENSE`. Security contact: GitHub issues on this repo (details in `SECURITY.md`). The
 `deadmanswallet.dev` domain did not resolve on Nov 7 2026 (NXDOMAIN), so its email addresses do not work yet.
+
