@@ -11,7 +11,8 @@
       ]
     },
     { "source": "/sw.js", "headers": [{ "key": "Cache-Control", "value": "no-cache" }, { "key": "Service-Worker-Allowed", "value": "/" }] },
-    { "source": "/manifest.webmanifest", "headers": [{ "key": "Content-Type", "value": "application/manifest+json" }] }
+    { "source": "/manifest.webmanifest", "headers": [{ "key": "Content-Type", "value": "application/manifest+json" }] },
+    { "source": "/robots.txt", "headers": [{ "key": "Content-Type", "value": "text/plain; charset=utf-8" }] }
   ],
-  "rewrites": [{ "source": "/((?!sw\\.js|manifest\\.webmanifest|icons/).*)", "destination": "/index.html" }]
+  "rewrites": [{ "source": "/((?!sw\\.js|robots\\.txt|manifest\\.webmanifest|icons/).*)", "destination": "/index.html" }]
 }

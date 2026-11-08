@@ -8,7 +8,7 @@ import { bpsToPct, fmtInterval, yoctoToNear } from "../lib/format";
 import { aliveStrip, STATE_COLOR } from "../lib/pulse";
 import TxBanner from "../components/TxBanner";
 import { ErrorNote, Label, Ribbon, ReconnectHint } from "../components/ui";
-import type { VaultState } from "../types";
+import type { VaultState, VaultView } from "../types";
 
 function MiniTrace({ state }: { state: VaultState }) {
   const d =
@@ -26,6 +26,44 @@ function MiniTrace({ state }: { state: VaultState }) {
 
 const COLS = "grid grid-cols-[4.5rem_1fr_auto] items-baseline gap-x-6 md:grid-cols-[5rem_13rem_1fr_9rem_8rem]";
 
+function Row({ v }: { v: VaultView }) {
+  return (
+    <Link role="row" to={`/vault/${v.token_id}`} className={`${COLS} group border-b border-rule py-6 transition-colors duration-700 hover:bg-[color-mix(in_srgb,var(--text)_3%,transparent)]`}>
+      <span role="cell" className="display num text-[44px] leading-none transition-colors duration-700 group-hover:text-accent">{v.token_id}</span>
+      <span role="cell" className="flex items-center gap-4">
+        <MiniTrace state={v.state} />
+        <Ribbon state={v.state} className="text-[24px]" />
+      </span>
+      <span role="cell" className="hidden min-w-0 space-y-0.5 md:block">
+        {v.heirs.map((h) => (
+          <span key={h.account_id} className="flex items-baseline gap-3">
+            <span className="mono truncate !text-[13px]">{h.account_id}</span>
+            <span className="num text-[13px] text-text-2">{bpsToPct(h.bps)}</span>
+          </span>
+        ))}
+      </span>
+      <span role="cell" className="hidden text-[15px] text-text-2 md:block">every {fmtInterval(v.heartbeat_interval_s)}</span>
+      <span role="cell" className="num text-right text-[17px]">{yoctoToNear(v.balance)} NEAR</span>
+    </Link>
+  );
+}
+
+function SkeletonRows() {
+  return (
+    <div aria-hidden>
+      {[0, 1, 2, 3].map((i) => (
+        <div key={i} className={`${COLS} h-[97px] items-center border-b border-rule`}>
+          <span className="h-9 w-10 animate-pulse rounded bg-[color-mix(in_srgb,var(--text)_8%,transparent)]" />
+          <span className="h-5 w-32 animate-pulse rounded bg-[color-mix(in_srgb,var(--text)_8%,transparent)]" />
+          <span className="hidden h-4 w-40 animate-pulse rounded bg-[color-mix(in_srgb,var(--text)_6%,transparent)] md:block" />
+          <span className="hidden h-4 w-20 animate-pulse rounded bg-[color-mix(in_srgb,var(--text)_6%,transparent)] md:block" />
+          <span className="h-4 w-16 animate-pulse justify-self-end rounded bg-[color-mix(in_srgb,var(--text)_6%,transparent)]" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function Home() {
   const { accountId } = useWallet();
   const nav = useNavigate();
@@ -34,6 +72,8 @@ export default function Home() {
   // Without a wallet, list every vault on the contract so the app is browsable read-only.
   const everyone = usePoll(() => (accountId ? Promise.resolve([]) : api.getAllVaults()), POLL_MS * 2, [accountId]);
   const list = [...((accountId ? mine.data : everyone.data) ?? [])].sort((a, b) => Number(BigInt(b.token_id) - BigInt(a.token_id)));
+  const active = list.filter((v) => v.state !== "Settled");
+  const settled = list.filter((v) => v.state === "Settled");
   const loaded = accountId ? mine.loaded : everyone.loaded;
 
   return (
@@ -73,7 +113,7 @@ export default function Home() {
           <span role="columnheader" className="sc text-right">Balance</span>
         </div>
 
-        {!loaded && <p className="py-8 text-text-2">Reading the register…</p>}
+        {!loaded && <SkeletonRows />}
         {accountId && mine.loaded && list.length === 0 && !mine.error && (
           <div className="py-12">
             <p className="display text-[32px]">No vaults kept by this account yet.</p>
@@ -81,25 +121,13 @@ export default function Home() {
           </div>
         )}
 
-        {list.map((v) => (
-          <Link role="row" key={v.token_id} to={`/vault/${v.token_id}`} className={`${COLS} group border-b border-rule py-6 transition-colors duration-700 hover:bg-[color-mix(in_srgb,var(--text)_3%,transparent)]`}>
-            <span role="cell" className="display num text-[44px] leading-none transition-colors duration-700 group-hover:text-accent">{v.token_id}</span>
-            <span role="cell" className="flex items-center gap-4">
-              <MiniTrace state={v.state} />
-              <Ribbon state={v.state} className="text-[24px]" />
-            </span>
-            <span role="cell" className="hidden min-w-0 space-y-0.5 md:block">
-              {v.heirs.map((h) => (
-                <span key={h.account_id} className="flex items-baseline gap-3">
-                  <span className="mono truncate !text-[13px]">{h.account_id}</span>
-                  <span className="num text-[13px] text-text-2">{bpsToPct(h.bps)}</span>
-                </span>
-              ))}
-            </span>
-            <span role="cell" className="hidden text-[15px] text-text-2 md:block">every {fmtInterval(v.heartbeat_interval_s)}</span>
-            <span role="cell" className="num text-right text-[17px]">{yoctoToNear(v.balance)} NEAR</span>
-          </Link>
-        ))}
+        {active.map((v) => <Row key={v.token_id} v={v} />)}
+        {settled.length > 0 && (
+          <details className="group/settled border-b border-rule">
+            <summary className="sc cursor-pointer select-none py-5 hover:text-accent">Settled ({settled.length})</summary>
+            {settled.map((v) => <Row key={v.token_id} v={v} />)}
+          </details>
+        )}
       </div>
 
       <form

@@ -56,6 +56,8 @@ code { color: var(--bone); background: var(--ink-3); padding: .08em .35em; borde
   transition: background-color 600ms var(--ease);
 }
 .pill:hover { background: #fff; }
+.pill-ink { background: var(--ink); color: var(--bone); }
+.pill-ink:hover { background: #1a1b20; }
 .btn {
   min-height: 48px; padding: 0 22px; border: 1px solid var(--hair-strong); border-radius: var(--radius);
   background: transparent; color: var(--bone); font: 500 16px/1 var(--font-text); cursor: pointer;
@@ -186,6 +188,7 @@ code { color: var(--bone); background: var(--ink-3); padding: .08em .35em; borde
 .heirs-grid { display: grid; gap: 28px; }
 .heirs h2 { font-size: 40px; line-height: 1.05; letter-spacing: -0.01em; max-width: 14ch; }
 .heirs-body p { font-size: 18px; color: #3b3a36; max-width: 30em; margin: 0 0 28px; }
+.heirs-actions { margin: 0 0 24px !important; }
 .link-ink { color: var(--ink); font-size: 19px; }
 .link-ink:hover { color: var(--brass-2); }
 .heirs :focus-visible { outline-color: var(--ink); }
