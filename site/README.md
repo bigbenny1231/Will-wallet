@@ -32,6 +32,8 @@ The seal, the pulse motif and the tokens live in [`../design/`](../design/):
 - `design/seal.svg`: the Will seal (inlined into `index.html` between `<!-- seal -->` markers, and again, aria-hidden, as the story clock's seal)
 - `design/pulse.js`: ECG geometry (`complex()` is also the story line's beat), `beat()`, `setState()`
 - `design/tokens.css`: colour, type and motion tokens
+- `design/logo.svg`: the mark (brass ring, one heartbeat, the flat line leaving the ring). `build_site.py` inlines it in
+  the nav and footer and exports `assets/favicon.svg`, `favicon-32.png`, `apple-touch-icon.png` and `dashboard/public/icons`
 - `design/seal3d/`: the WebGL seal source and its build
 
 After editing any of them run `python3 design/build_site.py` from the repo root (copies tokens and pulse,
@@ -39,7 +41,8 @@ re-inlines both seals, renders the phone-pulse QR code with `design/qr.js`). Com
 
 ## Checks
 
-- `node design/shoot-v4.cjs http://127.0.0.1:8091` writes `screenshots/v4-*.png` at 390 and 1440: hero idle,
+- `node design/shoot-v4.cjs http://127.0.0.1:8091` writes `screenshots/v4-*.png` at 390 and 1440 (hero idle also at 360, 430
+  and 768): hero idle,
   mid-simulation and settled with the heir "Maria"; the story at three scroll positions; the graph and a node's
   detail; the quiz card (and `v4-quiz-card.png`, the canvas itself). Add `full` as the third argument for full pages.
 - `node design/tour-v4.cjs` records `screenshots/v4-tour.mp4` (19 s scroll through the page).

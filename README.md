@@ -1,6 +1,6 @@
 # Dead Man's Wallet
 
-**A NEAR contract that executes your estate plan — for humans and for AI agents.**
+**Your crypto shouldn't die with you.** A NEAR contract that executes your estate plan — for humans and for AI agents.
 While you're alive, a pulse key sends a heartbeat. If the heartbeats stop, the contract
 pays your heirs on NEAR, deletes your AI agent's spending key, has NEAR's MPC network sign payouts
 on Base, Monad and Solana, files a proposal in your estate DAO, and hands the Will NFT (whose holder can

@@ -72,10 +72,11 @@ async function scrollThrough(page) {
     await page.close();
   }
 
-  // Open Graph card, v4: the WebGL seal (site/js/seal3d.bundle.js; the SVG seal if WebGL is unavailable), the
-  // headline, and the line: heartbeats that flatline into the five settlement ticks. 1200x630 PNG (site/assets/og.png).
+  // Open Graph card, v4: the mark and wordmark (design/logo.svg), the WebGL seal (site/js/seal3d.bundle.js; the SVG
+  // seal if WebGL is unavailable), the headline, and the line: heartbeats that flatline into the five settlement ticks. 1200x630 PNG (site/assets/og.png).
   if (!only || only === 'og') {
     const seal = fs.readFileSync(path.join(__dirname, 'seal.svg'), 'utf8');
+    const mark = fs.readFileSync(path.join(__dirname, 'logo.svg'), 'utf8').match(/<g\b[\s\S]*?<\/g>/)[0];
     const P = require(path.join(__dirname, 'pulse.js'));
     let line = '';
     for (let i = 0; i < 4; i++) line += P.complex(40 + i * 120, 60, 0.8).replace(/^M/, i ? 'L' : 'M') + ' L' + (40 + i * 120 + 120) + ',60';
@@ -88,9 +89,11 @@ async function scrollThrough(page) {
       <style>
         body{margin:0;width:1200px;height:630px;overflow:hidden;position:relative;background:radial-gradient(640px 520px at 905px 270px, rgba(61,220,132,.075), transparent 70%), #0B0C0F}
         body::after{opacity:.05}
-        .t{position:absolute;left:80px;top:96px;width:620px}
-        h1{font-size:104px;line-height:.95;letter-spacing:-.02em;margin:0 0 30px}
-        p{font-size:25px;color:var(--bone-2);margin:0;max-width:19em;line-height:1.42}
+        .b{position:absolute;left:80px;top:58px;display:flex;align-items:center;gap:12px;font:400 44px/1 var(--font-display);color:var(--bone)}
+        .b svg{width:38px;height:38px;margin-top:-4px}
+        .t{position:absolute;left:80px;top:142px;width:640px}
+        h1{font-size:82px;line-height:.96;letter-spacing:-.016em;margin:0 0 26px}
+        p{font-size:23px;color:var(--bone-2);margin:0;max-width:24em;line-height:1.4}
         .s{position:absolute;right:66px;top:34px;width:430px;height:430px}
         .s canvas{position:absolute;inset:-8%;width:116%;height:116%}
         .s .seal{width:100%;height:100%}
@@ -99,9 +102,9 @@ async function scrollThrough(page) {
         .l{position:absolute;left:0;right:0;bottom:22px;height:120px}
         .k{position:absolute;left:80px;bottom:150px;font:400 16px/1 var(--font-text);color:var(--bone-2);max-width:none;white-space:nowrap}
       </style></head><body>
-      <div class="t"><h1>Crypto that arrives.</h1><p>While you are alive, nothing happens. When you are not, this executes.</p></div>
+      <div class="b"><svg viewBox="0 0 32 32">${mark}</svg>Dead Man&#8217;s Wallet</div>
+      <div class="t"><h1>Your crypto shouldn&#8217;t die with you.</h1><p>While you&#8217;re alive, nothing happens. When you&#8217;re not, your vault pays the people you chose.</p></div>
       <div class="s" id="s">${seal}<canvas id="c"></canvas></div>
-      <p class="k">Dead Man&#8217;s Wallet. A testnet NEAR contract, meant to sit alongside a will.</p>
       <svg class="l" viewBox="0 0 1200 120"><path d="${line} L560,60" fill="none" stroke="#3DDC84" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
         <path d="M560,60 H1160" fill="none" stroke="#7A7F87" stroke-width="1.6"/>${ticks}</svg>
       <script type="module">

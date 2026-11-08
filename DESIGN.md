@@ -51,7 +51,7 @@ Legal framing rules are in the plan doc and site/README.md (never claim legal ef
 
 ## Site (landing)
 
-Sections in order: nav · hero (headline "Crypto that arrives." in Instrument Serif 72, sub in Inter Tight 20, the seal animating on the right with a live-looking pulse) · a full-width pulse strip that flatlines on scroll into the three steps · "For heirs" band on bone background (inverted) · security model as a typeset table · "For attorneys" with the sample clause in a document-styled block · FAQ · footer. The demo video embedded under the hero on a hairline-framed player.
+Sections in order: nav · hero (headline "Your crypto shouldn't die with you." in Instrument Serif 56–68, sub in Inter Tight 20, the seal animating on the right with a live-looking pulse) · a full-width pulse strip that flatlines on scroll into the three steps · "For heirs" band on bone background (inverted) · security model as a typeset table · "For attorneys" with the sample clause in a document-styled block · FAQ · footer. The demo video embedded under the hero on a hairline-framed player.
 
 ## Dashboard
 

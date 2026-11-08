@@ -52,10 +52,10 @@ github.com/bigbenny1231/will-wallet
 Who holds your agent's keys?
 ```
 
-**B. The heirs** (275)
+**B. The heirs** (253)
 
 ```text
-If you died tonight, could your family reach your crypto?
+Your crypto shouldn't die with you.
 
 Dead Man's Wallet: when your pulse stops, a NEAR contract pays them. They sign nothing to receive it. Built at NEAR Hackathon @NEARProtocol #NEARHackathon
 {{SITE_URL}}

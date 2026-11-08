@@ -1,7 +1,7 @@
 // v4 landing page screenshots. Needs a server for site/ that applies site/vercel.json headers, e.g.
 //   node design/serve.cjs site 8091 &      then      node design/shoot-v4.cjs [http://127.0.0.1:8091] [prefix] [only]
 // Writes site/screenshots/<prefix>-*-<width>.png (prefix defaults to v4): hero idle / mid-simulation / settled with a
-// custom heir name, the vault 17 story at three scroll positions, the live estate graph, the quiz card.
+// custom heir name (also hero idle at 360, 430 and 768), the vault 17 story at three scroll positions, the live estate graph, the quiz card.
 // The graph needs network access to NEAR testnet (the proxy in HTTPS_PROXY is used if set).
 const path = require('path');
 let chromium;
@@ -13,9 +13,9 @@ const ONLY = process.argv[4] || '';
 const OUT = path.resolve(__dirname, '..', 'site', 'screenshots');
 const proxy = process.env.HTTPS_PROXY ? { server: process.env.HTTPS_PROXY, bypass: 'localhost,127.0.0.1' } : undefined;
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
-const want = (k) => !ONLY || ONLY.split(',').includes(k);
+const wantAll = (k) => !ONLY || ONLY.split(',').includes(k);
 
-async function shots(browser, w, h, mobile) {
+async function shots(browser, w, h, mobile, heroOnly) {
   const ctx = await browser.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: mobile ? 2 : 1, isMobile: !!mobile, hasTouch: !!mobile, ignoreHTTPSErrors: true });
   const page = await ctx.newPage();
   const errors = [];
@@ -23,6 +23,7 @@ async function shots(browser, w, h, mobile) {
   page.on('pageerror', (e) => errors.push(String(e)));
   await page.goto(BASE + '/', { waitUntil: 'networkidle' });
   await page.evaluate(() => document.fonts.ready);
+  const want = (k) => (heroOnly ? k === 'hero' && wantAll('hero') : wantAll(k));
   const f = (n) => path.join(OUT, `${PREFIX}-${n}-${w}.png`);
 
   if (want('hero')) {
@@ -34,6 +35,7 @@ async function shots(browser, w, h, mobile) {
     await page.waitForFunction(() => document.getElementById('hero-seal').classList.contains('is-3d'), null, { timeout: 15000 }).catch(() => console.log(w, 'no 3D seal'));
     await wait(1600);
     await page.screenshot({ path: f('hero-idle') });
+    if (heroOnly) { await ctx.close(); return; }
     await page.locator('#hold').focus();
     await page.keyboard.press('Enter');
     await wait(6400);
@@ -93,5 +95,8 @@ async function shots(browser, w, h, mobile) {
   const browser = await chromium.launch({ proxy });
   await shots(browser, 390, 844, true);
   await shots(browser, 1440, 900, false);
+  await shots(browser, 360, 780, true, true);
+  await shots(browser, 430, 932, true, true);
+  await shots(browser, 768, 1024, true, true);
   await browser.close();
 })();

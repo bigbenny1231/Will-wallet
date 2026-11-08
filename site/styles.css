@@ -79,8 +79,15 @@ main, .footer { position: relative; z-index: 1; }
 /* ---------- nav ---------- */
 .nav { position: sticky; top: 0; z-index: 50; background: rgba(11, 12, 15, .82); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid var(--hair); }
 .nav-inner { display: flex; align-items: center; gap: 32px; height: 68px; }
-.brand { display: inline-flex; align-items: center; gap: 12px; text-decoration: none; color: var(--bone); font: 400 22px/1 var(--font-display); }
-.brand-mark { width: 28px; height: 28px; color: var(--brass); flex: none; }
+/* the mark (design/logo.svg): ring brass, trace life, flat line bone. .mark-mono turns it one colour (currentColor). */
+.mark { display: block; flex: none; overflow: visible; }
+.mark .r { stroke: var(--brass); }
+.mark .t { stroke: var(--life); }
+.mark .f { stroke: var(--bone); }
+.mark-mono .r, .mark-mono .t, .mark-mono .f { stroke: currentColor; }
+/* optical alignment: the ring (27 of the 32 units) matches the cap height (0.72em), centred on it */
+.brand { display: inline-flex; align-items: center; gap: 7px; text-decoration: none; color: var(--bone); font: 400 28px/1 var(--font-display); letter-spacing: -0.005em; }
+.brand .mark { width: 24px; height: 24px; margin-top: -0.1em; }
 .nav nav { margin-left: auto; }
 .nav-links { display: flex; gap: 28px; list-style: none; margin: 0; padding: 0; }
 .nav-links a { color: var(--bone-2); text-decoration: none; font-size: 15px; transition: color 300ms var(--ease); }
@@ -98,37 +105,41 @@ main, .footer { position: relative; z-index: 1; }
 @media (max-width: 960px) { .nav nav { display: none; } .sound-toggle { margin-left: auto; } }
 @media (min-width: 961px) { .sound-toggle { margin-left: 4px; } }
 @media (max-width: 520px) { .nav-cta { display: none; } }
-@media (max-width: 420px) { .brand { font-size: 20px; } .nav-inner { gap: 16px; } }
+@media (max-width: 420px) { .brand { font-size: 25px; gap: 6px; } .brand .mark { width: 21px; height: 21px; } .nav-inner { gap: 16px; } }
+@media (max-width: 370px) { .brand { font-size: 23px; } .brand .mark { width: 20px; height: 20px; } .sound-label { font-size: 14px; } }
 
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 
 /* ---------- hero: hold to stop your heartbeat ---------- */
-.hero { padding: 28px 0 48px; }
-.hero-grid { display: grid; grid-template-areas: "h" "stage" "swap"; gap: 18px; }
-.hero h1 { grid-area: h; font-size: clamp(44px, 12.4vw, 56px); line-height: 1; letter-spacing: -0.02em; text-align: center; }
-.hero-stage { grid-area: stage; display: grid; justify-items: center; }
-.hero-swap { grid-area: swap; display: grid; margin-top: 12px; }
+.hero { padding: 20px 0 48px; }
+.hero-grid { display: grid; grid-template-areas: "h" "sub" "stage" "swap"; gap: 0; }
+.hero h1 { grid-area: h; font-size: clamp(38px, 11vw, 46px); line-height: 1; letter-spacing: -0.015em; text-align: center; text-wrap: balance; }
+.hero-sub { grid-area: sub; margin: 12px auto 0; max-width: 24em; font-size: 15.5px; line-height: 1.45; color: var(--bone-2); text-align: center; text-wrap: pretty; }
+.hero-stage { grid-area: stage; display: grid; justify-items: center; padding-top: 20px; }
+.hero-swap { grid-area: swap; display: grid; margin-top: 36px; }
 .hero-swap > * { grid-area: 1 / 1; }
 
-.seal-wrap { position: relative; width: min(70vw, 272px); aspect-ratio: 1; transition: width var(--slow) var(--ease); }
+.seal-wrap { position: relative; width: min(60vw, 232px); aspect-ratio: 1; transition: width var(--slow) var(--ease); }
 .seal-wrap .seal { display: block; width: 100%; height: 100%; }
 .seal-wrap { perspective: 900px; }
 .seal-tilt { position: absolute; inset: 0; transform: rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)); transition: transform 700ms var(--ease); transform-style: preserve-3d; }
 .seal-wrap.is-tracking .seal-tilt { transition: transform 120ms linear; }
-.seal3d-canvas { position: absolute; inset: -8%; width: 116%; height: 116%; opacity: 0; transition: opacity 1.2s var(--ease); }
+.seal3d-canvas { position: absolute; left: -8%; top: -8%; width: 116%; height: 116%; max-width: none; opacity: 0; pointer-events: none; transition: opacity 1.2s var(--ease); }
 .is-3d .seal3d-canvas { opacity: 1; }
 .is-3d .seal-tilt .seal { opacity: 0; transition: opacity 1.2s var(--ease); }
 .is-3d .seal-tilt { transform: none; }
-.tilt-btn { margin: 10px 0 0; min-height: 32px; padding: 4px 0; border: 0; border-bottom: 1px solid var(--hair-strong); background: none; color: var(--bone-2); font: 400 12.5px/1.2 var(--font-text); cursor: pointer; }
-.tilt-btn[aria-pressed="true"] { color: var(--brass); border-color: var(--brass); }
-.heir-field { display: grid; justify-items: center; gap: 6px; margin: 0 0 18px; }
-.heir-field label { font: italic 400 21px/1.2 var(--font-display); color: var(--bone); }
-.heir-field input { width: 13em; max-width: 100%; min-height: 44px; padding: 0 4px 2px; border: 0; border-bottom: 1px solid var(--hair-strong); border-radius: 0; background: transparent;
-  color: var(--bone); font: 400 26px/1 var(--font-display); text-align: center; transition: border-color 400ms var(--ease); }
+.tilt-btn { margin: 6px 0 0; min-height: 24px; padding: 2px 4px; border: 0; background: none; color: var(--bone-2); font: 400 12.5px/1.2 var(--font-text);
+  text-decoration: underline; text-decoration-color: var(--hair-strong); text-underline-offset: 3px; cursor: pointer; }
+.tilt-btn:hover { color: var(--bone); }
+.tilt-btn[aria-pressed="true"] { color: var(--brass); text-decoration-color: var(--brass); }
+.heir-field { display: grid; justify-items: center; gap: 2px; margin: 0 0 14px; }
+.heir-field label { font: italic 400 20px/1.2 var(--font-display); color: var(--bone); }
+.heir-field input { width: 11em; max-width: 100%; min-height: 40px; padding: 0 4px 2px; border: 0; border-bottom: 1px solid var(--hair-strong); border-radius: 0; background: transparent;
+  color: var(--bone); font: 400 24px/1 var(--font-display); text-align: center; transition: border-color 400ms var(--ease); }
 .heir-field input::placeholder { color: #6F6B64; }
 .heir-field input:focus { outline: none; border-bottom-color: var(--brass); }
 .heir-field input:focus-visible { outline: 1px solid var(--brass); outline-offset: 4px; }
-.heir-note { margin: 0; font-size: 12.5px; color: var(--bone-2); }
+.heir-note { margin: 4px 0 0; font-size: 12px; color: var(--bone-2); }
 .is-sim .heir-field, .is-done .heir-field, .is-sim .tilt-btn, .is-done .tilt-btn { display: none; }
 .hold-ring { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
 .hold-ring circle { fill: none; stroke: var(--bone); stroke-width: 1.5; stroke-dasharray: 100 100; stroke-dashoffset: 100; opacity: 0; transition: stroke-dashoffset 360ms var(--ease), opacity 360ms var(--ease); }
@@ -146,7 +157,7 @@ main, .footer { position: relative; z-index: 1; }
 .seal[data-state="still"] .trace-hi { animation: none; stroke-dasharray: none; opacity: .55; }
 .seal[data-state="still"] .glow { animation: none; opacity: .3; transform: scale(1); }
 
-.hold-zone { display: grid; justify-items: center; text-align: center; margin-top: 22px; width: 100%; }
+.hold-zone { display: grid; justify-items: center; text-align: center; margin-top: 18px; width: 100%; }
 .hold {
   position: relative; overflow: hidden; display: inline-flex; align-items: center; justify-content: center;
   min-height: 54px; padding: 0 30px; border: 1px solid var(--hair-strong); border-radius: 999px;
@@ -158,7 +169,7 @@ main, .footer { position: relative; z-index: 1; }
 .hold-fill { position: absolute; inset: 0; background: rgba(237, 231, 220, .1); transform: scaleX(0); transform-origin: left; transition: transform 360ms var(--ease); }
 .is-holding .hold-fill { transform: scaleX(1); transition: transform 1500ms linear; }
 .hold-label { position: relative; }
-.hold-help { max-width: 30em; margin: 12px 0 0; font-size: 13px; line-height: 1.5; color: var(--bone-2); }
+.hold-help { max-width: 30em; margin: 10px 0 0; font-size: 12.5px; line-height: 1.45; color: var(--bone-2); }
 .sim-status { min-height: 1.25em; margin: 14px 0 0; font: italic 400 28px/1.15 var(--font-display); color: var(--bone); }
 .sim-status[data-tone="warn"] { color: var(--warn); }
 .sim-status[data-tone="dead"] { color: var(--dead); }
@@ -197,6 +208,9 @@ main, .footer { position: relative; z-index: 1; }
 .replay:hover { color: var(--bone); border-color: var(--bone); }
 
 @media (max-width: 959px) {
+  .is-sim .hero-sub, .is-done .hero-sub { display: none; }
+  .is-sim .hero-stage, .is-done .hero-stage { padding-top: 14px; }
+  .is-sim .hero-swap, .is-done .hero-swap { margin-top: 18px; }
   .is-sim .seal-wrap, .is-done .seal-wrap { width: min(40vw, 156px); }
   .is-sim .hold-zone, .is-done .hold-zone { margin-top: 6px; }
   .is-sim .hold:not(:focus-visible) { display: none; }
@@ -209,14 +223,38 @@ main, .footer { position: relative; z-index: 1; }
   .sim-h { font-size: 12.5px; margin-bottom: 8px; }
   .sim-end { margin-top: 12px; }
 }
+@media (min-width: 600px) and (max-width: 959px) {
+  .hero h1 { font-size: 56px; }
+  .hero-sub { font-size: 17px; }
+  .seal-wrap { width: min(46vw, 300px); }
+}
+/* Desktop: one grid for both columns. Rows 1 and 2 are the two halves of the seal, so the hook's last baseline
+   sits on the seal's centre line and the sub starts under it; the heir field and the hold control take rows 3 and 4,
+   and the left column's call to action ends on the hold control's bottom edge. */
 @media (min-width: 960px) {
-  .hero { padding: 64px 0 80px; }
-  .hero-grid { grid-template-columns: repeat(12, 1fr); grid-template-rows: auto 1fr; grid-template-areas: none; gap: 0 24px; }
-  .hero h1 { grid-column: 1 / span 6; grid-row: 1; align-self: end; text-align: left; font-size: var(--fs-display-1); max-width: 5em; margin-top: 40px; }
-  .hero-stage { grid-column: 8 / span 5; grid-row: 1 / span 2; }
-  .hero-swap { grid-column: 1 / span 6; grid-row: 2; margin-top: 32px; align-content: start; }
-  .lede { font-size: var(--fs-lede); }
-  .seal-wrap { width: min(100%, 420px); }
+  .hero { padding: 56px 0 72px; --seal: clamp(320px, 29vw, 400px); }
+  .hero-grid { grid-template-columns: repeat(12, 1fr); grid-template-rows: calc(var(--seal) / 2) calc(var(--seal) / 2) auto auto auto; grid-template-areas: none; gap: 0 24px; }
+  .hero-stage, .hold-zone { display: contents; }
+  .hero h1 { grid-column: 1 / span 6; grid-row: 1; align-self: end; text-align: left; font-size: clamp(56px, 4.6vw, 68px); line-height: .98; margin-bottom: -0.2em; }
+  .hero-sub { grid-column: 1 / span 6; grid-row: 2; align-self: start; margin: calc(0.2em + 22px) 0 0; max-width: 29em; font-size: var(--fs-lede); line-height: 1.5; text-align: left; }
+  .seal-wrap { grid-column: 8 / span 5; grid-row: 1 / span 2; justify-self: center; align-self: center; width: var(--seal); }
+  .tilt-btn { display: none; }
+  .heir-field { grid-column: 8 / span 5; grid-row: 3; margin: 28px 0 14px; }
+  .hold { grid-column: 8 / span 5; grid-row: 4; justify-self: center; align-self: end; }
+  .hold-help, .sim-status { grid-column: 8 / span 5; grid-row: 5; justify-self: center; text-align: center; }
+  .sim-status { align-self: start; }
+  .hero-swap { grid-column: 1 / span 6; grid-row: 3 / span 2; align-self: end; margin-top: 24px; }
+  .hero-swap { position: relative; }
+  .sim { position: absolute; left: 0; right: 0; top: 0; }
+  .is-sim .sim, .is-done .sim { position: static; }
+  .is-sim .hero-copy, .is-done .hero-copy { position: absolute; left: 0; right: 0; bottom: 0; }
+  .is-sim .hero-sub, .is-done .hero-sub { visibility: hidden; opacity: 0; }
+  .hero-sub { transition: opacity 700ms var(--ease), visibility 0s linear 700ms; }
+  .is-sim .hero-swap, .is-done .hero-swap { grid-row: 2 / span 3; align-self: start; margin-top: 30px; }
+  .is-sim .heir-field, .is-done .heir-field { display: grid; visibility: hidden; }   /* keeps the hold control where it was */
+  .lede { font-size: 17px; margin-bottom: 26px; }
+  .hero-copy { position: relative; }
+  .hero-copy .fine { position: absolute; left: 0; top: 100%; margin-top: 18px; }
 }
 
 /* ---------- trust strip ---------- */
@@ -653,6 +691,8 @@ main, .footer { position: relative; z-index: 1; }
 /* ---------- footer ---------- */
 .footer { border-top: 1px solid var(--hair); padding: 56px 0 48px; }
 .foot-grid { display: grid; gap: 24px; }
+.foot-brand { display: flex; align-items: center; gap: 7px; margin: 0; font: 400 28px/1 var(--font-display); color: var(--bone); }
+.foot-brand .mark { width: 24px; height: 24px; margin-top: -0.1em; }
 .disclaimer { font: italic 400 28px/1.2 var(--font-display); color: var(--bone); margin: 0; max-width: 22ch; }
 .foot-links { display: flex; flex-wrap: wrap; gap: 10px 24px; list-style: none; margin: 0; padding: 0; }
 .foot-links a { color: var(--bone-2); text-decoration: none; font-size: 15px; }
@@ -660,6 +700,7 @@ main, .footer { position: relative; z-index: 1; }
 .colophon { font-size: 13px; color: var(--still); margin: 0; }
 @media (min-width: 900px) {
   .foot-grid { grid-template-columns: repeat(12, 1fr); gap: 32px 24px; align-items: end; }
+  .foot-brand { grid-column: 1 / -1; }
   .disclaimer { grid-column: 1 / span 6; font-size: 36px; }
   .foot-links { grid-column: 7 / span 6; justify-content: flex-end; }
   .colophon { grid-column: 1 / -1; padding-top: 24px; border-top: 1px solid var(--hair); }

@@ -3,27 +3,29 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Dead Man's Wallet | Crypto that arrives.</title>
-<meta name="description" content="A NEAR contract that carries out the distribution you configure from your will or trust. Proof of life while you are here, settlement when you are not. Testnet build; heirs sign nothing to receive NEAR.">
+<title>Dead Man's Wallet | Your crypto shouldn't die with you.</title>
+<meta name="description" content="Your crypto shouldn't die with you. While you're alive, nothing happens. When you're not, a NEAR contract pays the people you chose, the way you configured it from your will or trust. Testnet build; heirs sign nothing to receive NEAR.">
 <meta name="theme-color" content="#0B0C0F">
 <meta name="color-scheme" content="dark">
 <!-- deadmanswallet.dev is the intended production domain (to be registered); canonical/og URLs use the Vercel deployment until then. -->
 <link rel="canonical" href="https://will-wallet-site.vercel.app/">
 <meta property="og:type" content="website">
-<meta property="og:title" content="Dead Man's Wallet | Crypto that arrives.">
-<meta property="og:description" content="Proof of life while you are here. Settlement when you are not. A testnet NEAR contract meant to sit alongside a will or trust.">
+<meta property="og:title" content="Your crypto shouldn't die with you. | Dead Man's Wallet">
+<meta property="og:description" content="While you're alive, nothing happens. When you're not, your vault pays the people you chose. A testnet NEAR contract meant to sit alongside a will or trust.">
 <meta property="og:url" content="https://will-wallet-site.vercel.app/">
 <meta property="og:image" content="https://will-wallet-site.vercel.app/assets/og.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
-<meta property="og:image:alt" content="The Dead Man's Wallet seal beside the line: Crypto that arrives. A heartbeat trace flatlines into five settlement steps.">
+<meta property="og:image:alt" content="The Dead Man's Wallet mark and seal beside the line: Your crypto shouldn't die with you. A heartbeat trace flatlines into five settlement steps.">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Dead Man's Wallet | Crypto that arrives.">
-<meta name="twitter:description" content="A testnet NEAR contract that carries out the distribution you configure from your will or trust.">
+<meta name="twitter:title" content="Your crypto shouldn't die with you. | Dead Man's Wallet">
+<meta name="twitter:description" content="While you're alive, nothing happens. When you're not, your vault pays the people you chose. A testnet NEAR contract.">
 <meta name="twitter:image" content="https://will-wallet-site.vercel.app/assets/og.png">
-<meta name="twitter:image:alt" content="The Dead Man's Wallet seal beside the line: Crypto that arrives.">
+<meta name="twitter:image:alt" content="The Dead Man's Wallet seal beside the line: Your crypto shouldn't die with you.">
 <meta name="dmw-build" content="v4">
 <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="assets/favicon-32.png" type="image/png" sizes="32x32">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
 <link rel="preload" href="fonts/instrument-serif-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="fonts/inter-tight-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preconnect" href="https://rpc.testnet.fastnear.com" crossorigin>
@@ -38,7 +40,9 @@
 <header class="nav">
   <div class="wrap nav-inner">
     <a class="brand" href="#top" aria-label="Dead Man's Wallet, home">
-      <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="14.5" fill="none" stroke="currentColor" stroke-width="1.1"/><circle cx="16" cy="16" r="12" fill="none" stroke="currentColor" stroke-width=".6"/><path d="M6.5 16.5h6l1.4-5 2.2 9.5 1.6-4.5h7.8" fill="none" stroke="#3DDC84" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <!-- mark -->
+<svg class="mark" viewBox="0 0 32 32" aria-hidden="true" focusable="false"><g fill="none" stroke-linecap="round" stroke-linejoin="round"><circle class="r" cx="14" cy="16" r="12.5" stroke="#C8A96A" stroke-width="2"/><circle class="r" cx="14" cy="16" r="9.6" stroke="#C8A96A" stroke-width="0.9"/><path class="t" d="M6 17.5h3.6l1.8-8 2.4 14 1.8-9 1.4 3h6.6" stroke="#3DDC84" stroke-width="2"/><path class="f" d="M23.6 17.5H31" stroke="#EDE7DC" stroke-width="2"/></g></svg>
+<!-- /mark -->
       <span>Dead Man&#8217;s Wallet</span>
     </a>
     <nav aria-label="Primary">
@@ -59,7 +63,8 @@
 
 <section class="hero" id="top" aria-labelledby="hero-h">
   <div class="wrap hero-grid">
-    <h1 id="hero-h">Crypto that arrives.</h1>
+    <h1 id="hero-h">Your crypto shouldn&#8217;t die with&nbsp;you.</h1>
+    <p class="hero-sub">While you&#8217;re alive, nothing happens. When you&#8217;re not, your vault pays the people you chose &#8212; on NEAR, Base, Monad and Solana &#8212; the way your will or trust says.</p>
 
     <div class="hero-stage">
       <div class="seal-wrap" id="hero-seal">
@@ -150,7 +155,7 @@
 
     <div class="hero-swap">
       <div class="hero-copy">
-        <p class="lede">While you are alive, nothing happens. When you are not, your vault pays your heirs on NEAR, the way you configured it from your will or trust, and has NEAR&#8217;s network sign their payouts on Base, Monad and Solana. Heirs sign nothing to receive their NEAR.</p>
+        <p class="lede">You configure the plan from your will or trust. On NEAR the contract pays heirs directly; on Base, Monad and Solana, NEAR&#8217;s network signs each payout for a keeper to relay. Heirs sign nothing to receive their NEAR.</p>
         <div class="cta-row">
           <a class="pill" data-link="dashboard" href="https://will-wallet.vercel.app">Set up a vault</a>
           <a class="link" href="https://github.com/bigbenny1231/will-wallet#run-it-in-about-10-minutes-testnet">Run it on testnet</a>
@@ -579,6 +584,9 @@
 
 <footer class="footer">
   <div class="wrap foot-grid">
+    <p class="foot-brand"><!-- mark-foot -->
+<svg class="mark" viewBox="0 0 32 32" aria-hidden="true" focusable="false"><g fill="none" stroke-linecap="round" stroke-linejoin="round"><circle class="r" cx="14" cy="16" r="12.5" stroke="#C8A96A" stroke-width="2"/><circle class="r" cx="14" cy="16" r="9.6" stroke="#C8A96A" stroke-width="0.9"/><path class="t" d="M6 17.5h3.6l1.8-8 2.4 14 1.8-9 1.4 3h6.6" stroke="#3DDC84" stroke-width="2"/><path class="f" d="M23.6 17.5H31" stroke="#EDE7DC" stroke-width="2"/></g></svg>
+<!-- /mark-foot --><span>Dead Man&#8217;s Wallet</span></p>
     <p class="disclaimer">Not a will. Not a custodian. Not legal advice. Configure it with your estate attorney.</p>
     <ul class="foot-links">
       <li><a href="https://github.com/bigbenny1231/will-wallet#readme">Docs</a></li>

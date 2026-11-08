@@ -189,9 +189,11 @@ export async function init() {
     b.type = 'button';
     b.dataset.id = id;
     b.setAttribute('aria-pressed', 'false');
-    b.setAttribute('aria-label', label);
     b.innerHTML = '';
-    parts.forEach((p) => b.append(p));
+    parts.forEach((p, i) => { if (i) b.append(' '); b.append(p); });   // spaced, so the text reads as words
+    // the accessible name starts with the visible text (WCAG 2.5.3), then says the rest
+    const shown = parts.map((p) => p.textContent.trim()).filter(Boolean).join(' ');
+    b.setAttribute('aria-label', shown + '. ' + label);
     b.addEventListener('click', () => { show(id); pulse(id); });
     b.addEventListener('pointerenter', (e) => { if (e.pointerType === 'mouse') show(id); });
     nodesEl.append(b);

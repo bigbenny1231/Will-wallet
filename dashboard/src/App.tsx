@@ -10,11 +10,15 @@ import PendingCreate from "./components/PendingCreate";
 import Pulse from "./pages/Pulse";
 
 function Mark() {
+  // The mark (design/logo.svg): brass ring, one heartbeat in life green, the flat line in the text colour.
   return (
-    <svg width="26" height="26" viewBox="0 0 40 40" aria-hidden className="shrink-0">
-      <circle cx="20" cy="20" r="18.5" fill="none" stroke="var(--accent)" strokeWidth="1.2" />
-      <circle cx="20" cy="20" r="16" fill="none" stroke="var(--accent)" strokeWidth=".6" />
-      <path d="M8 21h6l1.5-1.5 1.5 1.5 2-9 2.5 14 2-5.5h8.5" fill="none" stroke="var(--text)" strokeWidth="1.4" strokeLinejoin="round" strokeLinecap="round" />
+    <svg width="24" height="24" viewBox="0 0 32 32" aria-hidden className="shrink-0 overflow-visible" style={{ marginTop: "-0.1em" }}>
+      <g fill="none" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="14" cy="16" r="12.5" stroke="var(--accent)" strokeWidth="2" />
+        <circle cx="14" cy="16" r="9.6" stroke="var(--accent)" strokeWidth=".9" />
+        <path d="M6 17.5h3.6l1.8-8 2.4 14 1.8-9 1.4 3h6.6" stroke="var(--life)" strokeWidth="2" />
+        <path d="M23.6 17.5H31" stroke="var(--text)" strokeWidth="2" />
+      </g>
     </svg>
   );
 }
@@ -27,9 +31,9 @@ function Header() {
     <header className="border-b border-rule">
       <div className="wrap flex flex-wrap items-center justify-between gap-x-8 gap-y-3 py-5">
         <div className="flex flex-wrap items-center gap-x-10 gap-y-3">
-          <Link to="/" className="flex items-center gap-3">
+          <Link to="/" className="flex items-center gap-[7px]">
             <Mark />
-            <span className="display whitespace-nowrap text-[24px]">Dead Man’s Wallet</span>
+            <span className="display whitespace-nowrap text-[28px] leading-none">Dead Man’s Wallet</span>
           </Link>
           <nav className="flex gap-6 whitespace-nowrap" aria-label="Primary">
             <NavLink to="/" end className={nav}>Vaults</NavLink>

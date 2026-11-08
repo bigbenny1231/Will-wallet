@@ -281,7 +281,7 @@ Design: dark, calm, one accent; large type (recorded at 125%). No marketing copy
 
 ## 5. Site: `site/` (static, hand-written `index.html` + `styles.css` + `app.js`, self-hosted fonts, no CDN, no Tailwind)
 
-Landing page per the mockup in the plan doc: hero "Crypto that arrives.", vault card, trust strip,
+Landing page per the mockup in the plan doc: hero "Your crypto shouldn't die with you.", vault card, trust strip,
 three steps, heir claim band, FAQ, a "follow mainnet" link to GitHub releases (no waitlist backend exists), footer disclaimer
 "Not a will. Not a custodian. Configure it with your estate attorney."
 
