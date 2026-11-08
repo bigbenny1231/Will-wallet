@@ -76,39 +76,56 @@ main, .footer { position: relative; z-index: 1; }
 }
 .btn:hover { border-color: var(--brass); color: var(--brass); }
 
-/* ---------- nav ---------- */
-.nav { position: sticky; top: 0; z-index: 50; background: rgba(11, 12, 15, .82); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid var(--hair); }
-.nav-inner { display: flex; align-items: center; gap: 32px; height: 68px; }
-/* the mark (design/logo.svg): ring brass, trace life, flat line bone. .mark-mono turns it one colour (currentColor). */
+/* ---------- nav: an instrument strip, not a header ----------
+   Transparent on landing so the hero owns the screen; becomes a blurred strip once scrolled.
+   The live trace is the signature: a heartbeat sweeping the length of the bar. */
+.nav { position: sticky; top: 0; z-index: 50; background: transparent; border-bottom: 1px solid transparent; transition: background 400ms var(--ease), border-color 400ms var(--ease); }
+.nav.is-scrolled { background: rgba(11, 12, 15, .78); backdrop-filter: blur(14px) saturate(1.2); -webkit-backdrop-filter: blur(14px) saturate(1.2); border-bottom-color: var(--hair); }
+.nav-inner { display: flex; align-items: center; gap: 14px; height: 56px; }
 .mark { display: block; flex: none; overflow: visible; width: 24px; height: 24px; }
 .mark .r { stroke: var(--brass); }
 .mark .t { stroke: var(--life); }
 .mark .f { stroke: var(--bone); }
 .mark-mono .r, .mark-mono .t, .mark-mono .f { stroke: currentColor; }
-/* optical alignment: the ring (27 of the 32 units) matches the cap height (0.72em), centred on it */
-.brand { display: inline-flex; align-items: center; flex: 0 0 auto; gap: 7px; text-decoration: none; color: var(--bone); font: 400 28px/1 var(--font-display); letter-spacing: -0.005em; white-space: nowrap; }
-.brand span { white-space: nowrap; }
-.brand .mark { width: 24px; height: 24px; flex: 0 0 24px; margin-top: -0.1em; }
-.nav nav { margin-left: auto; }
-.nav-links { display: flex; gap: 28px; list-style: none; margin: 0; padding: 0; }
-.nav-links a { color: var(--bone-2); text-decoration: none; font-size: 15px; transition: color 300ms var(--ease); }
-.nav-links a:hover { color: var(--bone); }
-.nav-cta { font-size: 15px; }
-.sound-toggle { display: inline-flex; align-items: center; gap: 9px; min-height: 44px; padding: 0 4px; border: 0; background: none; color: var(--bone-2); font: 400 15px/1 var(--font-text); cursor: pointer; transition: color 300ms var(--ease); }
-.sound-toggle:hover, .sound-toggle[aria-pressed="true"] { color: var(--bone); }
-.sound-bars { display: inline-flex; align-items: center; gap: 2px; height: 14px; }
+.brand { display: inline-flex; align-items: center; flex: 0 0 auto; gap: 9px; text-decoration: none; color: var(--bone); white-space: nowrap; }
+.brand .mark { width: 26px; height: 26px; flex: 0 0 26px; }
+.brand-lockup { display: flex; flex-direction: column; gap: 2px; font: 500 9.5px/1 var(--font-mono); letter-spacing: .22em; text-transform: uppercase; }
+.brand-lockup span:first-child { color: var(--bone); }
+.brand-lockup span:last-child { color: var(--brass); }
+.brand:hover .mark .t, .brand:focus-visible .mark .t { filter: drop-shadow(0 0 3px var(--life)); }
+.nav-trace { flex: 1 1 40px; min-width: 24px; height: 24px; display: block; }
+.nav-trace-base { fill: none; stroke: var(--hair); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.nav-trace-live { fill: none; stroke: var(--life); stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; stroke-dasharray: 14 100; stroke-dashoffset: 114; animation: nav-sweep 2.6s linear infinite; opacity: .9; }
+@keyframes nav-sweep { to { stroke-dashoffset: 0; } }
+.nav nav { flex: none; }
+.nav-links { display: flex; gap: 22px; list-style: none; margin: 0; padding: 0; }
+.nav-links a { display: inline-flex; align-items: baseline; gap: 6px; color: var(--bone-2); text-decoration: none; font: 500 11px/1 var(--font-mono); letter-spacing: .14em; text-transform: uppercase; transition: color 300ms var(--ease); }
+.nav-links a i { font-style: normal; color: var(--brass); opacity: .75; font-size: 9px; letter-spacing: .1em; }
+.nav-links a:hover, .nav-links a:focus-visible { color: var(--bone); }
+.nav-status { display: inline-flex; align-items: center; gap: 7px; flex: none; font: 500 10px/1 var(--font-mono); letter-spacing: .16em; text-transform: uppercase; color: var(--still); white-space: nowrap; }
+.nav-status i { width: 6px; height: 6px; border-radius: 50%; background: var(--life); box-shadow: 0 0 0 0 rgba(61, 220, 132, .5); animation: status-ping 2.6s var(--ease) infinite; }
+@keyframes status-ping { 0% { box-shadow: 0 0 0 0 rgba(61, 220, 132, .55); } 60% { box-shadow: 0 0 0 7px rgba(61, 220, 132, 0); } 100% { box-shadow: 0 0 0 0 rgba(61, 220, 132, 0); } }
+.sound-toggle { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 40px; height: 40px; padding: 0; border: 1px solid var(--hair); border-radius: 50%; background: none; color: var(--bone-2); cursor: pointer; transition: color 300ms var(--ease), border-color 300ms var(--ease); }
+.sound-toggle:hover, .sound-toggle:focus-visible { color: var(--bone); border-color: var(--still); }
+.sound-toggle[aria-pressed="true"] { color: var(--life); border-color: rgba(61, 220, 132, .45); }
+.sound-bars { display: inline-flex; align-items: flex-end; gap: 2px; height: 14px; }
 .sound-bars i { display: block; width: 2px; height: 4px; background: currentColor; border-radius: 1px; transition: height 300ms var(--ease); }
-.sound-toggle[aria-pressed="true"] .sound-bars i { background: var(--life); animation: sound-bar 1.2s var(--ease) infinite; }
+.sound-bars i:nth-child(2) { height: 9px; }
+.sound-bars i:nth-child(3) { height: 6px; }
+.sound-toggle[aria-pressed="true"] .sound-bars i { animation: sound-bar 1.2s var(--ease) infinite; }
 .sound-toggle[aria-pressed="true"] .sound-bars i:nth-child(2) { animation-delay: .15s; }
 .sound-toggle[aria-pressed="true"] .sound-bars i:nth-child(3) { animation-delay: .3s; }
 @keyframes sound-bar { 0%, 100% { height: 4px; } 30% { height: 13px; } 60% { height: 6px; } }
 .no-audio .sound-toggle { display: none; }
-@media (max-width: 960px) { .nav nav { display: none; } .sound-toggle { margin-left: auto; flex: 0 1 auto; min-width: 0; } .sound-label { white-space: nowrap; } }
-@media (min-width: 961px) { .sound-toggle { margin-left: 4px; } }
-@media (max-width: 520px) { .nav-cta { display: none; } }
-@media (max-width: 420px) { .brand { font-size: 24px; gap: 6px; } .brand .mark { width: 21px; height: 21px; flex-basis: 21px; } .nav-inner { gap: 12px; } }
-@media (max-width: 370px) { .brand { font-size: 21px; } .brand .mark { width: 19px; height: 19px; flex-basis: 19px; } .sound-label { font-size: 13px; } }
-@media (max-width: 330px) { .sound-label { display: none; } .sound-toggle { gap: 0; padding: 0 8px; } }
+.nav-cta { display: inline-flex; align-items: center; gap: 8px; flex: none; height: 36px; padding: 0 14px 0 16px; border: 1px solid rgba(200, 169, 106, .55); border-radius: 999px; color: var(--bone); text-decoration: none; font: 500 11px/1 var(--font-mono); letter-spacing: .12em; text-transform: uppercase; white-space: nowrap; transition: background 300ms var(--ease), border-color 300ms var(--ease); }
+.nav-cta span { color: var(--brass); transition: transform 300ms var(--ease); }
+.nav-cta:hover, .nav-cta:focus-visible { background: rgba(200, 169, 106, .08); border-color: var(--brass); }
+.nav-cta:hover span { transform: translateX(3px); }
+@media (max-width: 1100px) { .nav-status { display: none; } }
+@media (max-width: 960px) { .nav nav { display: none; } .nav-inner { gap: 12px; } }
+@media (max-width: 560px) { .nav-cta { display: none; } .nav-inner { height: 52px; } .brand .mark { width: 24px; height: 24px; flex-basis: 24px; } .brand-lockup { font-size: 9px; letter-spacing: .2em; } .sound-toggle { width: 36px; height: 36px; } }
+@media (prefers-reduced-motion: reduce) { .nav-trace-live { animation: none; stroke-dasharray: none; stroke-dashoffset: 0; opacity: .5; } .nav-status i { animation: none; } }
+@media (min-width: 961px) { .nav-inner { height: 64px; gap: 22px; } .nav-trace { flex-basis: 80px; margin: 0 8px; } }
 
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 

@@ -47,6 +47,15 @@ if (light && !rm && matchMedia('(hover: hover) and (pointer: fine)').matches) {
   document.documentElement.addEventListener('pointerleave', () => light.classList.remove('is-on'));
 }
 
+// Nav: transparent on landing, a strip once the hero starts to leave.
+const navEl = document.getElementById('nav');
+if (navEl) {
+  let navRaf = 0;
+  const setNav = () => { navRaf = 0; navEl.classList.toggle('is-scrolled', (window.scrollY || 0) > 24); };
+  addEventListener('scroll', () => { if (!navRaf) navRaf = requestAnimationFrame(setNav); }, { passive: true });
+  setNav();
+}
+
 // Sound: off by default, loaded on the first tap. No sound with reduced motion.
 const soundBtn = document.getElementById('sound');
 if (soundBtn) {
@@ -57,6 +66,7 @@ if (soundBtn) {
     const on = s.setOn(!s.isOn());
     soundBtn.setAttribute('aria-pressed', String(on));
     soundBtn.querySelector('.sound-label').textContent = on ? 'Sound: on' : 'Sound: off';
+    soundBtn.setAttribute('aria-label', on ? 'Sound: on' : 'Sound: off');
     if (on) s.thump();
   });
 }
