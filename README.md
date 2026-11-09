@@ -10,12 +10,21 @@ nothing has arrived on Base, Monad or Solana yet.
 
 What is in the build:
 
+- **Guest run, no wallet.** The dashboard's `/try` page makes a throwaway testnet account in the browser (public
+  faucet), opens a real vault with a 30-second heartbeat, two heirs, an agent policy and Base and Solana payouts, and
+  walks through its whole life: the page beats with a pulse key, the agent key pays an invoice and is refused a
+  planted "send everything" message, you hold to stop, and the browser then acts as the keeper (poke, five steps) and
+  claims as the heir. Every step is a testnet transaction with an explorer link
+  ([`dashboard/README.md`](dashboard/README.md#guest-run)).
 - **Phone pulse PWA.** The dashboard's `/pulse` page is the owner's phone: pair it with a QR code from the vault
   page, and it sends heartbeats with a pulse key that can only call `heartbeat`.
 - **Autonomous agent.** `agent/` runs an agent loop whose wallet wrapper holds only the scoped agent key. The
   [live attack transcript](agent/LIVE_TRANSCRIPT.md) shows an agent that obeys a planted prompt injection being
   refused by the wrapper, and then, with the wrapper's pre-checks off, by the contract itself. The recorded runs use
   the offline scripted brain (written to obey the injection); the LLM brains are unit-tested but were not used there.
+- **Attack suite.** `make attacks` runs seven scripted attacks against a simulated vault, with the wallet's pre-checks
+  on and off: six are prevented, one (fake invoices to the allowlisted provider) is bounded by the daily cap. Offline,
+  no LLM, no chain; the recorded report is [`agent/ATTACK_SUITE.md`](agent/ATTACK_SUITE.md).
 - **Guardian pause.** The owner can name a guardian who can pause the vault once per heartbeat cycle, for at most
   a length the owner sets (SPEC §2.8). It closes the "dead pulse key triggers a live owner" finding (M-1).
 - **NEAR plus three signing targets.** Heirs are paid on NEAR; Base Sepolia, Monad testnet and Solana devnet
@@ -28,6 +37,12 @@ What is in the build:
   and in mock mode. The heir cannot claim or sign through it yet, and the owner must name the implicit account id,
   which the heir has to send them first. On any other origin the button reads "NEAR Auth (coming)"
   ([`dashboard/docs/near-auth.md`](dashboard/docs/near-auth.md)).
+- **The record.** Each vault page lists the Will NFT's history from the contract's own log: who created it, what
+  the agent paid or was denied, the trigger, each settlement step, and who holds it now.
+- **Warning notices and a hosted sweep.** The keeper can post to a Slack or Discord webhook when a vault misses a beat
+  or is triggered (`DMW_NOTIFY_WEBHOOK`). A scheduled GitHub workflow settles abandoned guest vaults and nothing else
+  (`keeper --owner-prefix dmw-guest-`, [`keeper/README.md`](keeper/README.md)). The notices are tested against a mock
+  only; the sweep was also run once on a private testnet copy of the contract.
 - **Attorney one-pager.** [One page for estate attorneys](docs/one-pager/attorney-one-pager.pdf).
 
 Built at NEAR Hackathon, Nov 1–14 2026. Tracks: `security` (06 AI Security & Defense), `nfts` (10), `open` (13).
@@ -64,7 +79,8 @@ No `.env`, keys or near-cli credentials are needed beforehand. `make deploy` cre
 git clone https://github.com/bigbenny1231/will-wallet deadmans-wallet && cd deadmans-wallet
 make check     # verify toolchain   -> "All good." (optional tools only warn)
 make build     # build the contract -> contracts/dmw/target/near/dmw.wasm and its code hash (about 1 min)
-make test      # unit tests         -> contract "104 passed", keeper "51 passed", dashboard "70 passed", agent "41 passed" (runs npm ci first)
+make test      # unit tests         -> contract "104 passed", keeper "81 passed", dashboard "88 passed", agent "60 passed" (runs npm ci first)
+make attacks   # offline attacks    -> "7 attacks, 0 escaped policy, worst bounded loss 1 NEAR" (no keys, no chain)
 make deploy    # faucet accounts    -> creates dmw-<rand>.testnet + dmw-keeper-<rand>.testnet, deploys, inits,
                #                       calls set_keeper, writes .env, ends with "deployed dmw-xxxxxx.testnet"
 make demo      # live demo          -> see below (about 1.5 min)
@@ -166,11 +182,42 @@ Step 1 paid the heirs 60/40 (1.08 / 0.72 NEAR here), step 2 deleted the pulse an
 source addresses; the faucets need a human login), and step 4 is skipped because this vault has no DAO
 (see below for a vault that has one). Keeper times are UTC. No wallet extension is needed for any of this.
 
+## Try it without a wallet (about 3 minutes)
+
+Open the dashboard's [`/try`](https://will-wallet.vercel.app/try) page and press Begin, or run it locally:
+
+```bash
+cd dashboard && npm ci && npm run dev     # http://localhost:5173/try  (uses dmw-x8cx.testnet unless .env.local says otherwise)
+```
+
+| Do | See |
+| --- | --- |
+| Press **Begin** | three lines fill in: a `dmw-guest-<hex>.testnet` account from the faucet, `create_vault`, then one transaction that adds the pulse key, the agent key and two foreign payouts. The page opens the new vault |
+| Wait a few seconds | "N sent from this page" counts up; the seal pulses on each heartbeat that lands |
+| **Pay an invoice** | `Allowed. 0.12 NEAR left the vault.` with a tx link; the agent ledger below gains a green row |
+| **Obey a planted message** | `Denied by the contract: receiver not allowlisted. Nothing moved.` with a tx link (the transaction succeeds; the denial is its result) |
+| **Skip the contract** | `Refused by the node before any contract code ran`: a function-call key cannot sign a transfer |
+| **Hold to stop** for two seconds | the countdown to Warning and to the deadline; "Come back" resumes the heartbeat |
+| **Poke and settle** (about a minute later) | poke, steps I to V, each with a tx link; the two foreign payouts turn `signed` |
+| **Claim the remaining 0.1 NEAR as Sarah** | the heir's own key signs `claim`; "See it as Sarah" opens the heir page |
+
+A complete run on the live contract, Nov 9 2026: [vault 20](https://will-wallet.vercel.app/vault/20), from
+[`create_vault`](https://testnet.nearblocks.io/txns/GGJ9d2FsdrKST1T5sgjLS6xkq7fhpiQcCnfEZXXEjVF) through the
+[denied payment](https://testnet.nearblocks.io/txns/Hd55LJTpCe7Whb5qMg3C4QQ2Q8JUHK37AmKeUFtGPhTE) and the
+[poke](https://testnet.nearblocks.io/txns/FYhnGAtLt8s6KhbYbqgFa3jeeMChGK9qXVRPGWopiVMH) to the heir's
+[`claim`](https://testnet.nearblocks.io/txns/9ug1SB1E3MfCeixhLbMKhKNWrqYq5cpWQExHNngfaPcv); every transaction is listed in
+[`dashboard/README.md`](dashboard/README.md#guest-run).
+
+The guest account is a normal testnet account whose full-access key is generated and kept in the browser
+(`localStorage`); the two heirs are NEAR implicit accounts made the same way. It needs the public faucet
+(`helper.nearprotocol.com`), which limits requests per address. If you leave before settling, the vault stays overdue
+until someone pokes it; the `guest-sweep` workflow does that every ten minutes for guest vaults only.
+
 ## What you can check without running anything
 
 | Claim | Where to look |
 | --- | --- |
-| The pulse key can only call `heartbeat`, the agent key only `agent_pay` | your own `make demo` contract: `node scripts/near-admin.mjs keys <contract>` shows `FunctionCall` keys with `method_names` `["heartbeat"]` / `["agent_pay"]`. On `dmw-x8cx.testnet` (checked Nov 7 2026) the list is the deployer's FullAccess key, one `["agent_pay"]` key (vault 13, Alive) and one `["heartbeat"]` key (vault 15) |
+| The pulse key can only call `heartbeat`, the agent key only `agent_pay` | your own `make demo` contract: `node scripts/near-admin.mjs keys <contract>` shows `FunctionCall` keys with `method_names` `["heartbeat"]` / `["agent_pay"]`. On `dmw-x8cx.testnet` (checked Nov 7 2026) the list was the deployer's FullAccess key, one `["agent_pay"]` key (vault 13) and one `["heartbeat"]` key (vault 15). Both vaults have short intervals, and settlement deletes their keys; a guest run adds two keys of its own for a few minutes |
 | An autonomous agent is refused when a prompt injection tells it to drain the vault | [`agent/LIVE_TRANSCRIPT.md`](agent/LIVE_TRANSCRIPT.md): three real runs against vault 13 on `dmw-x8cx.testnet` with the scripted brain (wrapper refuses; contract denies when the wrapper's checks are off; the vigilant scripted brain refuses on its own), with the setup transactions |
 | A guardian can pause once and the deadline moves | [TESTNET_SMOKE.md](contracts/TESTNET_SMOKE.md) vault 14: [`set_guardian`](https://testnet.nearblocks.io/txns/HqomRLAzzUd6KYTuz2bsNU1qYEsuC9RyBQUtuToFShcG), [`pause`](https://testnet.nearblocks.io/txns/FNZntghrMV7pj2S5qLvqqu4zrpLKJZ933mNQSyMm163o) (deadline +153 s, state Warning), a second [`pause`](https://testnet.nearblocks.io/txns/Chnrufz6tF2Z6qrSijL9xPgRuoukz8oNDfKMxqddY7Ub) rejected `already_paused`, an early [`poke`](https://testnet.nearblocks.io/txns/31xYgVNdcpY2sqaT369SVVFDf5oohmry8ifjzN23qEDn) rejected `not_due` |
 | The contract signs a Monad transaction | TESTNET_SMOKE.md vault 14, [step 3](https://testnet.nearblocks.io/txns/DFmmyrRWNTUdsn3KLXuoHfjuaAcMoY7c71i2EUN3p976): `v1.signer-prod.testnet` signs path `monad-14`; the stored tx decodes to chain id 10143 from the derived address `0x360D0232…0e13`. Relay is pending funding (the RPC answers `insufficient balance`) |
@@ -240,15 +287,37 @@ redeployed; the other Medium/Low items are documented with their mitigations. Fu
 
 Five later passes, all by AI agents that did not write the code, are in `docs/`: [`AUDIT_CLAIMS.md`](docs/AUDIT_CLAIMS.md) (every public claim checked against the repo and the chain), [`AUDIT_REPO_HYGIENE.md`](docs/AUDIT_REPO_HYGIENE.md) (secrets, licences, pre-publication), [`AUDIT_FINAL_OFFCHAIN.md`](docs/AUDIT_FINAL_OFFCHAIN.md) (keeper, dashboard, agent, site, CSP), [`AUDIT_FINAL_CONTRACT.md`](docs/AUDIT_FINAL_CONTRACT.md) (final contract audit; the EVM gas floor H-5 came from it) and [`AUDIT_ONCHAIN_STATE.md`](docs/AUDIT_ONCHAIN_STATE.md) (live state of `dmw-x8cx.testnet`: keys, solvency, vaults, MPC signatures). None is a third-party audit.
 
+## Failure cases
+
+What happens when something or someone fails. Each line is how the deployed contract behaves (SPEC §2), not a plan.
+
+| Case | What happens | What limits it |
+| --- | --- | --- |
+| The owner is alive but offline (hospital, travel, a dead phone) | Nothing, until `interval x (grace + 1)` has passed with no heartbeat. Before the poke, one heartbeat from the owner's wallet or any pulse key restores the vault, however late | Interval up to 10 years, grace up to 1000 missed beats, a guardian pause, and the keeper's webhook notice at the first missed beat |
+| The owner is back after the deadline but before anyone poked | A heartbeat still works: `Triggered` is only stored by `poke` | A keeper is normally watching, so do not rely on this |
+| The owner is back after the poke | Too late. `heartbeat` and every owner call are rejected once `Triggered`; the five steps run to the end | A cancel window after the poke is **not built**. Choose the grace accordingly |
+| The phone (pulse key) is lost | Heartbeats stop, as if the owner were gone | The owner beats from their wallet, removes the key and pairs a new phone |
+| The phone is stolen | The thief can send heartbeats, which only postpone settlement | The key can call nothing else; the owner removes it with `remove_key` |
+| The pulse key dies while the owner lives (finding M-1) | The vault would trigger | The guardian pause, and wallet heartbeats |
+| The guardian turns hostile | They can pause once per heartbeat cycle, for at most `max_pause_s` (up to 90 days) | No funds, heirs or keys; the pause cannot be repeated without a heartbeat, and cannot stop a settlement that has started |
+| The guardian loses their key or disappears | Nothing changes. The vault runs on the owner's heartbeat alone | The owner can name another with `set_guardian` |
+| The agent is prompt-injected or its key leaks | It can pay allowlisted receivers up to the daily cap, and burn its 1 NEAR gas allowance | Per-payment cap, daily cap, allowlist, disarmed in `Warning`, deleted in step II ([attack suite](agent/ATTACK_SUITE.md)) |
+| No keeper is running | An overdue vault waits. Nothing is lost | `poke` and `execute_step` are open to any account, and the poke pays a bounty |
+| The MPC network does not answer in step III | That payout is marked `failed` after 10 minutes and settlement moves on | `resign_foreign` can request the signature again |
+| A derived source address is unfunded | The payout stays `signed` and is never relayed. This is the state of every foreign payout on testnet today | The owner must fund the address while alive; the dashboard shows it |
+| An heir's account does not exist | That transfer fails and returns to the vault; the Will NFT holder can claim it after settlement | Name accounts that exist, or implicit accounts |
+| The owner loses their own NEAR key | Nobody can change the plan, and the vault settles to the heirs when the heartbeats stop | This is the product working, not a recovery path |
+| The deployer key is compromised | The contract can be replaced and every vault drained | A testnet trust assumption; see the security model |
+
 ## Repository
 
 | Path | What |
 | --- | --- |
 | `contracts/dmw` | the contract (Rust, near-sdk 5), unit tests, `build.sh` |
 | `contracts/chainsig-probe` | minimal contract used to prove the MPC round trip first |
-| `agent/` | TypeScript: autonomous agent loop (pluggable brain) + wallet wrapper that holds only the agent key; `make agent` |
-| `keeper/` | TypeScript CLI: `pulse`, `keeper` (`--token` limits it to some vaults), `agent-demo`, `derive`, `dao create`; `src/chains/` for Base, Monad and Solana |
-| `dashboard/` | Vite + React app: create vault, live Will NFT, agent log, keys, guardian, settlement timeline, heir view, phone pulse (`/pulse`) |
+| `agent/` | TypeScript: autonomous agent loop (pluggable brain) + wallet wrapper that holds only the agent key; `make agent`, and the offline attack suite, `make attacks` |
+| `keeper/` | TypeScript CLI: `pulse`, `keeper` (`--token` / `--owner-prefix` limit it to some vaults, `--until-idle` for a bounded sweep), `due`, `agent-demo`, `derive`, `dao create`; webhook notices; `src/chains/` for Base, Monad and Solana |
+| `dashboard/` | Vite + React app: guest run (`/try`), create vault, live Will NFT, agent log, keys, guardian, settlement timeline, the record, heir view, phone pulse (`/pulse`) |
 | `site/` | public landing page |
 | `scripts/` | `near-admin.mjs` (faucet/deploy/call without near-cli), `deploy.sh`, `demo.sh`, `kill.sh`, `check.sh` |
 | `docs/` | Chain Signatures notes, security review, diagrams, attorney one-pager, judge dry runs (`JUDGE_DRY_RUN.md`, `_2` to `_5`), the audits (`AUDIT_*.md`) |
@@ -290,8 +359,12 @@ The author leads no other hackathon project.
 - Not a reproducible build: the live code hash matches `make build` only with the same toolchain (see the table above).
 - The deployer's FullAccess key on `dmw-x8cx.testnet` can upgrade the contract and so move any vault's funds.
 - Not a legal instrument. The product configures alongside a will or trust; see the FAQ on the site.
-- Next: owner notifications at `Warning`, trust-owned vaults, production NEAR Auth credentials for heir sign-in
-  with Google, Shade Agent attestation for the heartbeat, audit, mainnet.
+- Once a vault is poked it cannot be stopped; there is no cancel window between the poke and step I.
+- Foreign payouts are native coins only (ETH, MON, SOL), and NEAR payouts are NEAR only: no stablecoins, no Bitcoin.
+- Warning notices are a keeper webhook, tested against a mock; nothing reaches the owner's phone by itself.
+- Next: a cancel window after the poke, push notices to the paired phone, Bitcoin and stablecoin payouts, trust-owned
+  vaults, production NEAR Auth credentials for heir sign-in with Google, Shade Agent attestation for the heartbeat,
+  audit, mainnet.
 
 ## License
 

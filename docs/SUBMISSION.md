@@ -14,7 +14,7 @@ NEAR enables, and ends with links and a question.
 `POST https://nearhackathon.com/api/applications` takes exactly these keys and no others (no `website` key: it is a
 spam trap): `requestId`, `projectName`, `leadName`, `email`, `size`, `tracks`, `nearAddress` (lowercase mainnet
 account), `projectUrl` (the public repo), `demoUrl` (the public X post), `idea` (20 to 2000 characters, this one is
-1698), `consent` (`true` only after the human agrees to the contact notice). The repo must be public by the deadline:
+1871), `consent` (`true` only after the human agrees to the contact notice). The repo must be public by the deadline:
 on Nov 7 2026 this checkout had no git remote and the GitHub URL was not reachable from the audit session.
 
 ```json
@@ -32,7 +32,7 @@ on Nov 7 2026 this checkout had no git remote and the GitHub URL was not reachab
   "nearAddress": "{{NEAR_MAINNET_PAYOUT_ACCOUNT}}",
   "projectUrl": "https://github.com/bigbenny1231/will-wallet",
   "demoUrl": "https://will-wallet-site.vercel.app/#demo",
-  "idea": "Agents hold wallets, API budgets and treasuries. When their operator dies, loses access or is incapacitated, the agent keeps spending until it runs dry, and anything it held on other chains is gone. The dead-man's switches we found move one key or one file on one chain; none disarms an agent or settles an estate across chains.\n\nDead Man's Wallet is a NEAR contract that does both. While you are alive, a phone key that can only call heartbeat says so. When the heartbeats stop, anyone can poke the contract, and it settles in five steps: heirs are paid on NEAR, with nothing for them to sign; the pulse and agent keys are deleted; NEAR's MPC network signs payouts on Base, Monad and Solana; a proposal is filed in the estate DAO; the Will NFT, which draws itself from state and can claim what is left, goes to the primary heir.\n\nWhat NEAR enables: function-call access keys scoped to one method, so a stolen phone can only say alive and a compromised agent can only spend inside its policy; Chain Signatures, so no single party holds a key for the foreign addresses and the contract requests signatures only after the trigger; NEP-171 with an on-chain SVG seal; permissionless keepers.\n\nShown on testnet: an agent scripted to obey a planted prompt injection, refused by its wallet, then by the contract itself; a guardian pause that moves the deadline once; two review rounds by a separate AI agent, with every Critical and High finding fixed. Foreign payouts are signed on chain but none has been relayed: the derived addresses are unfunded.\n\nTestnet only. Not a will, not a custodian, not audited. Built at NEAR Hackathon, mostly AI-generated with Claude under the direction of the author. MIT.",
+  "idea": "Agents hold wallets, API budgets and treasuries. When their operator dies, loses access or is incapacitated, the agent keeps spending until it runs dry, and anything it held on other chains is gone. The dead-man's switches we found move one key or one file on one chain; none disarms an agent or settles an estate across chains.\n\nDead Man's Wallet is a NEAR contract that does both. While you are alive, a phone key that can only call heartbeat says so. When the heartbeats stop, anyone can poke the contract, and it settles in five steps: heirs are paid on NEAR, with nothing for them to sign; the pulse and agent keys are deleted; NEAR's MPC network signs payouts on Base, Monad and Solana; a proposal is filed in the estate DAO; the Will NFT, which draws itself from state and can claim what is left, goes to the primary heir.\n\nWhat NEAR enables: function-call access keys scoped to one method, so a stolen phone can only say alive and a compromised agent can only spend inside its policy; Chain Signatures, so no single party holds a key for the foreign addresses and the contract requests signatures only after the trigger; NEP-171 with an on-chain SVG seal; permissionless keepers.\n\nTry it with no wallet: the dashboard makes a throwaway testnet account in your browser and runs a whole estate, from first heartbeat to the heir's claim, in three minutes.\n\nShown on testnet: an agent scripted to obey a planted prompt injection, refused by its wallet, then by the contract itself; a guardian pause that moves the deadline once; two review rounds by a separate AI agent, with every Critical and High finding fixed. Foreign payouts are signed on chain but none has been relayed: the derived addresses are unfunded.\n\nTestnet only. Not a will, not a custodian, not audited. Built at NEAR Hackathon, mostly AI-generated with Claude under the direction of the author. MIT.",
   "consent": true
 }
 ```
@@ -136,7 +136,7 @@ git ls-remote --tags origin hackathon-submission    # one line
 # 2. fresh clone of the tag
 rm -rf /tmp/dmw-fresh && git clone --branch hackathon-submission https://github.com/bigbenny1231/will-wallet /tmp/dmw-fresh
 cd /tmp/dmw-fresh && make check                      # "All good."
-make build && make test                              # contract 104, keeper 51, dashboard 70, agent 41 passed (about 3 min)
+make build && make test                              # contract 104, keeper 81, dashboard 88, agent 60 passed (about 3 min)
 cd -
 
 # 3. Vercel (set the two URLs first)

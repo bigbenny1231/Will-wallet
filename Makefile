@@ -34,7 +34,7 @@ build: ## Build the contract to WASM (cargo-near -> target/near/dmw.wasm, else p
 build-reproducible: ## Reproducible build of the committed tree in the pinned Docker image (needs docker + cargo-near)
 	REPRODUCIBLE=1 ./contracts/dmw/build.sh
 
-test: $(KEEPER_DEPS) $(DASHBOARD_DEPS) $(AGENT_DEPS) ## Contract unit tests (104), keeper typecheck + tests (51), dashboard tests (70), agent typecheck + tests (41)
+test: $(KEEPER_DEPS) $(DASHBOARD_DEPS) $(AGENT_DEPS) ## Contract unit tests (104), keeper typecheck + tests (81), dashboard tests (88), agent typecheck + tests (60)
 	cd contracts/dmw && cargo test --locked
 	cd keeper && npm run --silent typecheck && npm test --silent
 	cd dashboard && npm test --silent
@@ -49,6 +49,9 @@ demo: $(KEEPER_DEPS) ## Testnet demo on the .env contract: new vault (60 s), key
 agent: $(AGENT_DEPS) ## Autonomous agent with the scoped wallet wrapper (TOKEN=<id>, key = DMW_AGENT_KEY in .env or .demo/agent.key.json; BRAIN=scripted|anthropic|openai|nearai; ARGS=...). Writes .demo/agent-transcript.md
 	cd agent && ./node_modules/.bin/tsx src/cli.ts --token $(TOKEN) $(if $(BRAIN),--brain $(BRAIN)) $(ARGS)
 
+attacks: $(AGENT_DEPS) ## Offline attack suite: seven scripted attacks against the simulated vault, wallet pre-checks on and off (no keys, no chain). Writes .demo/attack-suite.md
+	cd agent && npm run --silent attacks
+
 kill: ## Stop the pulse daemon = the owner disappears. Follows the keeper log until Settled (~4 min)
 	./scripts/kill.sh
 
@@ -62,4 +65,4 @@ status: $(KEEPER_DEPS) ## Print a vault's state (TOKEN=<id>, default: the last m
 clean: ## Remove build artifacts and node_modules
 	rm -rf contracts/dmw/target keeper/node_modules keeper/dist dashboard/node_modules dashboard/dist agent/node_modules
 
-.PHONY: help check install build build-reproducible test deploy demo agent kill stop status clean
+.PHONY: help check install build build-reproducible test deploy demo agent attacks kill stop status clean

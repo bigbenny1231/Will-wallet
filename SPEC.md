@@ -267,6 +267,12 @@ Commands (`npm run <cmd>` or `npx dmw <cmd>`):
 | `agent-demo --token <id> --key <agent key>` | runs two `agent_pay` calls: one allowed (small, allowlisted) and one denied (over cap, unknown receiver); prints the on-chain log lines |
 | `dao create --name estate-<id>` | creates a Sputnik v2 DAO on testnet with the owner as council and prints its id |
 
+> Note (2026-11-09): `keeper` also takes `--owner-prefix <prefix>` (only vaults whose `owner_id` starts with it),
+> `--until-idle` and `--max-seconds <n>` (a bounded sweep that exits when nothing matching is overdue or Triggered).
+> `due --owner-prefix <prefix>` is the read-only pre-check. With `DMW_NOTIFY_WEBHOOK` set, the loop posts one JSON
+> message when a vault turns Warning and one when it is Triggered. `.github/workflows/keeper.yml` runs the sweep for
+> `dmw-guest-` vaults every ten minutes. Details in `keeper/README.md`.
+
 Config via `.env` (`.env.example` committed): `NEAR_NETWORK`, `DMW_CONTRACT`, `KEEPER_ACCOUNT_ID`, `KEEPER_PRIVATE_KEY`, `BASE_RPC`, `MONAD_RPC`, `SOLANA_RPC`.
 Solana blockhashes expire in ~60–90 s; keeper fetches a fresh one right before `execute_step` and retries once with a new blockhash if the sign callback reports failure.
 
@@ -278,6 +284,13 @@ Routes:
 - `/heir` — "Got an email?" — sign in (wallet or NEAR Auth if feasible), shows vaults where I'm an heir and what arrived
 
 Design: dark, calm, one accent; large type (recorded at 125%). No marketing copy in the app.
+
+> Note (2026-11-09): added since v1, no contract change.
+> - `/try`, the guest run: a throwaway `dmw-guest-<hex>.testnet` account from the testnet faucet, held in the browser,
+>   drives a 30 s vault from `create_vault` to `claim` (see `dashboard/README.md`, "Guest run"). Heirs are implicit
+>   accounts. The register folds unfinished guest vaults into their own group.
+> - `/vault/:id` gains "The record" (the vault log as the Will NFT's history) and derives a missing `from_address`
+>   in the browser. `/heir` leads with the wallet; Google sign-in shows only where NEAR Auth accepts the origin.
 
 ## 5. Site: `site/` (static, hand-written `index.html` + `styles.css` + `app.js`, self-hosted fonts, no CDN, no Tailwind)
 
