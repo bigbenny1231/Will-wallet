@@ -1,7 +1,8 @@
 // The keeper poll loop (SPEC §3): poke overdue vaults, drive settlement, relay signed foreign txs.
 import type { Backend } from './backend.js';
 import type { Chains } from './chainsApi.js';
-import { deriveState, describeAction, nextAction } from './machine.js';
+import { deriveState, describeAction, matchesFilter, needsSettlement, nextAction } from './machine.js';
+import type { Notifier } from './notify.js';
 import type { ChainName, StepArgs, TxResult, VaultView } from './types.js';
 import { MAX_RESIGNS, RELAY_COOLDOWN, classifyRelayError } from './relay.js';
 import { bumpedEvmArgs, clampEvm, msUntilResign, payoutTxId } from './resign.js';
@@ -35,6 +36,12 @@ export interface KeeperDeps {
   landedCheckAt: Map<string, number>;
   /** When set, only these token ids are driven (the live demo must not touch other people's vaults). */
   only?: Set<string>;
+  /** When set, only vaults whose `owner_id` starts with this are driven (`--owner-prefix`). Combines with `only`. */
+  ownerPrefix?: string;
+  /** When set, a vault entering Warning or Triggered is reported to the owner's webhook (DMW_NOTIFY_WEBHOOK). */
+  notifier?: Notifier;
+  /** Checked before every action; true means "start nothing new" (time limit reached, or the process is stopping). */
+  shouldStop?: () => boolean;
 }
 
 export function makeDeps(p: Pick<KeeperDeps, 'backend' | 'chains' | 'contractId'> & Partial<KeeperDeps>): KeeperDeps {
@@ -192,17 +199,29 @@ const MAX_ACTIONS_PER_VAULT = 25;
 
 /** Perform every action currently due for one vault. Never throws. */
 export async function driveVault(deps: KeeperDeps, initial: VaultView): Promise<ActionRecord[]> {
+  return (await driveVaultView(deps, initial)).actions;
+}
+
+/** `driveVault`, plus the last view of the vault that was read (its state after the actions). */
+export async function driveVaultView(deps: KeeperDeps, initial: VaultView): Promise<{ actions: ActionRecord[]; vault: VaultView }> {
   const { backend, chains, log } = deps;
   const out: ActionRecord[] = [];
   let v = initial;
   const id = v.token_id;
+  // A vault outside the filter is not touched at all: no state tracking, no chain lookups, no transactions.
+  if (!matchesFilter(v, deps)) return { actions: out, vault: v };
 
   const noteState = (view: VaultView) => {
     const s = deriveState(view, deps.now());
     const prev = deps.lastState.get(id);
     if (prev !== s) {
       deps.lastState.set(id, s);
-      if (prev) log.info('state', `vault ${id}: ${prev} → ${s}`);
+      if (prev) {
+        log.info('state', `vault ${id}: ${prev} → ${s}`);
+        // Only a change this process watched happen is reported, so a restart never repeats a notice.
+        if (prev === 'Alive' && s === 'Warning') deps.notifier?.notify('vault_warning', view, deps.now());
+        else if (s === 'Triggered') deps.notifier?.notify('vault_triggered', view, deps.now());
+      }
     }
   };
   noteState(v);
@@ -218,6 +237,13 @@ export async function driveVault(deps: KeeperDeps, initial: VaultView): Promise<
   for (let i = 0; i < MAX_ACTIONS_PER_VAULT; i++) {
     const action = nextAction(v, deps.now(), (idx) => (deps.relayBlock.get(`${id}:${idx}`)?.until ?? 0) > deps.now(), (idx) => rebroadcastSet.has(idx));
     if (!action) break;
+    if (deps.shouldStop?.()) break;
+    // The filter is checked against the view each action is based on. Step 5 hands the NFT to the primary heir,
+    // so a vault selected by owner prefix leaves the filter once it is Settled.
+    if (!matchesFilter(v, deps)) {
+      log.info('filter', `vault ${id} no longer matches the filter (owner is now ${v.owner_id}); not doing: ${describeAction(action)}`);
+      break;
+    }
     try {
       if (action.kind === 'poke') {
         let tx: TxResult;
@@ -329,13 +355,18 @@ export async function driveVault(deps: KeeperDeps, initial: VaultView): Promise<
       break;
     }
   }
-  return out;
+  return { actions: out, vault: v };
 }
 
 export interface TickResult {
   vaults: number;
   actions: ActionRecord[];
   error?: string;
+  /**
+   * Token ids of matching vaults that still need settlement after this pass (past the deadline, or Triggered).
+   * Undefined when the vault list could not be read. Signed payouts waiting for a relay do not count.
+   */
+  pending?: string[];
 }
 
 export async function tickOnce(deps: KeeperDeps): Promise<TickResult> {
@@ -347,30 +378,89 @@ export async function tickOnce(deps: KeeperDeps): Promise<TickResult> {
     return { vaults: 0, actions: [], error: errMsg(e) };
   }
   const actions: ActionRecord[] = [];
-  if (deps.only) vaults = vaults.filter((x) => deps.only!.has(x.token_id));
-  for (const v of vaults) actions.push(...(await driveVault(deps, v)));
-  return { vaults: vaults.length, actions, error: actions.some((a) => !a.ok && a.detail !== 'not_due' && a.detail !== 'unfunded' && a.detail !== 'stale') ? 'action_failed' : undefined };
+  const pending: string[] = [];
+  vaults = vaults.filter((x) => matchesFilter(x, deps));
+  for (const v of vaults) {
+    let last = v;
+    if (!deps.shouldStop?.()) {
+      const r = await driveVaultView(deps, v);
+      actions.push(...r.actions);
+      last = r.vault;
+    }
+    if (matchesFilter(last, deps) && needsSettlement(last, deps.now())) pending.push(v.token_id);
+  }
+  await deps.notifier?.flush();
+  return { vaults: vaults.length, actions, pending, error: actions.some((a) => !a.ok && a.detail !== 'not_due' && a.detail !== 'unfunded' && a.detail !== 'stale') ? 'action_failed' : undefined };
 }
 
-export async function runKeeper(
-  deps: KeeperDeps,
-  o: { pollS: number; once?: boolean; signal?: AbortSignal; sleepFn?: (ms: number) => Promise<void> },
-): Promise<void> {
+export interface RunOpts {
+  pollS: number;
+  /** One pass, then return. */
+  once?: boolean;
+  /** Sweep: return as soon as a pass ends with no matching vault past its deadline or Triggered. */
+  untilIdle?: boolean;
+  /** Return once this many seconds have passed. No action is started after the limit. */
+  maxSeconds?: number;
+  signal?: AbortSignal;
+  sleepFn?: (ms: number) => Promise<void>;
+}
+
+export interface RunResult {
+  reason: 'once' | 'idle' | 'time_limit' | 'aborted';
+  /** passes run */
+  ticks: number;
+  /** passes that read the vault list */
+  listed: number;
+  /** vaults that still needed settlement after the last pass that read the list */
+  pending: string[];
+}
+
+export async function runKeeper(deps: KeeperDeps, o: RunOpts): Promise<RunResult> {
   const sl = o.sleepFn ?? sleep;
+  const { log } = deps;
+  const deadline = o.maxSeconds !== undefined ? deps.now() + o.maxSeconds * 1000 : Infinity;
+  const timeUp = () => deps.now() >= deadline;
+  const d: KeeperDeps = { ...deps, shouldStop: () => !!o.signal?.aborted || timeUp() || !!deps.shouldStop?.() };
   let consecutiveErrors = 0;
-  deps.log.info('keeper', `watching ${deps.contractId} via ${deps.backend.label}, poll every ${o.pollS}s`);
+  let ticks = 0;
+  let listed = 0;
+  let pending: string[] = [];
+  const done = (reason: RunResult['reason']): RunResult => ({ reason, ticks, listed, pending });
+  const stopAtLimit = (): RunResult => {
+    log.warn('keeper', `time limit of ${o.maxSeconds}s reached${pending.length ? `; still to settle: vault ${pending.join(', ')} (the next run continues)` : ''}`);
+    return done('time_limit');
+  };
+
+  log.info('keeper', `watching ${deps.contractId} via ${deps.backend.label}, poll every ${o.pollS}s`);
+  if (deps.ownerPrefix !== undefined) log.info('keeper', `only vaults whose owner starts with "${deps.ownerPrefix}"`);
+  if (deps.only) log.info('keeper', `only vault ${[...deps.only].join(', ')}`);
+  if (o.untilIdle && !o.once) log.info('keeper', `sweep: exits when nothing is left to settle${o.maxSeconds !== undefined ? `, or after ${o.maxSeconds}s` : ''}`);
+
   while (!o.signal?.aborted) {
+    let r: TickResult | undefined;
     try {
-      const r = await tickOnce(deps);
+      r = await tickOnce(d);
       consecutiveErrors = r.error ? consecutiveErrors + 1 : 0;
     } catch (e) {
       // tickOnce should never throw; belt and braces so the loop survives anything.
       consecutiveErrors++;
-      deps.log.err('keeper', `tick crashed: ${errMsg(e)}`);
+      log.err('keeper', `tick crashed: ${errMsg(e)}`);
     }
-    if (o.once) return;
-    const delay = Math.min(60_000, o.pollS * 1000 * 2 ** Math.min(consecutiveErrors, 4));
-    if (consecutiveErrors) deps.log.warn('keeper', `errors in a row: ${consecutiveErrors}, next poll in ${Math.round(delay / 1000)}s`);
+    ticks++;
+    if (r?.pending) {
+      listed++;
+      pending = r.pending;
+    }
+    if (o.once) return done('once');
+    if (o.untilIdle && r?.pending && r.pending.length === 0) {
+      log.ok('keeper', ticks === 1 && r.actions.length === 0 ? 'nothing to settle' : 'nothing left to settle');
+      return done('idle');
+    }
+    if (timeUp()) return stopAtLimit();
+    const delay = Math.min(60_000, o.pollS * 1000 * 2 ** Math.min(consecutiveErrors, 4), deadline - deps.now());
+    if (consecutiveErrors) log.warn('keeper', `errors in a row: ${consecutiveErrors}, next poll in ${Math.round(delay / 1000)}s`);
     await sl(delay);
+    if (timeUp()) return stopAtLimit();
   }
+  return done('aborted');
 }

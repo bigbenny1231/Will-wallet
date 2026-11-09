@@ -21,10 +21,42 @@ export function deriveState(v: VaultView, now: number): VaultState {
   return now < warningAtMs(v) ? 'Alive' : 'Warning';
 }
 
+/**
+ * Deadline the contract enforces in `poke`. The view's `trigger_at_ms` already includes a guardian pause
+ * (SPEC 2.8: max(last_beat + interval * (grace + 1), paused_until_ms)); the later of the two wins, so a paused
+ * vault is not poked early. Without the view field this is `triggerAtMs`.
+ */
+export function effectiveTriggerAtMs(v: Pick<VaultView, 'last_beat_ms' | 'heartbeat_interval_s' | 'grace_missed' | 'trigger_at_ms'>): number {
+  return Math.max(triggerAtMs(v), v.trigger_at_ms ?? 0);
+}
+
 /** True when the vault has not been poked yet but the deadline has passed. */
 export function isDue(v: VaultView, now: number): boolean {
   if (v.state === 'Triggered' || v.state === 'Settled') return false;
-  return now >= triggerAtMs(v);
+  return now >= effectiveTriggerAtMs(v);
+}
+
+/** True while settlement is unfinished: the vault is past its deadline (poke is legal) or stored Triggered. */
+export function needsSettlement(v: VaultView, now: number): boolean {
+  return v.state === 'Triggered' || isDue(v, now);
+}
+
+/** Which vaults the keeper may act on. Every condition that is set must hold. */
+export interface VaultFilter {
+  /** token ids (`--token`) */
+  only?: Set<string>;
+  /** `owner_id` must start with this (`--owner-prefix`) */
+  ownerPrefix?: string;
+}
+
+/**
+ * `owner_id` is the current Will NFT holder: the creator while Alive, Warning and Triggered, the primary heir once
+ * Settled (SPEC 2.4 step 5). So a prefix filter follows a vault up to settlement and then lets go of it.
+ */
+export function matchesFilter(v: Pick<VaultView, 'token_id' | 'owner_id'>, f: VaultFilter): boolean {
+  if (f.only && !f.only.has(v.token_id)) return false;
+  if (f.ownerPrefix !== undefined && !(typeof v.owner_id === 'string' && v.owner_id.startsWith(f.ownerPrefix))) return false;
+  return true;
 }
 
 export interface Countdown {
@@ -40,7 +72,7 @@ export function countdown(v: VaultView, now: number): Countdown {
   return {
     state: deriveState(v, now),
     msToWarning: warningAtMs(v) - now,
-    msToTrigger: triggerAtMs(v) - now,
+    msToTrigger: effectiveTriggerAtMs(v) - now,
     due: isDue(v, now),
   };
 }

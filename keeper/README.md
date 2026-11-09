@@ -6,7 +6,7 @@ Node 22, TypeScript, run through `tsx` (no build step). Spec: [`SPEC.md`](../SPE
 ```bash
 cd keeper && npm install
 cp .env.example .env        # then fill it in; see the table below
-npm test                    # 51 unit tests, no network
+npm test                    # 81 unit tests, no network
 ```
 
 ## Do X, see Y
@@ -17,6 +17,8 @@ npm test                    # 51 unit tests, no network
 | keep a vault alive | `npm run pulse -- --token 1 --key ed25519:<pulse key> --interval 10` | in a terminal, a live `alive · next beat in 7s` countdown; `♥ heartbeat sent <nearblocks link>` on each beat (redirected to a file: only the beat lines, each with the next-beat time) |
 | make the owner disappear | press Ctrl-C in the pulse terminal | `pulse stopped — this is the moment the owner disappears` |
 | run the keeper | `npm run keeper -- --poll 5 [--token 5,6]` | one line per action: `poke`, `step 1/5` ... `step 5/5`, `relay`, `mark`, each with an explorer link |
+| settle only some owners' vaults, then exit | `npm run keeper -- --until-idle --max-seconds 240 --owner-prefix dmw-guest-` | the same action lines for matching vaults only, then `nothing left to settle` and exit 0 |
+| ask whether a sweep has work, without sending anything | `npm run dmw -- due --owner-prefix dmw-guest-` | `work=true  2 to settle (...)` or `work=false  no matching vault is past its deadline or Triggered` |
 | look at a vault | `npm run dmw -- status --token 1` | state, countdown, step, heirs, payouts and the last log lines |
 | see where to fund the vault | `npm run derive -- --token 1` | Base Sepolia, Monad testnet and Solana devnet source addresses (paths `base-<id>`, `monad-<id>`, `sol-<id>`) plus faucet links |
 | show the agent guard rails | `npm run agent-demo -- --token 1 --key ed25519:<agent key>` | one green `agent_pay_allowed` and one red `agent_pay_denied reason=receiver_not_allowlisted` (the denied call goes to an unknown receiver and is also over `per_tx_max`; the contract checks the receiver first) |
@@ -34,6 +36,8 @@ Read from the process environment, then `keeper/.env`, then the repo-root `.env`
 | `KEEPER_ACCOUNT_ID`, `KEEPER_PRIVATE_KEY` | keeper, dao create | any funded testnet account; the keeper earns the poke bounty |
 | `NEAR_NETWORK`, `NEAR_RPC` | all | default testnet, `https://rpc.testnet.fastnear.com` |
 | `BASE_RPC`, `MONAD_RPC`, `SOLANA_RPC` | keeper, derive | defaults from SPEC section 1 (Base Sepolia, Monad testnet `https://testnet-rpc.monad.xyz`, Solana devnet) |
+| `DMW_NOTIFY_WEBHOOK` | keeper | optional; webhook URL for owner notifications (see below). It is a secret and is never printed |
+| `DMW_DASHBOARD_URL` | keeper | optional; base URL for the vault link in notifications, default `https://will-wallet.vercel.app` |
 | `DMW_MOCK=1` | all | offline mock vault, state in `keeper/.mock-state.json` |
 
 ## Mock mode: demo before the contract exists
@@ -51,15 +55,95 @@ npm run pulse -- --token 1 --interval 4           # terminal B: vault stays Aliv
 ## How it behaves
 
 - **pulse** signs `heartbeat({token_id})` with the pulse function-call key, with the contract account as the signer. It beats once on start, then every `--interval` seconds, and never exits on an RPC error.
-- **keeper** polls `get_vaults`. Per vault it relays any `signed` payout first (Solana blockhashes expire in about 60-90 s), then `poke`s if the deadline passed, then calls `execute_step` until the vault is Settled. Before each step-3 call it fetches Base nonce and fees, or a Solana blockhash, from `src/chains/`. If a Solana sign does not advance the payout the keeper does not retry right away (a second signature over a live blockhash could double-pay); it waits for `resign_allowed_after_ms`. RPC errors are retried with exponential backoff and the loop never exits; use `--once` for a single pass. `--token 5,6` restricts the keeper to those vaults (without it every vault on the contract is driven).
+- **keeper** polls `get_vaults`. Per vault it relays any `signed` payout first (Solana blockhashes expire in about 60-90 s), then `poke`s if the deadline passed, then calls `execute_step` until the vault is Settled. Before each step-3 call it fetches Base nonce and fees, or a Solana blockhash, from `src/chains/`. If a Solana sign does not advance the payout the keeper does not retry right away (a second signature over a live blockhash could double-pay); it waits for `resign_allowed_after_ms`. RPC errors are retried with exponential backoff and the loop never exits; use `--once` for a single pass. `--token 5,6` restricts the keeper to those vaults (without it every vault on the contract is driven). `--owner-prefix`, `--until-idle` and `--max-seconds` are described in the next section.
 - **relay failures never fail a payout.** An unfunded source (`insufficient funds` / `AccountNotFound`) is logged once, the payout stays `signed`, and the keeper retries every 60 s while it carries on with the remaining steps. A stale signed tx (expired Solana blockhash, EVM price/nonce problem) is handled under the hardened contract rules (SPEC 2.7): read `get_sign_track`, wait until `resign_allowed_after_ms` (5 min after the last request), check the old tx never landed (`getSignatureStatuses` / `eth_getTransactionByHash`; if it did, record it with `mark_broadcast` instead), then `resign_foreign`. EVM re-signs send max(fresh fees, 1.1 x last fees) for both fee fields with gas 21000..100000 (we send 21000; the contract raises the EVM gas it signs with to its 50,000 floor, final audit H-5) and max fee within the chain's cap (Base 100 gwei, Monad 1000 gwei, read from `get_config().chains`) (the contract ignores the nonce we send). Solana re-signs of a signed payout must come from the keeper account (`set_keeper`). At most 2 re-signs per payout, then a 5 min pause. A payout that is `broadcast` but whose hash is not on chain gets its stored `signed_tx` relayed again (no new `mark_broadcast`). `mark_broadcast` is only called after a successful broadcast.
 - **gas:** `heartbeat` 10 TGas (the key allowance is charged on prepaid gas), `poke` 60, `execute_step` and `resign_foreign` 300, `mark_broadcast` 30.
 - **agent-demo** reads the vault policy, sends an allowed payment (a tenth of `per_tx_max` to the first allowlisted receiver) and a denied one (twice `per_tx_max` to a random account), then prints the result and the NEP-297 `dmw` events from the receipt logs.
+
+## Filters and the bounded sweep
+
+**`--owner-prefix <prefix>`** restricts the keeper to vaults whose `owner_id` starts with the prefix. With `--token` as well, a vault must pass both.
+
+- The filter is checked on the vault list and again before every action, against the view that action is based on. It covers `poke`, `execute_step`, relay, `mark_broadcast`, re-broadcast and `resign_foreign`. A vault outside the filter gets no transaction and no chain lookup.
+- `owner_id` is the current holder of the Will NFT. It is the creator while the vault is Alive, Warning or Triggered, so the filter follows a vault through settlement. Step 5 hands the NFT to the primary heir. From then on the vault no longer matches and the keeper leaves it alone.
+- One consequence: a signed payout that was not relayed before step 5 is not retried by a filtered keeper. It stays `signed`. Each signed payout gets one relay attempt as soon as it is signed, because relaying comes before the next step.
+- One caveat: if the primary heir's account also starts with the prefix, the settled vault still matches, and the keeper may relay or re-sign its payouts.
+- An empty prefix is refused. It would match every vault.
+
+**`--once`** is exactly one pass. One pass does everything that is possible right now, but it does not wait. A vault whose signature is still in flight, or whose step failed, is left as it is.
+
+**`--until-idle`** turns the loop into a sweep. After each pass it looks at the matching vaults. If none is past its deadline and none is Triggered, it prints `nothing left to settle` and exits 0. Otherwise it sleeps `--poll` seconds and runs another pass. With nothing to do it exits after one read and sends nothing.
+
+- Work is still one unit per contract call: `poke`, then each `execute_step`. Waiting for an MPC signature happens between passes.
+- Signed payouts that could not be relayed do not count as work. An unfunded source address keeps its payout `signed` and does not keep the sweep running.
+- A failed read of the vault list is never treated as idle.
+
+**`--max-seconds <n>`** stops the run after `n` seconds. The limit is checked before every action and between passes, and the last sleep is cut short to end on it. A transaction that is already in flight is awaited, so the process can end a little after the limit. The exit code is 0 and the log names the vaults still to settle; the next run continues from the contract state. The exit code is 1 only when the vault list could not be read even once.
+
+**`due`** is the read-only pre-check. It calls `get_vaults`, applies the same `--owner-prefix` and `--token` filters, and prints `work=true` or `work=false`. It needs `DMW_CONTRACT` and no keeper account. `--json` prints the full report. `--github-output` also appends `work=<true|false>` and `count=<n>` to the file named by `$GITHUB_OUTPUT`. The exit code is 0 for both answers and 1 when the contract could not be read.
+
+The keeper and `due` use the contract's `trigger_at_ms` when it is later than `last_beat + interval * (grace + 1)`, so a vault under a guardian pause (SPEC 2.8) is not poked early.
+
+## Owner notifications
+
+Set `DMW_NOTIFY_WEBHOOK` to a webhook URL and the keeper posts one JSON message when a vault it watches:
+
+- goes from Alive to Warning (`event: "vault_warning"`), or
+- becomes Triggered (`event: "vault_triggered"`).
+
+There is one message per transition per vault. A heartbeat that brings the vault back to Alive sends nothing; if it later misses again, that is a new transition and a new message. Settled sends nothing.
+
+```json
+{
+  "text": "Vault 12 missed a heartbeat. Settlement becomes possible at 2026-11-09 17:00:00 UTC unless a heartbeat arrives first. https://will-wallet.vercel.app/vault/12",
+  "content": "Vault 12 missed a heartbeat. Settlement becomes possible at 2026-11-09 17:00:00 UTC unless a heartbeat arrives first. https://will-wallet.vercel.app/vault/12",
+  "event": "vault_warning",
+  "token_id": "12",
+  "owner_id": "andrew.testnet",
+  "warning_at_ms": 1794236400000,
+  "trigger_at_ms": 1794243600000,
+  "contract": "dmw-x8cx.testnet"
+}
+```
+
+`text` is the field Slack incoming webhooks read and `content` is the field Discord webhooks read; both hold the same line. Other receivers can use the structured fields. `DMW_DASHBOARD_URL` replaces the base of the link.
+
+- Only transitions the running process saw are reported. A vault that is already in Warning when the keeper starts gets no warning message, so a restart never repeats one. This means notifications need the long-running keeper. A sweep is a new process each time and never sees Alive turn into Warning.
+- With `--token` or `--owner-prefix`, only matching vaults are reported.
+- The POST has a 5 second timeout. It is sent in the background and awaited at the end of the pass, so it does not hold up a settlement action. A failure is logged as `notify ... was not delivered (HTTP 404)` and the loop carries on. Nothing is retried.
+- The webhook URL is a secret. It is never written to the log; error text is stripped of the URL, its host and its path before it is printed.
+- Tested with an injected `fetch` in `test/notify.test.ts`. No message has been posted to a real Slack or Discord webhook from this code yet.
+
+## Hosted guest sweep (GitHub Actions)
+
+The dashboard's guest mode creates throwaway accounts named `dmw-guest-<random>.testnet`, each with a short-interval vault on the public contract. A visitor who leaves would otherwise leave that vault overdue with nobody to settle it. [`.github/workflows/keeper.yml`](../.github/workflows/keeper.yml) (`guest-sweep`) settles those vaults and no others.
+
+It runs every 10 minutes and on manual dispatch, one run at a time:
+
+1. Checkout, Node 22, `npm ci` in `keeper/`.
+2. Pre-check, read-only: `npx tsx src/cli.ts due --owner-prefix dmw-guest- --github-output`. With `work=false` the job ends here. No account is created and nothing is sent.
+3. With `work=true` it picks a keeper account. If the repository secrets `KEEPER_ACCOUNT_ID` and `KEEPER_PRIVATE_KEY` are both set it uses them. Otherwise it creates a one-off account `dmw-sweep-<random>.testnet` from the testnet faucet with `node scripts/near-admin.mjs create`, masks the new key in the log, and passes it to the keeper through the environment. The keeper earns the poke bounty, so the account pays for its own gas.
+4. Sweep: `npx tsx src/cli.ts keeper --until-idle --max-seconds 240 --owner-prefix dmw-guest- --poll 5`.
+
+The contract and RPC come from the repository variables `DMW_CONTRACT` (default `dmw-x8cx.testnet`) and `NEAR_RPC` (default `https://rpc.testnet.fastnear.com`). The workflow passes them as environment variables; there is no `.env` on the runner.
+
+Setup: none is required. One optional step: add the repository secrets `KEEPER_ACCOUNT_ID` and `KEEPER_PRIVATE_KEY` (Settings, Secrets and variables, Actions) for a funded testnet account. Then the sweep does not depend on the faucet, and that account can be registered with `set_keeper` so it may re-sign stale Solana payouts. Use a testnet account that holds nothing else.
+
+What to expect:
+
+- Foreign payouts of guest vaults are signed and stay `signed`. Their derived source addresses are unfunded, so the relay fails and is not retried after settlement.
+- A one-off faucet account is not the contract's registered keeper. It cannot re-sign a signed Solana payout. That only matters for a funded source with an expired blockhash.
+- Each run that finds work without the secrets leaves one faucet account behind with its remaining testnet NEAR. If the faucet refuses, that run fails and the next one tries again.
+- `DMW_NOTIFY_WEBHOOK` is not passed to the workflow. Guest vaults have no owner to notify.
+- GitHub may start scheduled runs late, and it disables schedules in a repository with no activity for 60 days.
+
+What has been tested: the filter, the sweep and the pre-check are unit-tested against the mock backend (`test/sweep.test.ts`). The pre-check was run read-only against `dmw-x8cx.testnet` on 2026-11-09 and reported 19 vaults, none of them a guest vault, `work=false`. The sweep step's shell script was dry-run locally with a stub in place of the faucet and the mock backend. The workflow itself has not run on GitHub yet, and no live sweep transaction has been sent.
 
 ## Layout
 
 - `src/machine.ts` pure state derivation, countdown math, step scheduling (unit tested)
 - `src/keeperLoop.ts` the poll loop; `src/backend.ts` NEAR calls with retry; `src/mock.ts` the mock vault
 - `src/chainsApi.ts` the interface to `src/chains/` (derive / evm / solana); `src/relay.ts` classifies relay errors
+- `src/notify.ts` owner notifications; `src/commands/due.ts` the read-only sweep pre-check
 - `LIVE_RUN.md` a real testnet run with every tx link; `SHOWCASE.md` the demo-video vault and the addresses to fund
 - `src/commands/` one file per CLI command; `test/` vitest

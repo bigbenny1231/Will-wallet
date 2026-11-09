@@ -1,0 +1,74 @@
+name: guest-sweep
+
+# Settles abandoned guest vaults on the public testnet contract: vaults whose owner is a throwaway
+# `dmw-guest-*` account made by the dashboard's guest mode. No other vault is touched (keeper --owner-prefix).
+# Details: keeper/README.md, "Hosted guest sweep".
+on:
+  schedule:
+    # Every 10 minutes, a few minutes off the hour (the top of the hour is the busiest time for scheduled runs).
+    - cron: '7-59/10 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One sweep at a time. A run that starts while another is going waits for it; it is not cancelled.
+concurrency:
+  group: guest-sweep
+  cancel-in-progress: false
+
+jobs:
+  sweep:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      # keeper/src/config.ts reads the process environment first; there is no .env file on the runner.
+      NEAR_NETWORK: testnet
+      DMW_CONTRACT: ${{ vars.DMW_CONTRACT || 'dmw-x8cx.testnet' }}
+      NEAR_RPC: ${{ vars.NEAR_RPC || 'https://rpc.testnet.fastnear.com' }}
+      DMW_MOCK: '0'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm, cache-dependency-path: keeper/package-lock.json }
+      - name: Install keeper dependencies
+        working-directory: keeper
+        run: npm ci
+
+      # Read-only view call. Sets outputs `work` (true/false) and `count`. No account, no key, no transaction.
+      - name: Pre-check for guest vaults that are past their deadline or Triggered
+        id: due
+        working-directory: keeper
+        run: npx tsx src/cli.ts due --owner-prefix dmw-guest- --github-output
+
+      - name: Sweep guest vaults
+        if: steps.due.outputs.work == 'true'
+        shell: bash
+        env:
+          # Secrets cannot be tested in `if:`, so both are passed in and checked in the script. Unset secrets are empty.
+          SECRET_KEEPER_ACCOUNT_ID: ${{ secrets.KEEPER_ACCOUNT_ID }}
+          SECRET_KEEPER_PRIVATE_KEY: ${{ secrets.KEEPER_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -n "$SECRET_KEEPER_ACCOUNT_ID" ] && [ -n "$SECRET_KEEPER_PRIVATE_KEY" ]; then
+            echo "keeper account: from the repository secrets"
+            export KEEPER_ACCOUNT_ID="$SECRET_KEEPER_ACCOUNT_ID"
+            export KEEPER_PRIVATE_KEY="$SECRET_KEEPER_PRIVATE_KEY"
+          else
+            name="dmw-sweep-$(openssl rand -hex 5).testnet"
+            echo "keeper account: one-off testnet faucet account $name"
+            node scripts/near-admin.mjs create "$name"
+            # Mask the new private key (with and without its ed25519: prefix) before anything else runs.
+            node -e 'const k = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")).private_key; console.log("::add-mask::" + k); console.log("::add-mask::" + k.replace(/^ed25519:/, ""));' "keys/$name.json"
+            KEEPER_PRIVATE_KEY="$(node -e 'process.stdout.write(JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")).private_key)' "keys/$name.json")"
+            export KEEPER_ACCOUNT_ID="$name" KEEPER_PRIVATE_KEY
+            # Give the RPC node a moment to see the new account (up to 20 s).
+            for _ in 1 2 3 4 5 6 7 8 9 10; do
+              seen="$(curl -s "$NEAR_RPC" -H 'content-type: application/json' \
+                -d "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"query\",\"params\":{\"request_type\":\"view_account\",\"finality\":\"final\",\"account_id\":\"$name\"}}" || true)"
+              case "$seen" in *'"amount"'*) break ;; esac
+              sleep 2
+            done
+          fi
+          cd keeper
+          npx tsx src/cli.ts keeper --until-idle --max-seconds 240 --owner-prefix dmw-guest- --poll 5

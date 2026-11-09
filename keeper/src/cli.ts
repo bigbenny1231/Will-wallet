@@ -3,12 +3,14 @@ import pc from 'picocolors';
 import { agentDemo } from './commands/agentDemo.js';
 import { daoCreate } from './commands/dao.js';
 import { deriveCommand } from './commands/derive.js';
+import { dueCommand } from './commands/due.js';
 import { pulseCommand } from './commands/pulse.js';
 import { loadConfig, need } from './config.js';
 import { agentBackend, getChains, keeperBackend, pulseBackend } from './factory.js';
-import { makeDeps, runKeeper } from './keeperLoop.js';
+import { consoleLogger, makeDeps, runKeeper } from './keeperLoop.js';
 import { countdown, formatDuration } from './machine.js';
 import { MockBackend } from './mock.js';
+import { notifierFromEnv } from './notify.js';
 import { errMsg, formatYocto, foreignTxLink, termSafe } from './util.js';
 import { viewBackend } from './factory.js';
 
@@ -19,6 +21,23 @@ const run = (fn: () => Promise<void>) =>
     console.error(pc.red(`error: ${termSafe(errMsg(e))}`));
     process.exit(1);
   });
+
+const tokenSet = (ids: unknown): Set<string> | undefined =>
+  ids ? new Set<string>(String(ids).split(',').map((x) => x.trim()).filter(Boolean)) : undefined;
+
+/** An empty prefix would match every vault on the contract, so it is refused instead of being read as "no filter". */
+function ownerPrefixOf(raw: unknown): string | undefined {
+  if (raw === undefined) return undefined;
+  const p = String(raw).trim();
+  if (!/^[a-z0-9._-]+$/.test(p)) throw new Error('--owner-prefix must be a non-empty run of NEAR account id characters (a-z, 0-9, ".", "_", "-")');
+  return p;
+}
+
+const positive = (raw: unknown, flag: string): number => {
+  const n = Number(raw);
+  if (!(n > 0) || !Number.isFinite(n)) throw new Error(`${flag} must be a positive number of seconds`);
+  return n;
+};
 
 program
   .command('derive')
@@ -85,15 +104,52 @@ program
   .description('poll loop: poke overdue vaults, drive execute_step, relay signed foreign txs, mark_broadcast')
   .option('--poll <seconds>', 'poll interval', '5')
   .option('--once', 'run a single pass and exit')
+  .option('--until-idle', 'sweep: keep polling until no matching vault is past its deadline or Triggered, then exit 0')
+  .option('--max-seconds <n>', 'stop cleanly after this many seconds (exit 0; the next run continues)')
   .option('--token <ids>', 'only drive these vault token ids (comma separated); default: every vault')
+  .option('--owner-prefix <prefix>', 'only drive vaults whose owner_id starts with this prefix (with --token, both must match)')
   .action((o) =>
     run(async () => {
       const cfg = loadConfig();
+      const pollS = positive(o.poll, '--poll');
+      const maxSeconds = o.maxSeconds !== undefined ? positive(o.maxSeconds, '--max-seconds') : undefined;
+      const ownerPrefix = ownerPrefixOf(o.ownerPrefix);
       const ac = new AbortController();
       process.once('SIGINT', () => ac.abort());
       process.once('SIGTERM', () => ac.abort());
-      const deps = makeDeps({ backend: keeperBackend(cfg), chains: getChains(cfg), contractId: cfg.contract, only: o.token ? new Set<string>(String(o.token).split(',').map((x) => x.trim()).filter(Boolean)) : undefined });
-      await runKeeper(deps, { pollS: Number(o.poll), once: !!o.once, signal: ac.signal });
+      const deps = makeDeps({
+        backend: keeperBackend(cfg),
+        chains: getChains(cfg),
+        contractId: cfg.contract,
+        only: tokenSet(o.token),
+        ownerPrefix,
+        notifier: notifierFromEnv(process.env, cfg.contract, consoleLogger),
+      });
+      const r = await runKeeper(deps, { pollS, once: !!o.once, untilIdle: !!o.untilIdle, maxSeconds, signal: ac.signal });
+      // A run that hit the time limit without ever reading the vault list did no sweeping at all: say so with exit 1.
+      if (r.reason === 'time_limit' && r.listed === 0) throw new Error(`could not read the vault list from ${cfg.contract} within ${maxSeconds}s`);
+    }),
+  );
+
+program
+  .command('due')
+  .description('read-only check: is any (matching) vault past its deadline or Triggered? Prints work=true or work=false; sends nothing')
+  .option('--token <ids>', 'only look at these vault token ids (comma separated)')
+  .option('--owner-prefix <prefix>', 'only look at vaults whose owner_id starts with this prefix')
+  .option('--json', 'machine-readable output')
+  .option('--github-output', 'also append work=<true|false> and count=<n> to the file named by $GITHUB_OUTPUT')
+  .action((o) =>
+    run(async () => {
+      const cfg = loadConfig();
+      const githubOutput = o.githubOutput ? process.env.GITHUB_OUTPUT : undefined;
+      if (o.githubOutput && !githubOutput) throw new Error('--github-output needs the GITHUB_OUTPUT environment variable (GitHub Actions sets it)');
+      await dueCommand({
+        backend: viewBackend(cfg),
+        contract: need(cfg.contract, 'DMW_CONTRACT'),
+        filter: { only: tokenSet(o.token), ownerPrefix: ownerPrefixOf(o.ownerPrefix) },
+        json: !!o.json,
+        githubOutput,
+      });
     }),
   );
 
