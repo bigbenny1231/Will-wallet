@@ -54,7 +54,8 @@ subset, OFL (licences in `fonts/`).
 
 ## Demo video
 
-`assets/demo-720p.mp4` is the v3 cut (2:50, vault 17), re-encoded to about 2.8 MB so it can be committed and
+`assets/demo-720p.mp4` is the v3 cut (2:50, vault 17), re-encoded to about 3.2 MB (its end card's repository line
+corrected on Nov 9 2026, see `docs/video/VOICEOVER.md`) so it can be committed and
 served by a git-triggered deploy. The command is in the docstring of `design/build_site.py`.
 
 ## Configure

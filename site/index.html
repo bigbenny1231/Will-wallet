@@ -30,7 +30,7 @@
 <link rel="preload" href="fonts/inter-tight-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preconnect" href="https://rpc.testnet.fastnear.com" crossorigin>
 <link rel="stylesheet" href="assets/tokens.css">
-<link rel="stylesheet" href="styles.css?v=eb513e6f">
+<link rel="stylesheet" href="styles.css?v=7d287a75">
 <noscript><style>.hold-zone, .sound-toggle { display: none; } .ev { color: var(--bone); }</style></noscript>
 </head>
 <body>
@@ -160,10 +160,10 @@
 
     <div class="hero-swap">
       <div class="hero-copy">
-        <p class="lede">You configure the plan from your will or trust. On NEAR the contract pays heirs directly; on Base, Monad and Solana, NEAR&#8217;s network signs each payout for a keeper to relay. Heirs sign nothing to receive their NEAR.</p>
+        <p class="lede">On NEAR the contract pays heirs directly, and they sign nothing to receive it. On Base, Monad and Solana, NEAR&#8217;s network signs each payout for a keeper to relay.</p>
         <div class="cta-row">
-          <a class="pill" data-link="dashboard" href="https://will-wallet.vercel.app">Set up a vault</a>
-          <a class="link" href="https://github.com/bigbenny1231/will-wallet#run-it-in-about-10-minutes-testnet">Run it on testnet</a>
+          <a class="pill" data-link="try" href="https://will-wallet.vercel.app/try">Try it, no wallet</a>
+          <a class="link" data-link="dashboard" href="https://will-wallet.vercel.app">Set up a vault</a>
           <a class="link" href="#demo">Watch the demo, 2:50</a>
         </div>
         <p class="fine">Open source. Testnet only. Not a will; meant to sit alongside one.</p>
@@ -187,7 +187,7 @@
 <section class="trust" aria-label="What this is">
   <ul class="wrap trust-list">
     <li><strong>Open source</strong><span>MIT licence, every line on GitHub</span></li>
-    <li><strong>250 tests pass</strong><span>Contract 99, keeper 46, dashboard 68, agent 37</span></li>
+    <li><strong>333 tests pass</strong><span>Contract 104, keeper 81, dashboard 88, agent 60</span></li>
     <li><strong>Reviewed twice</strong><span>By a separate AI agent. Not a third-party audit</span></li>
     <li><strong>Testnet only</strong><span>Not a will. Meant to sit alongside one</span></li>
   </ul>
@@ -319,6 +319,24 @@
         <li class="ev ev-end" data-t="1794077045000"><p class="settled-line">Settled. Left to Sarah.</p></li>
       </ol>
     </div>
+  </div>
+</section>
+
+<section class="tryit" id="try" aria-labelledby="try-h">
+  <div class="wrap try-grid">
+    <div class="try-head">
+      <h2 id="try-h">Now run one yourself.</h2>
+      <p>Three minutes, no wallet. Your browser makes a throwaway account on NEAR testnet and opens a real vault with a 30-second heartbeat.</p>
+    </div>
+    <ol class="try-acts">
+      <li><span class="try-n">I</span><span><strong>Alive.</strong> The page beats with a pulse key. Your agent pays an invoice, then obeys a planted message and is refused by the contract.</span></li>
+      <li><span class="try-n">II</span><span><strong>Silence.</strong> You hold to stop. One missed beat later, anyone may poke the vault.</span></li>
+      <li><span class="try-n">III</span><span><strong>Settlement.</strong> Five transactions: heirs paid, keys deleted, Base and Solana payouts signed by NEAR&#8217;s MPC network, the Will NFT handed over.</span></li>
+    </ol>
+    <p class="try-cta">
+      <a class="pill" data-link="try" href="https://will-wallet.vercel.app/try">Begin a guest run</a>
+      <span class="try-fine">Testnet funds from the public faucet. Nothing has value; the keys stay in your browser.</span>
+    </p>
   </div>
 </section>
 
@@ -455,7 +473,7 @@
 <span class="c-k">agent</span>.call(dmw, <span class="c-s">'agent_pay'</span>, { token_id, receiver_id: <span class="c-s">'stranger.testnet'</span>, amount })  <span class="c-c">// denied, logged</span>
 <span class="c-k">agent</span>.transfer(<span class="c-s">'stranger.testnet'</span>, <span class="c-n">1</span>)  <span class="c-c">// refused by the node: RequiresFullAccess</span></code></pre>
       </figure>
-      <p class="builders-run"><span>Run it: <code>make demo</code></span> <a class="link" href="https://github.com/bigbenny1231/will-wallet">Read the code on GitHub</a></p>
+      <p class="builders-run"><span>Run it: <code>make demo</code></span> <span>Seven scripted attacks, offline: <code>make attacks</code></span> <a class="link" href="https://github.com/bigbenny1231/will-wallet">Read the code on GitHub</a></p>
     </div>
 
     <aside class="phone" aria-labelledby="phone-h">
@@ -477,7 +495,7 @@
   <div class="wrap heirs-grid">
     <h2 id="heirs-h">Were you named as an heir?</h2>
     <div class="heirs-body">
-      <p>Your share of NEAR is sent to your account at settlement; you sign nothing to receive it. The heir page lists each vault that names your account. Google sign-in, which shows the NEAR account your Google identity controls so you can give it to the owner, works on testnet from a local copy only. Email notices are not built yet.</p>
+      <p>Your share of NEAR is sent to your account at settlement; you sign nothing to receive it. Connect the NEAR account you were named under and the heir page lists each vault that names it, what is set aside, and what has arrived. Sign-in with Google is built but works from a local copy only, and email notices are not built yet.</p>
       <p class="heirs-actions"><a class="pill pill-ink" data-link="heir" href="https://will-wallet.vercel.app/heir">See what was left to you</a></p>
       <a class="link link-ink" href="https://github.com/bigbenny1231/will-wallet/blob/master/dashboard/docs/near-auth.md">How heir sign-in works today</a>
     </div>
@@ -558,8 +576,14 @@
   <div class="wrap faq-grid">
     <h2 id="faq-h">Questions</h2>
     <div class="faq-list">
-      <details><summary>What if I am in the hospital?</summary>
-        <p>Choose an interval and grace that suit your life: up to ten years between heartbeats, plus missed beats of grace. A guardian you name can pause the vault once per heartbeat cycle, for up to a length you set; you can also name no guardian. Reminders after a missed heartbeat are <span class="soon">coming soon</span>; they are not in the hackathon build.</p></details>
+      <details><summary>What if I am alive but offline?</summary>
+        <p>Choose an interval and grace that suit your life: up to ten years between heartbeats, plus missed beats of grace. A guardian you name can pause the vault once per heartbeat cycle, for up to a length you set. A keeper can post to a Slack or Discord webhook the moment a beat is missed. Push notices to your phone are not built.</p></details>
+      <details><summary>What if I lose my phone, or someone takes it?</summary>
+        <p>The phone holds a pulse key and nothing else. A thief can only send heartbeats, which postpones settlement until you remove the key from your own account. A lost phone stops sending them, so pair a new one, or send a heartbeat from your wallet, before the grace runs out.</p></details>
+      <details><summary>What if my guardian turns against me, or disappears?</summary>
+        <p>A guardian can pause once per heartbeat cycle, for at most the length you set, and nothing more: no funds, no heirs, no keys. The worst a hostile guardian can do is delay settlement once. A guardian who disappears changes nothing; the vault runs on your heartbeat alone.</p></details>
+      <details><summary>Can it be stopped once it starts?</summary>
+        <p>Until someone pokes the vault, one heartbeat from you restores it, however late. After the poke it cannot be stopped: the five steps run to the end. That is why the grace period should be generous. A cancel window after the poke is not in this build.</p></details>
       <details><summary>Is this a will?</summary>
         <p>No. It is not a will or a trust. It executes the distribution your will or trust specifies, so configure it with your estate attorney and keep the two consistent.</p></details>
       <details><summary>What is a heartbeat?</summary>
@@ -605,6 +629,6 @@
 </footer>
 
 <script src="assets/pulse.js" defer></script>
-<script type="module" src="js/main.js?v=c36f774e"></script>
+<script type="module" src="js/main.js?v=44e191dd"></script>
 </body>
 </html>
