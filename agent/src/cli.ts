@@ -7,9 +7,9 @@ import { parseArgs } from 'node:util';
 import { runAgent } from './agent.js';
 import { BRAIN_KINDS, autoBrain, makeBrain, type BrainKind } from './brains/index.js';
 import { loadAgentEnv } from './env.js';
-import { loadScenario } from './inbox.js';
+import { loadScenario, scenarioVars } from './inbox.js';
 import { NearChain } from './near.js';
-import { SimChain, simVault } from './sim.js';
+import { SimChain, simPreset, simVault } from './sim.js';
 import { Transcript, formatHeader, inline } from './transcript.js';
 import { Wallet } from './wallet.js';
 import { errMsg } from './util.js';
@@ -57,8 +57,9 @@ async function main() {
   if (!tokenId) throw new Error(`--token is required\n${USAGE}`);
 
   let chain;
+  let sim: SimChain | undefined;
   if (a.sim) {
-    chain = new SimChain(simVault());
+    chain = sim = new SimChain(simVault());
   } else {
     const contract = env.DMW_CONTRACT;
     if (!contract) throw new Error('DMW_CONTRACT is not set (repo-root .env)');
@@ -70,9 +71,15 @@ async function main() {
 
   const wallet = new Wallet({ chain, tokenId, localChecks: !a['no-local-checks'] });
   const audit = await wallet.audit();
-  const vault = await wallet.snapshot();
+  let vault = await wallet.snapshot();
   const scenarioFile = resolve(process.cwd(), a.scenario ?? resolve(AGENT_DIR, 'scenarios/api-bills.json'));
-  const scenario = loadScenario(existsSync(scenarioFile) ? scenarioFile : resolve(AGENT_DIR, a.scenario!), { PROVIDER: vault.policy.allowlist[0] ?? 'provider.testnet' });
+  const scenario = loadScenario(existsSync(scenarioFile) ? scenarioFile : resolve(AGENT_DIR, a.scenario!), scenarioVars(vault.policy.allowlist, chain.contractId));
+  if (sim && scenario.attack?.vault && scenario.attack.vault !== 'alive') {
+    // An attack scenario may ask for a simulated vault state (the owner missed a beat).
+    const now = Date.now();
+    sim.vault = simVault(now, simPreset(scenario.attack.vault, now));
+    vault = await wallet.snapshot();
+  }
   const brain = await makeBrain(brainKind, env, { vigilant: a.vigilant, model: a.model });
 
   const transcript = new Transcript((md) => process.stdout.write(md + '\n\n'));

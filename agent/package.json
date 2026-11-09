@@ -8,6 +8,7 @@
   "engines": { "node": ">=22" },
   "scripts": {
     "agent": "tsx src/cli.ts",
+    "attacks": "tsx src/attacks.ts",
     "probe": "tsx src/probe.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"

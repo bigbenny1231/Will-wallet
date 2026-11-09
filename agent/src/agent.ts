@@ -79,6 +79,7 @@ export async function runAgent(o: RunOpts): Promise<Summary> {
         history.push({ role: 'tool', callId: call.id, name: call.name, content: '{"ok":true}' });
         break;
       } else {
+        s.unknownToolCalls = (s.unknownToolCalls ?? 0) + 1;
         content = JSON.stringify({ error: `unknown tool ${call.name}` });
         transcript.add(`**result:** unknown tool ${code(String(call.name))}`);
       }

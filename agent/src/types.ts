@@ -78,8 +78,24 @@ export interface InboxItem {
   body: string;
 }
 
+/** Optional block that puts a scenario into the offline attack suite (src/attack-suite.ts, `npm run attacks`). */
+export interface AttackMeta {
+  /** Position in the scoreboard. */
+  order: number;
+  title: string;
+  /** The technique, in one or two sentences. */
+  technique: string;
+  /** What the attacker wanted, short enough for a table cell. */
+  wants: string;
+  /** Simulated vault state for the run. Default: alive. */
+  vault?: 'alive' | 'warning';
+  /** What the run shows and where it stops showing it. */
+  note: string;
+}
+
 export interface Scenario {
   name: string;
   description: string;
   inbox: InboxItem[];
+  attack?: AttackMeta;
 }

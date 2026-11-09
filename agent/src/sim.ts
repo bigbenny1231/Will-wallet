@@ -8,6 +8,8 @@ export class SimChain implements VaultChain {
   readonly label = 'sim (in-memory vault, no network)';
   readonly publicKey = 'ed25519:SIMULATEDAGENTKEY';
   calls: { receiver_id: string; amount: string }[] = [];
+  /** Ledger of what the simulated contract let out: one entry per allowed payment. */
+  transfers: { receiver_id: string; amount: string }[] = [];
   private n = 0;
   constructor(
     public vault: VaultView,
@@ -28,22 +30,38 @@ export class SimChain implements VaultChain {
     this.calls.push({ receiver_id: a.receiver_id, amount: a.amount });
     const v = this.vault;
     const now = this.nowMs();
+    const hash = `sim-${++this.n}`;
+    const amount = BigInt(a.amount);
+    // The contract's two require! guards run before the policy. They panic, so the transaction fails and no state changes.
+    if (amount <= 0n) return { hash, logs: [], returnValue: null, failure: simPanic('amount must be > 0') };
+    if (a.receiver_id === this.contractId) return { hash, logs: [], returnValue: null, failure: simPanic('receiver cannot be the dmw contract') };
     if (now >= v.daily_window_start_ms + DAY_MS) {
       v.daily_window_start_ms = now;
       v.daily_spent = '0';
     }
-    const amount = BigInt(a.amount);
     const reason = localPolicyCheck(v, a.receiver_id, amount, now)[0];
-    const hash = `sim-${++this.n}`;
     if (reason) {
       const data = { token_id: v.token_id, receiver_id: a.receiver_id, amount: a.amount, reason };
       return { hash, logs: [`EVENT_JSON:${JSON.stringify({ standard: 'dmw', version: '1.0.0', event: 'agent_pay_denied', data })}`], returnValue: { allowed: false, reason, receiver_id: a.receiver_id, amount: a.amount, daily_spent: v.daily_spent, balance: v.balance } };
     }
     v.balance = (BigInt(v.balance) - amount).toString();
     v.daily_spent = (BigInt(v.daily_spent) + amount).toString();
+    this.transfers.push({ receiver_id: a.receiver_id, amount: a.amount });
     const data = { token_id: v.token_id, receiver_id: a.receiver_id, amount: a.amount, daily_spent: v.daily_spent };
     return { hash, logs: [`EVENT_JSON:${JSON.stringify({ standard: 'dmw', version: '1.0.0', event: 'agent_pay_allowed', data })}`], returnValue: { allowed: true, reason: null, receiver_id: a.receiver_id, amount: a.amount, daily_spent: v.daily_spent, balance: v.balance } };
   }
+}
+
+/** Same shape as a failed receipt from the node (near.ts toTxResult): the JSON of status.Failure. */
+const simPanic = (msg: string) => JSON.stringify({ ActionError: { index: 0, kind: { FunctionCallError: { ExecutionError: `Smart contract panicked: ${msg}` } } } });
+
+export type SimPreset = 'alive' | 'warning';
+
+/** Overrides for simVault. `warning`: the owner missed one beat a minute ago; the trigger deadline is still ahead. */
+export function simPreset(preset: SimPreset, now: number): Partial<VaultView> {
+  if (preset === 'alive') return {};
+  const lastBeat = now - 3_600_000 - 60_000;
+  return { state: 'Warning', last_beat_ms: lastBeat, warning_at_ms: lastBeat + 3_600_000, trigger_at_ms: lastBeat + 3 * 3_600_000 };
 }
 
 export function simVault(now = Date.now(), over: Partial<VaultView> = {}): VaultView {
