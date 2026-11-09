@@ -213,6 +213,25 @@ body {
   }
 }
 
+/* ---------- the guest run (components/GuestGuide.tsx) ---------- */
+.guide {
+  border-top: 1px solid var(--accent);
+  border-bottom: 1px solid var(--rule);
+  padding: 1.75rem 0 2.25rem;
+}
+.guide-ledger {
+  max-height: 19rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--rule) transparent;
+}
+.guide .hold {
+  flex: none;
+  width: 132px;
+  height: 132px;
+}
+
 /* ---------- pulse motion ---------- */
 @keyframes sweep {
   from {

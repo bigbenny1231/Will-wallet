@@ -1,6 +1,6 @@
 import { chainMeta } from "../lib/chainmeta";
 import { links } from "../config";
-import { fmtTime, humanizeYocto, shortAddr, unitsFor } from "../lib/format";
+import { fmtTime, humanizeYocto, shortAccount, shortAddr, unitsFor } from "../lib/format";
 import { lastEvent, parseStep1Detail } from "../lib/logparse";
 import type { ForeignPayout, VaultView } from "../types";
 import { ExtLink, ROMAN } from "./ui";
@@ -61,7 +61,7 @@ export default function Timeline({ v, contract, onRelay, relayBusy }: Props) {
             {step1.map((p) => (
               <li key={p.account}>
                 <span className="num">{p.amount} NEAR</span> <span className="text-text-2">to</span>{" "}
-                <a className="mono !text-[14px] text-text underline decoration-rule underline-offset-4" href={links.nearAddress(p.account)} target="_blank" rel="noreferrer">{p.account}</a>
+                <a className="mono !text-[14px] text-text underline decoration-rule underline-offset-4" href={links.nearAddress(p.account)} target="_blank" rel="noreferrer" title={p.account}>{shortAccount(p.account)}</a>
               </li>
             ))}
           </ul>
@@ -118,13 +118,13 @@ export default function Timeline({ v, contract, onRelay, relayBusy }: Props) {
           {v.dao_proposal_id !== null && v.dao_proposal_id !== undefined && <span className="ml-3 text-text-2">proposal {v.dao_proposal_id}</span>}
         </span>
       ) : (
-        <span className="text-text-2">{ev(4)?.detail ? humanizeYocto(ev(4)!.detail) : "No DAO set, step is skipped"}</span>
+        <span className="text-text-2">{ev(4)?.detail && ev(4)!.detail !== "no dao; skipped" ? humanizeYocto(ev(4)!.detail) : ev(4) ? "No estate DAO was named, so the step was skipped" : "No DAO set, step is skipped"}</span>
       ),
     },
     {
       n: 5,
       title: "Will NFT sent to primary heir",
-      body: ev(5)?.detail ? <span className="mono">{humanizeYocto(ev(5)!.detail)}</span> : <ExtLink href={links.nearAddress(contract)}>contract on nearblocks</ExtLink>,
+      body: ev(5)?.detail ? <span className="mono">{humanizeYocto(ev(5)!.detail).replace(/[0-9a-f]{64}/, (m) => shortAccount(m))}</span> : <ExtLink href={links.nearAddress(contract)}>contract on nearblocks</ExtLink>,
     },
   ];
 

@@ -1,13 +1,15 @@
 import { chainMeta } from "../lib/chainmeta";
 import { useState, type ReactNode } from "react";
 import { Link, useParams } from "react-router-dom";
-import { CONTRACT, MOCK, POLL_MS, links } from "../config";
+import { CONTRACT, MOCK, POLL_MS, SHOWCASE_VAULT, links } from "../config";
 import { api } from "../lib/near";
 import { useWallet } from "../lib/wallet";
 import { usePoll, useNow } from "../lib/usePoll";
-import { bpsToPct, expectedShare, fmtDuration, fmtInterval, fmtTime, nearToYocto, yoctoToNear } from "../lib/format";
+import { bpsToPct, expectedShare, fmtDuration, fmtInterval, fmtTime, nearToYocto, shortAccount, yoctoToNear } from "../lib/format";
 import { claimCall, depositCall, executeStepCall, heartbeatCall, markBroadcastCall, nftTransferCall, pokeCall } from "../lib/calls";
 import { broadcastForeign, currentForeign, stepArgsFor } from "../lib/chains";
+import { deriveFor } from "../lib/derive";
+import { guestAvailable } from "../lib/guest";
 import { lastEvent, step1AmountFor } from "../lib/logparse";
 import type { CallArgs, VaultView } from "../types";
 import AgentPanel from "../components/AgentPanel";
@@ -17,11 +19,13 @@ import Timeline from "../components/Timeline";
 import TxBanner from "../components/TxBanner";
 import Seal from "../components/Seal";
 import PulseStrip from "../components/PulseStrip";
+import GuestGuide from "../components/GuestGuide";
+import Record from "../components/Record";
 import { ErrorNote, ExtLink, Figure, Label, ReconnectHint, Ribbon, Section, Tip } from "../components/ui";
 
 export default function Vault() {
   const { id = "" } = useParams();
-  const { accountId, connect, call } = useWallet();
+  const { accountId, connect, call, guest, isGuest, guestAs, alias } = useWallet();
   const now = useNow(250);
   const vault = usePoll(() => api.getVault(id), POLL_MS, [id]);
   const nft = usePoll(() => api.nftToken(id), POLL_MS, [id]);
@@ -44,6 +48,16 @@ export default function Vault() {
   }
 
   const isOwner = accountId === v.owner_id;
+  // A guest run: this browser made the vault (lib/guest.ts). The guide drives it; the page below is the real console.
+  const guided = isGuest && !!guest && guest.token === v.token_id ? guest : null;
+  const showcase = !MOCK && SHOWCASE_VAULT === v.token_id;
+  // Older vaults stored no source address for some payouts; it is a pure function of the contract and vault id.
+  const derived = v.foreign.some((f) => !f.from_address) ? safeDerive(v.token_id) : null;
+  const sourceOf = (f: VaultView["foreign"][number]) => f.from_address || derived?.[f.chain] || "";
+  const who = (id: string) => {
+    const a = alias(id);
+    return a && a !== "You" ? a : null;
+  };
   const nftOwner = nft.data?.owner_id ?? null;
   const canHeartbeat = isOwner && (v.state === "Alive" || v.state === "Warning");
   const canClaim = v.state === "Settled" && !!accountId && nftOwner === accountId;
@@ -120,6 +134,8 @@ export default function Vault() {
         {vault.error && <ErrorNote>Could not refresh: {vault.error}</ErrorNote>}
       </div>
 
+      {guided && <GuestGuide v={v} now={now} guest={guided} />}
+
       {/* ---------- the estate console ---------- */}
       <section className="grid gap-12 pb-16 pt-12 lg:grid-cols-12 lg:gap-10">
         <div className="flex flex-col items-center lg:col-span-5">
@@ -132,6 +148,12 @@ export default function Vault() {
           <Label>
             Vault {v.token_id} on <ExtLink href={links.nearAddress(CONTRACT)}>{CONTRACT}</ExtLink>
           </Label>
+          {showcase && (
+            <p className="mt-3 max-w-[60ch] border-l border-accent pl-3 text-[14px] leading-relaxed text-text-2">
+              The example vault. The project keeps it alive so there is always a living one to read. Its foreign payouts are pending, and nothing has been relayed.{" "}
+              {guestAvailable() && <Link className="link" to="/try">Run one of your own, no wallet needed.</Link>}
+            </p>
+          )}
           <h1 className="display mt-4 text-[48px] md:text-[64px]">{paused ? "Paused." : headline(v)}</h1>
           <p className="mt-5 max-w-[56ch] text-[19px] leading-relaxed text-text-2">
             {paused ? (
@@ -164,7 +186,9 @@ export default function Vault() {
           </dl>
 
           <div className="mt-10 flex flex-wrap items-center gap-x-8 gap-y-4">
-            {accountId ? (
+            {guided && !guestAs ? (
+              <p className="max-w-[52ch] text-[15px] leading-relaxed text-text-2">The guest run above drives this vault. Everything on this page is read from the chain as it happens.</p>
+            ) : accountId ? (
               <>
                 {live && (
                   <Tip why={heartbeatWhy}>
@@ -196,11 +220,14 @@ export default function Vault() {
                 )}
               </>
             ) : (
-              <button className="pill" onClick={connect}>Connect wallet</button>
+              <>
+                <button className="pill" onClick={connect}>Connect wallet</button>
+                {guestAvailable() && <Link className="tl" to="/try">Try it without a wallet</Link>}
+              </>
             )}
           </div>
           <div className="mt-5 space-y-3 text-[14px]">
-            {accountId && !isOwner && v.state !== "Settled" && <p className="text-text-2">Poke and Execute can be sent by any account. Heartbeat is limited to the owner or a pulse key.</p>}
+            {accountId && !guided && !isOwner && v.state !== "Settled" && <p className="text-text-2">Poke and Execute can be sent by any account. Heartbeat is limited to the owner or a pulse key.</p>}
             {msg && (
               <p className="text-life">
                 {msg}
@@ -221,7 +248,10 @@ export default function Vault() {
         <ul>
           {v.heirs.map((h, i) => (
             <li key={h.account_id} className={`grid grid-cols-[1fr_auto] items-baseline gap-x-6 gap-y-1 py-4 sm:grid-cols-[1fr_7rem_14rem] ${i ? "border-t border-rule" : ""}`}>
-              <ExtLinkMono href={links.nearAddress(h.account_id)}>{h.account_id}</ExtLinkMono>
+              <span className="min-w-0">
+                {who(h.account_id) && <span className="display mr-3 text-[24px] leading-none">{who(h.account_id)}</span>}
+                <ExtLinkMono href={links.nearAddress(h.account_id)} title={h.account_id}>{shortAccount(h.account_id)}</ExtLinkMono>
+              </span>
               <span className="display num text-right text-[34px]">{bpsToPct(h.bps)}</span>
               <span className="num col-span-2 text-[15px] text-text-2 sm:col-span-1 sm:text-right">{heirAmount(v, h.account_id, h.bps)}</span>
             </li>
@@ -231,9 +261,9 @@ export default function Vault() {
           <p className="mt-4 text-[15px] text-text-2">
             Also {v.foreign.length} foreign payout{v.foreign.length === 1 ? "" : "s"}, listed under settlement. Source addresses:{" "}
             {v.foreign.map((f, i) =>
-              f.from_address ? (
+              sourceOf(f) ? (
                 <span key={i} className="mr-3">
-                  <ExtLink href={chainMeta(f.chain).address(f.from_address)}>{chainMeta(f.chain).short}</ExtLink>
+                  <ExtLink href={chainMeta(f.chain).address(sourceOf(f))}>{chainMeta(f.chain).short}</ExtLink>
                 </span>
               ) : null,
             )}
@@ -246,7 +276,7 @@ export default function Vault() {
       </Section>
 
       <Section label="Agent" note="An AI agent may spend from this vault within these limits, only while the owner is alive.">
-        <AgentPanel v={v} />
+        <AgentPanel v={v} alias={who} />
       </Section>
 
       <Section label="Keys" note="Pulse keys can only send heartbeats. Pair a phone to carry one. Agent keys can only pay within policy.">
@@ -261,7 +291,11 @@ export default function Vault() {
         <FundTransfer v={v} isOwner={isOwner} connected={!!accountId} busy={busy} onDeposit={(y) => send("Deposit", () => depositCall(v.token_id, y))} onTransfer={(to) => send("Transfer", () => nftTransferCall(to, v.token_id))} />
       </Section>
 
-      <Section label="Stop the heartbeat" note="For the demo: this is how absence is simulated.">
+      <Section label="The record" note="Every event the contract kept for this Will NFT, newest first.">
+        <Record v={v} nftOwner={nftOwner} alias={who} />
+      </Section>
+
+      {!guided && <Section label="Stop the heartbeat" note="For the demo: this is how absence is simulated.">
         <p className="max-w-[62ch] text-[17px] leading-relaxed">
           On a paired phone, press and hold <span className="text-text">Hold to stop</span> for two seconds. Or press <kbd className="mono rounded-sm border border-rule px-1.5 py-0.5 !text-[13px]">Ctrl-C</kbd> in the terminal running{" "}
           <code className="mono text-brass">npm run pulse</code>, or run <code className="mono text-brass">make kill</code> from the repo root.
@@ -269,7 +303,7 @@ export default function Vault() {
         <p className="mt-3 max-w-[62ch] text-[15px] text-text-2">
           After {fmtInterval(v.heartbeat_interval_s)} the vault turns Warning. After {v.grace_missed + 1} intervals ({silence}) anyone can poke it.
         </p>
-      </Section>
+      </Section>}
 
       {MOCK && <p className="rule pt-6 text-center text-[13px] text-text-2">Mock mode: the vault cycles Alive, Warning, Triggered, Settled every 20 s.</p>}
     </div>
@@ -299,7 +333,7 @@ function Sentence({ v, silence, isOwner }: { v: VaultView; silence: string; isOw
 }
 
 function Who({ isOwner, id }: { isOwner: boolean; id: string }) {
-  return isOwner ? <>you</> : <span className="mono !text-[16px] text-text">{id}</span>;
+  return isOwner ? <>you</> : <span className="mono !text-[16px] text-text" title={id}>{shortAccount(id)}</span>;
 }
 
 function figures(v: VaultView, now: number, nftOwner: string | null, trigMs?: number, settledMs?: number, paused = false): ReactNode {
@@ -307,7 +341,7 @@ function figures(v: VaultView, now: number, nftOwner: string | null, trigMs?: nu
   if (v.state === "Settled")
     return [
       <Figure key="s" label="Settled at" value={settledMs ? fmtTime(settledMs) : "Complete"} />,
-      <Figure key="o" label="Will NFT held by" value={nftOwner ?? "…"} mono />,
+      <Figure key="o" label="Will NFT held by" value={nftOwner ? <span title={nftOwner}>{shortAccount(nftOwner)}</span> : "…"} mono />,
       bal,
     ];
   if (v.state === "Triggered")
@@ -325,9 +359,17 @@ function figures(v: VaultView, now: number, nftOwner: string | null, trigMs?: nu
   ];
 }
 
-function ExtLinkMono({ href, children }: { href: string; children: ReactNode }) {
+function safeDerive(tokenId: string) {
+  try {
+    return deriveFor(tokenId);
+  } catch {
+    return null;
+  }
+}
+
+function ExtLinkMono({ href, children, title }: { href: string; children: ReactNode; title?: string }) {
   return (
-    <a href={href} target="_blank" rel="noreferrer" className="mono !text-[15px] text-text decoration-rule underline-offset-4 hover:underline">
+    <a href={href} title={title} target="_blank" rel="noreferrer" className="mono !text-[15px] text-text decoration-rule underline-offset-4 hover:underline">
       {children}
     </a>
   );

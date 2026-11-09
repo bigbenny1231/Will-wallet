@@ -26,6 +26,8 @@ const tgas = (n: number) => (BigInt(n) * T).toString();
 /** Gas per method (raw gas units as strings). */
 export const GAS = {
   heartbeat: tgas(10),
+  /** Same budget the agent wrapper uses (agent/src/near.ts): about 0.006 NEAR of the key's allowance per call. */
+  agentPay: tgas(60),
   addKey: tgas(50),
   executeStep: tgas(300),
   create: tgas(100),
@@ -134,6 +136,13 @@ export const pauseCall = (tokenId: string): CallArgs => ({ method: "pause", args
 
 /** Contract range for max_pause_s (lib.rs MIN_PAUSE_S..MAX_PAUSE_S). */
 export const PAUSE_RANGE_S = { min: 10, max: 90 * 24 * 3600 } as const;
+
+/** Agent key only: pay `amount` yocto to `receiver` if the vault's policy allows it. Never panics on a policy denial. */
+export const agentPayCall = (tokenId: string, receiverId: string, amountYocto: string, memo?: string): CallArgs => ({
+  method: "agent_pay",
+  args: memo ? { token_id: tokenId, receiver_id: receiverId, amount: amountYocto, memo } : { token_id: tokenId, receiver_id: receiverId, amount: amountYocto },
+  gas: GAS.agentPay,
+});
 
 export const pokeCall = (tokenId: string): CallArgs => ({ method: "poke", args: { token_id: tokenId }, gas: GAS.other });
 

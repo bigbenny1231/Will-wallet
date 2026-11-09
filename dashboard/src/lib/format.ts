@@ -54,6 +54,11 @@ export function shortAddr(a: string, n = 8): string {
   return a.length <= n * 2 + 1 ? a : `${a.slice(0, n)}…${a.slice(-6)}`;
 }
 
+/** NEAR implicit accounts are 64 hex characters; show them like a key, in full only on hover. */
+export function shortAccount(id: string): string {
+  return /^[0-9a-f]{64}$/.test(id) ? `${id.slice(0, 8)}…${id.slice(-6)}` : id;
+}
+
 export function fmtDuration(ms: number): string {
   const total = Math.max(0, Math.ceil(ms / 1000));
   const d = Math.floor(total / 86400);

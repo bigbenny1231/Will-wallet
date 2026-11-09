@@ -1,13 +1,13 @@
 import { chainMeta } from "../lib/chainmeta";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { MOCK, NEAR_AUTH, POLL_MS, links, CONTRACT } from "../config";
+import { MOCK, POLL_MS, links, CONTRACT } from "../config";
 import { continueWithGoogle, isImplicitAccount, loadIdentity, nearAuthAvailable, signOutGoogle, type HeirIdentity } from "../lib/nearAuth";
 import { mockApi } from "../lib/mock";
 import { api } from "../lib/near";
 import { useWallet } from "../lib/wallet";
 import { usePoll } from "../lib/usePoll";
-import { bpsToPct, expectedShare, fmtInterval, unitsFor, yoctoToNear } from "../lib/format";
+import { bpsToPct, expectedShare, fmtInterval, shortAccount, unitsFor, yoctoToNear } from "../lib/format";
 import { CopyBox, ErrorNote, ExtLink, Figure, Label, ReconnectHint } from "../components/ui";
 import { parseStep1Detail, step1AmountFor } from "../lib/logparse";
 import type { VaultView } from "../types";
@@ -15,14 +15,22 @@ import { sealDataUri } from "../lib/seal";
 
 /** The one warm page: bone ground, ink type. App.tsx sets the inverted palette on this route. */
 export default function Heir() {
-  const { accountId, connect, ready } = useWallet();
+  const { accountId: activeId, connect, ready, isGuest, guest, guestAs, setGuestAs, alias } = useWallet();
+  // A guest run names two heirs whose keys this browser holds. The heir page shows the one being viewed ("See it as
+  // Sarah" on the vault page), or all of them. A connected wallet is unaffected.
+  const guestHeirs = isGuest && guest ? (guestAs ? [guestAs] : guest.heirs.map((h) => h.accountId)) : null;
+  const accountId = isGuest ? null : activeId;
   const [gid, setGid] = useState<HeirIdentity | null>(() => loadIdentity());
   const [authBusy, setAuthBusy] = useState(false);
   const [authErr, setAuthErr] = useState<string | null>(null);
   const googleOk = nearAuthAvailable();
 
   // A wallet account wins; otherwise the accounts NEAR Auth resolved for the Google identity.
-  const candidates = useMemo(() => (accountId ? [accountId] : gid ? [gid.implicitId, ...gid.named] : []), [accountId, gid]);
+  const candidates = useMemo(
+    () => (accountId ? [accountId] : guestHeirs ? guestHeirs : gid ? [gid.implicitId, ...gid.named] : []),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [accountId, gid, guestHeirs?.join(",")],
+  );
   useEffect(() => {
     if (MOCK && gid && !accountId) mockApi.nameImplicitHeir(gid.implicitId);
   }, [gid, accountId]);
@@ -39,7 +47,8 @@ export default function Heir() {
     [candidates.join(",")],
   );
   const count = res.data?.length ?? 0;
-  const who = accountId ?? gid?.implicitId ?? null;
+  const who = accountId ?? guestHeirs?.[0] ?? gid?.implicitId ?? null;
+  const guestWho = guestHeirs ? (guestHeirs.length === 1 ? (alias(guestHeirs[0]) ?? "the heir") : guest!.heirs.map((h) => h.name).join(" and ")) : null;
 
   const google = async () => {
     setAuthErr(null);
@@ -64,7 +73,15 @@ export default function Heir() {
         <Label>For heirs</Label>
         <h1 className="display fade-in mt-6 text-[56px] leading-[0.95] md:text-[88px]">Something was left to you.</h1>
         <p className="mt-8 max-w-[54ch] text-[20px] leading-relaxed text-text-2">
-          {who ? (
+          {guestWho ? (
+            res.loaded ? (
+              <>
+                Seen as <span className="text-text">{guestWho}</span>, {guestHeirs!.length === 1 ? "an heir" : "the heirs"} named in your guest run. {count > 0 ? "What arrived is set out below." : "Nothing names them yet."}
+              </>
+            ) : (
+              "Reading the register…"
+            )
+          ) : who ? (
             count > 0 ? (
               <>
                 <AccountName id={who} /> is named in {count === 1 ? "one vault" : `${count} vaults`}. What arrives, and when, is set out below.
@@ -77,28 +94,40 @@ export default function Heir() {
               "Reading the register…"
             )
           ) : (
-            "Sign in with Google, or with the NEAR account you were named under. Nothing is asked of you beyond that."
+            "Connect the NEAR account you were named under. Nothing is asked of you beyond that: your share of NEAR is sent to you at settlement, with nothing to sign."
           )}
         </p>
 
         {!accountId && gid && <GoogleIdentity id={gid} onSignOut={signOut} />}
 
-        {!accountId && !gid && (
+        {guestHeirs && guest && guest.heirs.length > 1 && (
+          <div className="mt-8 flex flex-wrap items-baseline gap-x-6 gap-y-2 text-[15px]">
+            <span className="sc">View as</span>
+            {guest.heirs.map((h) => (
+              <button key={h.accountId} className={`tl ${guestAs === h.accountId ? "!border-accent" : ""}`} onClick={() => setGuestAs(h.accountId)}>{h.name}</button>
+            ))}
+            {guestAs && <button className="tl" onClick={() => setGuestAs(null)}>Both</button>}
+          </div>
+        )}
+
+        {!accountId && !gid && !guestHeirs && (
           <div className="mt-10">
             <div className="flex flex-wrap items-center gap-x-8 gap-y-4">
-              <button className="pill gap-3" onClick={google} disabled={!googleOk || authBusy}>
-                <GoogleMark />
-                {authBusy ? "Waiting for Google…" : "Continue with Google"}
-              </button>
-              <button className="tl" onClick={connect} disabled={!ready}>Use a NEAR wallet</button>
+              <button className="pill" onClick={connect} disabled={!ready}>Connect a NEAR wallet</button>
+              {googleOk && (
+                <button className="tl gap-2" onClick={google} disabled={authBusy}>
+                  <GoogleMark />
+                  {authBusy ? "Waiting for Google…" : "Continue with Google"}
+                </button>
+              )}
             </div>
-            <p className="mt-4 max-w-[60ch] text-[14px] leading-relaxed text-text-2">
+            <p className="mt-5 max-w-[60ch] text-[14px] leading-relaxed text-text-2">
               {googleOk ? (
                 <>Google sign-in runs through NEAR Auth. Your Google identity controls one NEAR account, derived by the NEAR MPC network. No wallet, no seed phrase.</>
               ) : (
                 <>
-                  <span className="sc mr-2">NEAR Auth (coming)</span>
-                  Google sign-in needs this site’s address registered with NEAR Auth. The shared testnet credentials only accept {NEAR_AUTH.origins.join(", ") || "no origin"}; production credentials are on request.
+                  No wallet yet? MyNearWallet and Meteor both make a testnet account in a minute. Sign-in with Google through NEAR Auth is built and works from a local copy; on this address it waits for production credentials (
+                  <a className="link" href="https://github.com/bigbenny1231/will-wallet/blob/master/dashboard/docs/near-auth.md" target="_blank" rel="noreferrer">how it works today</a>).
                 </>
               )}
             </p>
@@ -152,6 +181,7 @@ function GoogleMark() {
 }
 
 function Bequest({ v, me }: { v: VaultView; me: string }) {
+  const { alias } = useWallet();
   const mine = v.heirs.find((h) => h.account_id === me)!;
   const settled = v.state === "Settled";
   const step1 = v.log.find((l) => l.event === "step_1");
@@ -180,7 +210,7 @@ function Bequest({ v, me }: { v: VaultView; me: string }) {
         ) : (
           <>
             <Label>From</Label>
-            <div className="mono mt-2 !text-[16px] text-text">{v.owner_id}</div>
+            <div className="mono mt-2 !text-[16px] text-text" title={v.owner_id}>{shortAccount(v.owner_id)}</div>
           </>
         )}
 
@@ -230,7 +260,7 @@ function Bequest({ v, me }: { v: VaultView; me: string }) {
 
         {allPaid.length > 0 && (
           <p className="mt-8 text-[15px] text-text-2">
-            Settlement paid {allPaid.map((p) => `${p.account} ${p.amount} NEAR`).join(", ")}.
+            Settlement paid {allPaid.map((p) => `${p.amount} NEAR to ${alias(p.account) ?? shortAccount(p.account)}`).join(", ")}.
           </p>
         )}
         <div className="mt-8 flex flex-wrap items-baseline gap-x-8 gap-y-2">

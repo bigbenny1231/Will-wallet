@@ -10,6 +10,8 @@ export const SPUTNIK_UI: string = env.VITE_SPUTNIK_UI || "";
 
 export const NEARBLOCKS = NETWORK === "mainnet" ? "https://nearblocks.io" : "https://testnet.nearblocks.io";
 export const POLL_MS = 3000;
+/** The vault the project keeps alive as a living example (labelled as such on its page). Empty: none. */
+export const SHOWCASE_VAULT: string = env.VITE_SHOWCASE_VAULT ?? (CONTRACT === "dmw-x8cx.testnet" ? "6" : "");
 
 export const links = {
   nearAddress: (account: string) => `${NEARBLOCKS}/address/${account}`,

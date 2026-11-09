@@ -4,10 +4,11 @@ import { CONTRACT, MOCK, POLL_MS } from "../config";
 import { api } from "../lib/near";
 import { useWallet } from "../lib/wallet";
 import { usePoll } from "../lib/usePoll";
-import { bpsToPct, fmtInterval, yoctoToNear } from "../lib/format";
+import { bpsToPct, fmtInterval, shortAccount, yoctoToNear } from "../lib/format";
 import { aliveStrip, STATE_COLOR } from "../lib/pulse";
 import TxBanner from "../components/TxBanner";
 import { ErrorNote, Label, Ribbon, ReconnectHint } from "../components/ui";
+import { guestAvailable, isGuestAccount } from "../lib/guest";
 import type { VaultState, VaultView } from "../types";
 
 function MiniTrace({ state }: { state: VaultState }) {
@@ -18,32 +19,32 @@ function MiniTrace({ state }: { state: VaultState }) {
         ? "M0 15h14l1 2 1.5-9 1.5 10 1-3h22l1 1 1-5 1 5h40"
         : "M0 15h84";
   return (
-    <svg width="84" height="22" viewBox="0 0 84 22" aria-hidden className="shrink-0 overflow-visible">
+    <svg width="84" height="22" viewBox="0 0 84 22" aria-hidden className="h-auto w-14 shrink-0 overflow-visible sm:w-[84px]">
       <path d={d} fill="none" stroke={STATE_COLOR[state]} strokeWidth="1.25" strokeLinejoin="round" strokeLinecap="round" opacity={state === "Settled" ? 0.7 : 1} />
     </svg>
   );
 }
 
-const COLS = "grid grid-cols-[4.5rem_1fr_auto] items-baseline gap-x-6 md:grid-cols-[5rem_13rem_1fr_9rem_8rem]";
+const COLS = "grid grid-cols-[3.25rem_1fr_auto] items-baseline gap-x-3 sm:grid-cols-[4.5rem_1fr_auto] sm:gap-x-6 md:grid-cols-[5rem_13rem_1fr_9rem_8rem]";
 
 function Row({ v }: { v: VaultView }) {
   return (
     <Link role="row" to={`/vault/${v.token_id}`} className={`${COLS} group border-b border-rule py-6 transition-colors duration-700 hover:bg-[color-mix(in_srgb,var(--text)_3%,transparent)]`}>
       <span role="cell" className="display num text-[44px] leading-none transition-colors duration-700 group-hover:text-accent">{v.token_id}</span>
-      <span role="cell" className="flex items-center gap-4">
+      <span role="cell" className="flex min-w-0 items-center gap-3 sm:gap-4">
         <MiniTrace state={v.state} />
         <Ribbon state={v.state} className="text-[24px]" />
       </span>
       <span role="cell" className="hidden min-w-0 space-y-0.5 md:block">
         {v.heirs.map((h) => (
           <span key={h.account_id} className="flex items-baseline gap-3">
-            <span className="mono truncate !text-[13px]">{h.account_id}</span>
+            <span className="mono truncate !text-[13px]" title={h.account_id}>{shortAccount(h.account_id)}</span>
             <span className="num text-[13px] text-text-2">{bpsToPct(h.bps)}</span>
           </span>
         ))}
       </span>
       <span role="cell" className="hidden text-[15px] text-text-2 md:block">every {fmtInterval(v.heartbeat_interval_s)}</span>
-      <span role="cell" className="num text-right text-[17px]">{yoctoToNear(v.balance)} NEAR</span>
+      <span role="cell" className="num whitespace-nowrap text-right text-[16px] sm:text-[17px]">{yoctoToNear(v.balance)} NEAR</span>
     </Link>
   );
 }
@@ -65,15 +66,24 @@ function SkeletonRows() {
 }
 
 export default function Home() {
-  const { accountId } = useWallet();
+  const { accountId: activeId, isGuest, guest } = useWallet();
+  // A guest's throwaway account is not "their vaults": after settlement the vault belongs to the heir. Guests read
+  // the whole register, with their own run pointed out.
+  const accountId = isGuest ? null : activeId;
+  const myRun = isGuest ? (guest?.token ?? null) : null;
   const nav = useNavigate();
   const [open, setOpen] = useState("");
   const mine = usePoll(() => (accountId ? api.getVaultsForOwner(accountId) : Promise.resolve([])), POLL_MS * 2, [accountId]);
   // Without a wallet, list every vault on the contract so the app is browsable read-only.
   const everyone = usePoll(() => (accountId ? Promise.resolve([]) : api.getAllVaults()), POLL_MS * 2, [accountId]);
   const list = [...((accountId ? mine.data : everyone.data) ?? [])].sort((a, b) => Number(BigInt(b.token_id) - BigInt(a.token_id)));
-  const active = list.filter((v) => v.state !== "Settled");
+  // Guest runs (lib/guest.ts) are short-lived test vaults made by visitors: they get their own folded group so the
+  // register reads as the estates it is about. A guest sees their own run as usual.
+  const guestRun = (v: VaultView) => !accountId && v.state !== "Settled" && isGuestAccount(v.owner_id) && v.token_id !== myRun;
+  const active = list.filter((v) => v.state !== "Settled" && !guestRun(v));
+  const guestRuns = list.filter(guestRun);
   const settled = list.filter((v) => v.state === "Settled");
+  const tryOn = guestAvailable() && !MOCK;
   const loaded = accountId ? mine.loaded : everyone.loaded;
 
   return (
@@ -94,13 +104,28 @@ export default function Home() {
             ) : (
               <>
                 Each vault waits while its owner keeps a heartbeat. Connect a NEAR wallet to see your own;{" "}
-                until then, the full register is open to read.
+                until then, the full register is open to read{tryOn && !myRun ? ", and a guest run needs no wallet at all" : ""}.
+                {myRun && (
+                  <>
+                    {" "}Your guest run is <Link className="link" to={`/vault/${myRun}`}>vault {myRun}</Link>.
+                  </>
+                )}
               </>
             )}
           </p>
         </div>
-        <div className="flex items-center gap-8 md:col-span-4 md:justify-end">
-          <Link to="/create" className="pill">Create a vault</Link>
+        <div className="flex flex-wrap items-center gap-x-8 gap-y-4 md:col-span-4 md:justify-end">
+          {tryOn && !accountId && !myRun ? (
+            <>
+              <Link to="/try" className="pill">Try it, no wallet</Link>
+              <Link to="/create" className="tl">Create a vault</Link>
+            </>
+          ) : (
+            <>
+              <Link to="/create" className="pill">Create a vault</Link>
+              {tryOn && myRun && <Link to={`/vault/${myRun}`} className="tl">Your guest run</Link>}
+            </>
+          )}
         </div>
       </div>
 
@@ -122,6 +147,12 @@ export default function Home() {
         )}
 
         {active.map((v) => <Row key={v.token_id} v={v} />)}
+        {guestRuns.length > 0 && (
+          <details className="group/guest border-b border-rule">
+            <summary className="sc cursor-pointer select-none py-5 hover:text-accent">Guest runs in progress ({guestRuns.length})</summary>
+            {guestRuns.map((v) => <Row key={v.token_id} v={v} />)}
+          </details>
+        )}
         {settled.length > 0 && (
           <details className="group/settled border-b border-rule">
             <summary className="sc cursor-pointer select-none py-5 hover:text-accent">Settled ({settled.length})</summary>

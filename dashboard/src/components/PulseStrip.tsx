@@ -1,6 +1,6 @@
 import { chainMeta } from "../lib/chainmeta";
 import { links } from "../config";
-import { fmtTime } from "../lib/format";
+import { fmtTime, shortAccount } from "../lib/format";
 import { lastEvent } from "../lib/logparse";
 import { FLAT_FROM, STATE_COLOR, STRIP_H, STRIP_W, STRIP_Y, aliveStrip, flatStrip, tickX, warningStrip } from "../lib/pulse";
 import type { VaultView } from "../types";
@@ -116,7 +116,7 @@ export default function PulseStrip({ v, contract }: { v: VaultView; contract: st
       )}
       {v.state === "Settled" && settledTo && (
         <p className="mt-3 text-[15px] text-text-2">
-          The line is still. The Will passed to <span className="mono !text-[14px] text-text">{settledTo}</span>.
+          The line is still. The Will passed to <span className="mono !text-[14px] text-text" title={settledTo}>{shortAccount(settledTo)}</span>.
         </p>
       )}
     </div>

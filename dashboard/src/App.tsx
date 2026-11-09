@@ -8,6 +8,8 @@ import Create from "./pages/Create";
 import Heir from "./pages/Heir";
 import PendingCreate from "./components/PendingCreate";
 import Pulse from "./pages/Pulse";
+import Try from "./pages/Try";
+import { guestAvailable } from "./lib/guest";
 
 function Mark() {
   // The mark (design/logo.svg): brass ring, one heartbeat in life green, the flat line in the text colour.
@@ -24,31 +26,50 @@ function Mark() {
 }
 
 function Header() {
-  const { accountId, connect, disconnect, ready } = useWallet();
+  const { accountId, connect, disconnect, ready, isGuest, guest, guestAs, alias } = useWallet();
   const nav = ({ isActive }: { isActive: boolean }) =>
     `pb-0.5 text-[15px] border-b transition-colors duration-700 ${isActive ? "border-accent text-text" : "border-transparent text-text-2 hover:text-text"}`;
+  const tryOn = guestAvailable() && !MOCK;
+  const links = (
+    <>
+      <NavLink to="/" end className={nav}>Vaults</NavLink>
+      <NavLink to="/create" className={nav}>Create</NavLink>
+      {tryOn && <NavLink to="/try" className={nav}>Try it</NavLink>}
+      <NavLink to="/heir" className={nav}>For heirs</NavLink>
+    </>
+  );
+  const guestName = isGuest ? (guestAs ? `as ${alias(guestAs) ?? "an heir"}` : guest?.accountId.replace(/\.testnet$/, "")) : null;
   return (
     <header className="border-b border-rule">
-      <div className="wrap flex flex-wrap items-center justify-between gap-x-8 gap-y-3 py-5">
-        <div className="flex flex-wrap items-center gap-x-10 gap-y-3">
-          <Link to="/" className="flex items-center gap-[7px]">
-            <Mark />
-            <span className="display whitespace-nowrap text-[28px] leading-none">Dead Man’s Wallet</span>
-          </Link>
-          <nav className="flex gap-6 whitespace-nowrap" aria-label="Primary">
-            <NavLink to="/" end className={nav}>Vaults</NavLink>
-            <NavLink to="/create" className={nav}>Create</NavLink>
-            <NavLink to="/heir" className={nav}>For heirs</NavLink>
-          </nav>
+      <div className="wrap py-4 md:py-5">
+        <div className="flex items-center justify-between gap-x-6">
+          <div className="flex min-w-0 items-center gap-x-10">
+            <Link to="/" className="flex items-center gap-[7px]">
+              <Mark />
+              <span className="display whitespace-nowrap text-[26px] leading-none sm:text-[28px]">Dead Man’s Wallet</span>
+            </Link>
+            <nav className="hidden gap-6 whitespace-nowrap md:flex" aria-label="Primary">{links}</nav>
+          </div>
+          <div className="flex min-w-0 items-baseline gap-5">
+            <span className="sc hidden sm:inline">{MOCK ? "Mock data" : NETWORK}</span>
+            {accountId ? (
+              isGuest ? (
+                <button className="tl min-w-0 !text-[13px]" onClick={disconnect} title="Forget this guest account">
+                  <span className="sc mr-1.5 !text-[11px]">Guest</span>
+                  <span className="mono hidden truncate !text-[12.5px] sm:inline">{guestName}</span>
+                </button>
+              ) : (
+                <button className="tl mono min-w-0 max-w-[46vw] truncate !text-[13px]" onClick={disconnect} title="Disconnect">{accountId}</button>
+              )
+            ) : (
+              <button className="tl whitespace-nowrap" onClick={connect} disabled={!ready}>Connect wallet</button>
+            )}
+          </div>
         </div>
-        <div className="flex items-baseline gap-6">
-          <span className="sc">{MOCK ? "Mock data" : NETWORK}</span>
-          {accountId ? (
-            <button className="tl mono !text-[13px]" onClick={disconnect} title="Disconnect">{accountId}</button>
-          ) : (
-            <button className="tl" onClick={connect} disabled={!ready}>Connect wallet</button>
-          )}
-        </div>
+        <nav className="mt-3 flex items-baseline gap-6 whitespace-nowrap md:hidden" aria-label="Primary">
+          {links}
+          <span className="sc ml-auto sm:hidden">{MOCK ? "Mock" : NETWORK}</span>
+        </nav>
       </div>
     </header>
   );
@@ -91,6 +112,7 @@ export default function App() {
           <Route path="/create" element={<Create />} />
           <Route path="/vault/:id" element={<Vault />} />
           <Route path="/heir" element={<Heir />} />
+          <Route path="/try" element={<Try />} />
           <Route
             path="*"
             element={
