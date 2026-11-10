@@ -97,6 +97,29 @@ export function loadPulse(storage: Pick<Storage, "getItem"> = localStorage): Sto
   }
 }
 
+/**
+ * What to do with a pairing that arrives on a phone (a link that was opened, or pasted text). SECURITY_REVIEW_3 D-1:
+ * a link is one tap, so it must not be able to point the phone at another contract, or silently replace the key the
+ * phone already holds (the owner's real vault would then go quiet and settle).
+ *  - "refuse":  the link is for another contract than the one this page serves
+ *  - "same":    the phone already holds exactly this pairing
+ *  - "confirm": the phone holds a different pairing; ask before replacing it
+ *  - "store":   nothing stored yet
+ */
+export type PairingDecision = { kind: "refuse"; message: string } | { kind: "same" } | { kind: "confirm"; message: string } | { kind: "store" };
+
+export function decidePairing(incoming: Pairing, current: Pairing | null, contract: string): PairingDecision {
+  if (incoming.contract !== contract) {
+    return { kind: "refuse", message: `This link is for another contract (${incoming.contract}). This page only pairs with ${contract}. Nothing was changed.` };
+  }
+  if (!current) return { kind: "store" };
+  if (current.secret === incoming.secret && current.token === incoming.token && current.contract === incoming.contract) return { kind: "same" };
+  return {
+    kind: "confirm",
+    message: `This phone already sends the heartbeat for vault ${current.token}. Replace that key with the one in this link (vault ${incoming.token})? Vault ${current.token} will stop receiving heartbeats from this phone.`,
+  };
+}
+
 export function savePulse(v: StoredPulse, storage: Pick<Storage, "setItem"> = localStorage): void {
   storage.setItem(PULSE_STORE, JSON.stringify(v));
 }

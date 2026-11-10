@@ -17,6 +17,7 @@ import {
   newGuestSession,
   planDeposit,
   publicKeyOf,
+  resumeInterrupted,
   sendAs,
   type GuestSession,
 } from "../lib/guest";
@@ -75,6 +76,12 @@ export default function Try() {
         // A finished run: a second vault fits on the same account if enough test NEAR is left.
         s = balance !== null && planDeposit(balance) !== null ? { ...newGuestSession(), accountId: s.accountId, secret: s.secret } : null;
       }
+      // An interrupted setup (a refresh or a dropped connection while a transaction was in flight). Without this the
+      // run could never continue: the account no longer holds enough for a vault, so every retry ended in the same
+      // error (SECURITY_REVIEW_3 D-6).
+      if (s && balance !== null && !s.armed) {
+        s = await resumeInterrupted(s, balance, api);
+      }
       if (!s) {
         s = newGuestSession();
         balance = null;
@@ -85,13 +92,13 @@ export default function Try() {
         balance = await guestBalance(s.accountId);
       }
       const deposit = balance === null ? null : planDeposit(balance);
-      if (deposit === null) throw new Error("The guest account does not hold enough test NEAR for a vault. Start again to get a new one.");
+      if (!s.token && deposit === null) throw new Error("The guest account does not hold enough test NEAR for a vault. Press Try again to get a new one.");
       show(0, { state: "done", detail: s.accountId });
       const owner = accountFor(s.accountId, s.secret);
 
       /* 2. the vault */
       show(1, { state: "doing" });
-      if (!s.token) {
+      if (!s.token && deposit !== null) {
         const sent = await sendAs(owner, [
           createVaultCall({
             heartbeat_interval_s: GUEST_INTERVAL_S,

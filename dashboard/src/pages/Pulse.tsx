@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { POLL_MS, links } from "../config";
+import { CONTRACT, POLL_MS, links } from "../config";
 import { fmtDuration, fmtInterval, fmtTime } from "../lib/format";
-import { PairingError, loadPulse, parsePairing, savePulse, PULSE_STORE, type StoredPulse } from "../lib/pairing";
+import { PairingError, decidePairing, loadPulse, parsePairing, savePulse, PULSE_STORE, type Pairing, type StoredPulse } from "../lib/pairing";
 import { beatPeriodS, idle, secondsUntil, settled, shouldBeat, tick, type Scheduler } from "../lib/pulseSchedule";
 import { beatError, makeBeater } from "../lib/pulseSigner";
 import { aliveStrip, warningStrip, SEAL_TRACE, STATE_COLOR } from "../lib/pulse";
@@ -10,9 +10,29 @@ import Seal from "../components/Seal";
 import HoldToStop from "../components/HoldToStop";
 import type { VaultView } from "../types";
 
+/**
+ * Stores a pairing that arrived on this phone, unless it is for another contract or would replace a different
+ * stored key without the owner saying yes. Returns the stored pairing, or null when nothing changed.
+ */
+function acceptPairing(p: Pairing, current: StoredPulse | null): StoredPulse | null {
+  const d = decidePairing(p, current, CONTRACT);
+  if (d.kind === "refuse") throw new PairingError(d.message);
+  if (d.kind === "same") return current;
+  if (d.kind === "confirm" && !window.confirm(d.message)) return null;
+  const v: StoredPulse = { ...p, pairedMs: Date.now(), periodS: null, keepAlive: false };
+  savePulse(v);
+  return v;
+}
+
+/** A stored pairing for another contract (an older build, or another deployment on this origin) is not used. */
+function loadPulseHere(): StoredPulse | null {
+  const v = loadPulse();
+  return v && v.contract === CONTRACT ? v : null;
+}
+
 /** The owner's phone. Paired from the vault page; beats while open; hold to stop is the on-camera kill. */
 export default function Pulse() {
-  const [paired, setPaired] = useState<StoredPulse | null>(() => loadPulse());
+  const [paired, setPaired] = useState<StoredPulse | null>(() => loadPulseHere());
   const [justPaired, setJustPaired] = useState(false);
   const [linkErr, setLinkErr] = useState<string | null>(null);
 
@@ -20,20 +40,22 @@ export default function Pulse() {
   useEffect(() => {
     const h = window.location.hash;
     if (!/[#&]k=/.test(h)) return;
+    // Drop the key from the address bar and history before anything else, whatever the link turns out to be.
+    window.history.replaceState(null, "", window.location.pathname);
     try {
-      const p = parsePairing(h);
-      const v: StoredPulse = { ...p, pairedMs: Date.now(), periodS: null, keepAlive: false };
-      savePulse(v);
-      setPaired(v);
-      setJustPaired(true);
+      const current = loadPulseHere();
+      const v = acceptPairing(parsePairing(h), current);
+      if (v && v !== current) {
+        setPaired(v);
+        setJustPaired(true);
+      }
     } catch (e) {
       setLinkErr(e instanceof PairingError ? e.message : String(e));
     }
-    window.history.replaceState(null, "", window.location.pathname);
   }, []);
 
   if (!paired) return <Unpaired error={linkErr} onPaired={(v) => { setPaired(v); setJustPaired(true); }} />;
-  return <Paired key={paired.secret} cfg={paired} justPaired={justPaired} onChange={(v) => { if (v) savePulse(v); else localStorage.removeItem(PULSE_STORE); setPaired(v); }} />;
+  return <Paired key={paired.secret} cfg={paired} justPaired={justPaired} notice={linkErr} onChange={(v) => { if (v) savePulse(v); else localStorage.removeItem(PULSE_STORE); setPaired(v); }} />;
 }
 
 function Shell({ children }: { children: React.ReactNode }) {
@@ -63,10 +85,8 @@ function Unpaired({ error, onPaired }: { error: string | null; onPaired: (v: Sto
   const [err, setErr] = useState<string | null>(error);
   const pair = () => {
     try {
-      const p = parsePairing(text);
-      const v: StoredPulse = { ...p, pairedMs: Date.now(), periodS: null, keepAlive: false };
-      savePulse(v);
-      onPaired(v);
+      const v = acceptPairing(parsePairing(text), null);
+      if (v) onPaired(v);
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
     }
@@ -98,7 +118,7 @@ function Unpaired({ error, onPaired }: { error: string | null; onPaired: (v: Sto
 
 type Phase = "beating" | "stopped";
 
-function Paired({ cfg, justPaired, onChange }: { cfg: StoredPulse; justPaired: boolean; onChange: (v: StoredPulse | null) => void }) {
+function Paired({ cfg, justPaired, notice, onChange }: { cfg: StoredPulse; justPaired: boolean; notice?: string | null; onChange: (v: StoredPulse | null) => void }) {
   const beater = useMemo(() => makeBeater(cfg), [cfg.secret, cfg.contract, cfg.token]); // eslint-disable-line react-hooks/exhaustive-deps
   const [vault, setVault] = useState<VaultView | null>(null);
   const [viewErr, setViewErr] = useState<string | null>(null);
@@ -230,6 +250,7 @@ function Paired({ cfg, justPaired, onChange }: { cfg: StoredPulse; justPaired: b
       />
 
       {justPaired && beats === 0 && !stopped && <p className="mt-4 border-l border-life pl-3 text-[14px] text-text-2">Paired. The key is stored on this phone only.</p>}
+      {notice && <p role="alert" className="mt-4 break-words border-l border-dead pl-3 text-[14px] text-dead">{notice} This phone still sends the heartbeat for vault {cfg.token}.</p>}
 
       {showSettings ? (
         <Settings cfg={cfg} intervalS={intervalS} periodS={periodS} publicKey={beater.publicKey} onChange={onChange} />

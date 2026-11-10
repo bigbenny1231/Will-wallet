@@ -36,6 +36,18 @@ export default function Vault() {
 
   const v = vault.data;
   if (!vault.loaded) return <p className="wrap py-24 text-text-2">Loading vault {id}…</p>;
+  // `undefined` means no read has succeeded yet (the RPC is rate limited or down); only `null` means the contract
+  // answered that there is no such vault. The poll keeps retrying, so this clears by itself. SECURITY_REVIEW_3 D-4.
+  if (v === undefined) {
+    return (
+      <div className="wrap space-y-4 py-24">
+        <h1 className="display text-[48px]">Vault {id} could not be read.</h1>
+        <p className="text-text-2" role="status">The NEAR node did not answer. Trying again every few seconds; nothing is wrong with the vault.</p>
+        {vault.error && <ErrorNote>{vault.error.length > 200 ? vault.error.slice(0, 200) + "…" : vault.error}</ErrorNote>}
+        <Link className="tl" to="/">Back to vaults</Link>
+      </div>
+    );
+  }
   if (!v) {
     return (
       <div className="wrap space-y-4 py-24">

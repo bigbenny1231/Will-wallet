@@ -9,7 +9,9 @@
     <title>Dead Man's Wallet</title>
   </head>
   <body>
-    <div id="root"></div>
+    <!-- Shown until the app's script has loaded (it replaces the content of #root). The wallet and chain-signature
+         libraries are large, so on a slow phone the page would otherwise be blank for several seconds. -->
+    <div id="root"><p style="margin:0;padding:28px 24px;font:15px/1.5 system-ui,-apple-system,Segoe UI,sans-serif;color:#9aa0a6">Loading Dead Man’s Wallet…</p></div>
     <!-- CSP: this inline script is allowed by its sha256 in vercel.json. Edit it and the hash there must change too. -->
     <script>window.process = window.process || { env: {}, version: "", versions: {}, browser: true, nextTick: function (f) { setTimeout(f, 0); } };</script>
     <script type="module" src="/src/main.tsx"></script>

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { KeyPair } from "near-api-js";
-import { PairingError, loadPulse, pairingAppLink, pairingWebLink, parsePairing, savePulse, validatePairing, PULSE_STORE } from "./pairing";
+import { PairingError, decidePairing, loadPulse, pairingAppLink, pairingWebLink, parsePairing, savePulse, validatePairing, PULSE_STORE } from "./pairing";
 
 const secret = KeyPair.fromRandom("ed25519").toString();
 const P = { contract: "dmw-x8cx.testnet", token: "12", secret };
@@ -61,5 +61,33 @@ describe("pairing links", () => {
     expect(loadPulse(st)).toBeNull();
     m.set(PULSE_STORE, JSON.stringify({ ...P, secret: "nope" }));
     expect(loadPulse(st)).toBeNull();
+  });
+});
+
+describe("decidePairing (D-1: a link must not hijack a paired phone)", () => {
+  const HERE = "dmw-x8cx.testnet";
+  const other = KeyPair.fromRandom("ed25519").toString();
+
+  it("stores the first pairing for this contract", () => {
+    expect(decidePairing(P, null, HERE)).toEqual({ kind: "store" });
+  });
+  it("refuses a link for another contract, paired or not, and names both", () => {
+    const evil = { ...P, contract: "evil-contract.testnet" };
+    for (const current of [null, P]) {
+      const d = decidePairing(evil, current, HERE);
+      expect(d.kind).toBe("refuse");
+      expect(d.kind === "refuse" && d.message).toMatch(/evil-contract\.testnet/);
+      expect(d.kind === "refuse" && d.message).toMatch(/dmw-x8cx\.testnet/);
+    }
+  });
+  it("asks before replacing a different stored key or vault, and says which vault goes quiet", () => {
+    const d = decidePairing({ ...P, token: "99", secret: other }, P, HERE);
+    expect(d.kind).toBe("confirm");
+    expect(d.kind === "confirm" && d.message).toMatch(/vault 12/);
+    expect(d.kind === "confirm" && d.message).toMatch(/vault 99/);
+    expect(decidePairing({ ...P, secret: other }, P, HERE).kind).toBe("confirm");
+  });
+  it("opening the same link twice changes nothing", () => {
+    expect(decidePairing({ ...P }, P, HERE)).toEqual({ kind: "same" });
   });
 });

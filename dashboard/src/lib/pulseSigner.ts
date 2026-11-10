@@ -54,7 +54,7 @@ export function makeBeater(p: Pairing): Beater {
 /** Human sentence for the common failures of a pulse-key heartbeat. */
 export function beatError(e: unknown): string {
   const m = e instanceof Error ? e.message : String(e);
-  if (/does not exist while viewing|AccessKeyDoesNotExist|access key .* does not exist/i.test(m)) return "This key is not registered on the contract. It may have been removed or settlement deleted it.";
+  if (/does not exist while viewing|AccessKeyDoesNotExist|access key .* (does not|doesn't) exist/i.test(m)) return "This key is not registered on the contract. It may have been removed or settlement deleted it.";
   if (/NotEnoughAllowance|allowance/i.test(m)) return "The key's gas allowance is spent. Pair a new phone from the vault page.";
   if (/vault_triggered|Triggered|already_triggered/i.test(m)) return "The vault is triggered. Heartbeats are no longer accepted.";
   if (/Failed to fetch|NetworkError|network/i.test(m)) return "No connection to the NEAR node. Retrying.";

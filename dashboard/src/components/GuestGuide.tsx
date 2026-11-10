@@ -61,7 +61,10 @@ export default function GuestGuide({ v, now, guest }: { v: VaultView; now: numbe
     if (!beating) return;
     let stop = false;
     let timer: ReturnType<typeof setTimeout>;
+    let inFlight = false;
     const beat = async () => {
+      if (inFlight) return; // one transaction at a time on this key: two would collide on its nonce
+      inFlight = true;
       try {
         await beater.beat();
         if (stop) return;
@@ -70,14 +73,24 @@ export default function GuestGuide({ v, now, guest }: { v: VaultView; now: numbe
       } catch (e) {
         if (!stop) setBeatErr(beatError(e));
       } finally {
+        inFlight = false;
         if (!stop) timer = setTimeout(beat, GUEST_BEAT_MS);
       }
     };
     // First beat a little after the page settles, so a reload does not double up with the last one.
     timer = setTimeout(beat, Math.max(1500, Math.min(GUEST_BEAT_MS, v.last_beat_ms + GUEST_BEAT_MS - Date.now())));
+    // Browsers pause timers in a hidden tab (on a phone, opening a "tx" link is enough), and this vault may be poked
+    // after a minute of silence. Beat as soon as the page is in front again instead of waiting for the next timer.
+    const onVisible = () => {
+      if (stop || inFlight || document.visibilityState !== "visible") return;
+      clearTimeout(timer);
+      void beat();
+    };
+    document.addEventListener("visibilitychange", onVisible);
     return () => {
       stop = true;
       clearTimeout(timer);
+      document.removeEventListener("visibilitychange", onVisible);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [beating, beater]);
@@ -117,8 +130,13 @@ export default function GuestGuide({ v, now, guest }: { v: VaultView; now: numbe
     } catch (e) {
       const m = e instanceof Error ? e.message : String(e);
       const kind = /RequiresFullAccess/i.test(m) ? "RequiresFullAccess" : /access key|InvalidAccessKey|not allowed|permission/i.test(m) ? "InvalidAccessKeyError" : null;
-      note({ what, ok: false, hash: null, line: kind ? `Refused by the node before any contract code ran: ${kind}.` : `Refused: ${m.slice(0, 140)}` });
-      record({ label: "transfer with the agent key", hash: null, note: "refused by the node" });
+      if (kind) {
+        note({ what, ok: false, hash: null, line: `Refused by the node before any contract code ran: ${kind}.` });
+        record({ label: "transfer with the agent key", hash: null, note: "refused by the node" });
+      } else {
+        // A network or node error proves nothing about the key: say so instead of claiming a refusal.
+        note({ what, ok: false, hash: null, line: `Could not send it: ${guestError(e)} Try again.` });
+      }
     } finally {
       setAgentBusy(null);
     }
@@ -241,7 +259,7 @@ export default function GuestGuide({ v, now, guest }: { v: VaultView; now: numbe
             <>
               <p className="mt-4 max-w-[58ch] text-[17px] leading-relaxed text-text-2">
                 This browser holds a pulse key that can only call <code className="mono !text-[14px] text-text">heartbeat</code>. It beats every {GUEST_BEAT_MS / 1000} seconds; the vault expects one every {v.heartbeat_interval_s}.{" "}
-                <span className="num text-text">{beats}</span> sent from this page.
+                <span className="num text-text">{beats}</span> sent from this page. Keep this tab in front: a hidden tab stops beating, and this vault only waits a minute.
               </p>
               {beatErr && <div className="mt-3"><ErrorNote>{beatErr}</ErrorNote></div>}
 

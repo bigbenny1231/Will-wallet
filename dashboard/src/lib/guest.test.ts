@@ -14,6 +14,7 @@ import {
   parseGuest,
   planDeposit,
   publicKeyOf,
+  resumeInterrupted,
 } from "./guest";
 import { agentPayCall } from "./calls";
 import { describe as describeEvent, recordRows } from "../components/Record";
@@ -135,6 +136,57 @@ describe("faucet", () => {
     expect(guestError(new Error("NotEnoughBalance: ..."))).toMatch(/run out of test NEAR/);
     expect(guestError(new FaucetError("x"))).toBe("x");
     expect(guestError(new Error("z".repeat(500))).length).toBeLessThan(210);
+  });
+});
+
+describe("resumeInterrupted (D-6: a refresh during setup must not strand the run)", () => {
+  const NOW = 1_000_000;
+  const alive = { state: "Alive" as const, trigger_at_ms: NOW + 40_000 };
+  const chain = (owned: string[], vaults: Record<string, { state: string; trigger_at_ms: number } | null>) => ({
+    getVaultsForOwner: async () => owned.map((token_id) => ({ token_id })),
+    getVault: async (id: string) => (vaults[id] ?? null) as never,
+  });
+  const s = newGuestSession(C);
+  const spent = GUEST_PLAN.minDeposit - 1n; // an account that already paid for one vault
+  const full = GUEST_PLAN.deposit + GUEST_PLAN.keepForGas;
+
+  it("adopts the vault that create_vault made although its number was never stored", async () => {
+    const r = await resumeInterrupted(s, spent, chain(["7", "31"], { "31": alive }), NOW);
+    expect(r?.token).toBe("31");
+    expect(r?.accountId).toBe(s.accountId);
+  });
+  it("keeps a stored, still healthy vault", async () => {
+    const r = await resumeInterrupted({ ...s, token: "5" }, spent, chain([], { "5": alive }), NOW);
+    expect(r?.token).toBe("5");
+  });
+  it("nothing to resume and no NEAR for a vault: a new account (null), not an endless error", async () => {
+    expect(await resumeInterrupted(s, spent, chain([], {}), NOW)).toBeNull();
+  });
+  it("a vault that is overdue, triggered or settled cannot take keys: new vault if affordable, else new account", async () => {
+    for (const dead of [{ state: "Triggered", trigger_at_ms: NOW - 1 }, { state: "Settled", trigger_at_ms: NOW - 1 }, { state: "Warning", trigger_at_ms: NOW - 1 }]) {
+      expect(await resumeInterrupted({ ...s, token: "5" }, spent, chain(["5"], { "5": dead }), NOW)).toBeNull();
+      const again = await resumeInterrupted({ ...s, token: "5" }, full, chain(["5"], { "5": dead }), NOW);
+      expect(again?.token).toBeNull();
+      expect(again?.accountId).toBe(s.accountId);
+    }
+  });
+  it("a fresh account with no vault keeps going on the same session", async () => {
+    const r = await resumeInterrupted(s, full, chain([], {}), NOW);
+    expect(r).toEqual({ ...s, token: null });
+  });
+});
+
+describe("error sentences", () => {
+  it("D-5: near-api-js 6 says \"doesn't exist\" for a deleted access key", () => {
+    const m = "Can't complete the action because access key ed25519:6wV7hpZRyfVskAXBo9ATWYScWLohLybg5Tyj doesn't exist";
+    expect(guestError(new Error(m))).toMatch(/no longer on the account/);
+    expect(guestError(new Error("account x.testnet does not exist while viewing"))).toMatch(/no longer exists/);
+  });
+  it("a faucet that hangs is reported as a timeout", async () => {
+    const hang = (async () => {
+      throw Object.assign(new Error("The operation was aborted due to timeout"), { name: "TimeoutError" });
+    }) as unknown as typeof fetch;
+    await expect(createGuestAccount(newGuestSession(C), hang)).rejects.toThrow(/did not answer in time/);
   });
 });
 

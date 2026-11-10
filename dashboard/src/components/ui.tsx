@@ -86,7 +86,7 @@ export function CopyBox({ value, label }: { value: string; label?: string }) {
 
 export function ErrorNote({ children }: { children: ReactNode }) {
   return (
-    <div role="alert" className="border-l border-dead py-1 pl-4 text-[15px] text-dead">
+    <div role="alert" className="break-words border-l border-dead py-1 pl-4 text-[15px] text-dead [overflow-wrap:anywhere]">
       {children}
     </div>
   );

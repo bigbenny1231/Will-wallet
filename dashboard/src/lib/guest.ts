@@ -180,6 +180,33 @@ export function planDeposit(available: bigint): bigint | null {
   return null;
 }
 
+/**
+ * A guest session whose setup stopped half way (a refresh or a dropped connection while a transaction was in
+ * flight). Returns the session to continue with, or null when a new account is needed:
+ *  - no vault number stored: the vault may exist all the same (create_vault landed, the page never saw the answer).
+ *    The newest vault this account owns is adopted instead of paying for a second one.
+ *  - a vault that is past its deadline, triggered or settled can no longer take keys. It is left alone (the hosted
+ *    sweep settles it) and a new vault is made if the account can still pay for one.
+ */
+export async function resumeInterrupted(
+  s: GuestSession,
+  balance: bigint,
+  chain: { getVaultsForOwner(account: string): Promise<Pick<VaultView, "token_id">[]>; getVault(id: string): Promise<Pick<VaultView, "state" | "trigger_at_ms"> | null> },
+  now: number = Date.now(),
+): Promise<GuestSession | null> {
+  let token = s.token;
+  if (!token) {
+    const mine = await chain.getVaultsForOwner(s.accountId);
+    token = mine.map((x) => x.token_id).sort((a, b) => Number(BigInt(b) - BigInt(a)))[0] ?? null;
+  }
+  if (token) {
+    const v = await chain.getVault(token);
+    if (v && v.state !== "Triggered" && v.state !== "Settled" && now < v.trigger_at_ms) return { ...s, token };
+  }
+  if (planDeposit(balance) === null) return null;
+  return { ...s, token: null };
+}
+
 export type GuestStage = "alive" | "silence" | "due" | "settling" | "settled";
 
 /** Where the run stands, from the chain view and the one local fact (did the guest stop the pulse). */
@@ -199,6 +226,7 @@ export function accountFor(accountId: string, secret: string): Account {
 }
 
 export class FaucetError extends Error {}
+const FAUCET_TIMEOUT_MS = 30_000;
 
 /** Asks the public testnet faucet to create the account with this session's key. Resolves once it exists. */
 export async function createGuestAccount(s: GuestSession, fetchImpl: typeof fetch = fetch): Promise<void> {
@@ -208,8 +236,13 @@ export async function createGuestAccount(s: GuestSession, fetchImpl: typeof fetc
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ newAccountId: s.accountId, newAccountPublicKey: publicKeyOf(s.secret) }),
+      // The public faucet sometimes hangs; without a limit the page would sit on "Setting up…" for good.
+      signal: AbortSignal.timeout(FAUCET_TIMEOUT_MS),
     });
-  } catch {
+  } catch (e) {
+    if (e instanceof Error && /TimeoutError|AbortError|aborted|timed out/i.test(`${e.name} ${e.message}`)) {
+      throw new FaucetError("The testnet faucet did not answer in time. Try again in a minute, or connect a testnet wallet.");
+    }
     throw new FaucetError("The testnet faucet could not be reached. Check the connection and try again.");
   }
   if (!res.ok) {
@@ -274,6 +307,7 @@ export function guestError(e: unknown): string {
   if (e instanceof FaucetError) return m;
   if (/NotEnoughBalance|LackBalance|not enough balance/i.test(m)) return "The guest account has run out of test NEAR. Start a new run.";
   if (/Failed to fetch|NetworkError|timed out|timeout|408|503/i.test(m)) return "The NEAR node did not answer in time. Try again.";
-  if (/does not exist while viewing|UNKNOWN_ACCOUNT/i.test(m)) return "This guest account no longer exists on testnet. Start a new run.";
+  if (/access key .* (does not|doesn't) exist|AccessKeyDoesNotExist/i.test(m)) return "This key is no longer on the account. Settlement deletes the pulse and agent keys.";
+  if (/does not exist while viewing|doesn't exist|UNKNOWN_ACCOUNT/i.test(m)) return "This guest account no longer exists on testnet. Start a new run.";
   return m.length > 200 ? m.slice(0, 200) + "…" : m;
 }
