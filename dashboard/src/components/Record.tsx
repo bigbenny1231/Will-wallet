@@ -52,7 +52,7 @@ export function describe(e: LogEntry, alias: (id: string) => string | null = () 
     case "dao_proposal":
       return { tone: "brass", title: "Step IV: proposal filed in the estate DAO", detail: d };
     case "dao_proposal_failed":
-      return { tone: "warn", title: "Step IV: the DAO proposal failed; the bond returned", detail: d };
+      return { tone: "warn", title: "Step IV: the DAO proposal failed; settlement went on", detail: d };
     case "heirs_set":
       return { tone: "plain", title: "Heirs changed", detail: d };
     case "policy_set":

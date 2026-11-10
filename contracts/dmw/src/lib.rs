@@ -1063,8 +1063,13 @@ impl Contract {
                 );
             }
             Err(_) => {
-                // The bond is refunded to the contract account on failure; give it back to the vault.
-                v.balance += DAO_BOND;
+                // The bond is NOT credited back to the vault. `dao_id` is any account the owner names, and
+                // an `Err` here does not prove the bond came back: a contract can accept the deposit
+                // (its receipt succeeds, so nothing is refunded) and return a promise that fails, which
+                // is what this callback then sees. Crediting the vault in that case paid the bond twice,
+                // out of other vaults' NEAR (finding C-2, docs/SECURITY_REVIEW_3.md). When the call
+                // really fails, the refund lands in the contract's free balance, as a refunded Sputnik
+                // bond already does (M-4).
                 let data = json!({"token_id": token_id.to_string(), "dao_id": v.dao_id});
                 record(
                     &mut v,

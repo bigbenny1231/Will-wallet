@@ -649,13 +649,46 @@ fn step1_keeps_dao_reserve_and_step4_proposes() {
     Ctx::new().by("dmw.testnet").set();
     assert_eq!(c.on_dao_proposal(1, Ok(7)), 5);
     assert_eq!(v(&c).dao_proposal_id, Some(7));
-    // failure path re-credits the bond and continues
+    // failure path: settlement continues and the bond is NOT credited back (C-2)
     assert_eq!(c.on_dao_proposal(1, Err(near_sdk::PromiseError::Failed)), 5);
-    assert_eq!(v(&c).balance, before);
+    assert_eq!(v(&c).balance, before - DAO_BOND);
+    assert_eq!(v(&c).log.last().unwrap().event, "dao_proposal_failed");
     // the DAO may ratify via mark_broadcast
     Ctx::new().by("estate.sputnik-v2.testnet").set();
     c.mark_broadcast(1.into(), 0, "dao-ratified".into());
     assert_eq!(v(&c).log.last().unwrap().event, "dao_ratified");
+}
+
+/// C-2 (docs/SECURITY_REVIEW_3.md): `dao_id` is any account. A contract can keep the 1 NEAR bond (its
+/// `add_proposal` receipt succeeds) and return a promise that fails, so the callback gets `Err` although
+/// nothing was refunded. The vault must not get the bond back, or `claim` pays it out of other vaults' NEAR.
+#[test]
+fn step4_failed_dao_call_never_recredits_the_bond() {
+    let mut c = setup();
+    Ctx::new().dep(1).set();
+    c.set_dao(1.into(), Some(acc("evil-dao.testnet")));
+    trigger(&mut c);
+    Ctx::new().by("keeper.testnet").at(T0 + 41_000).set();
+    let _ = c.execute_step(1.into(), None); // step 1: heirs paid, 1.5 NEAR reserve kept
+    let _ = c.execute_step(1.into(), None); // step 2
+    let _ = c.execute_step(1.into(), None); // step 3, no payouts
+    let reserve = v(&c).balance;
+    let _ = c.execute_step(1.into(), None); // step 4: the bond leaves with the call
+    assert_eq!(v(&c).balance, reserve - DAO_BOND);
+    // the "DAO" kept the deposit and made the returned promise fail
+    Ctx::new().by("dmw.testnet").set();
+    assert_eq!(c.on_dao_proposal(1, Err(near_sdk::PromiseError::Failed)), 5);
+    assert_eq!(v(&c).balance, reserve - DAO_BOND);
+    // a second, late callback changes nothing either
+    assert_eq!(c.on_dao_proposal(1, Err(near_sdk::PromiseError::Failed)), 5);
+    assert_eq!(v(&c).balance, reserve - DAO_BOND);
+    // step 5 and the claim hand out exactly what the vault still holds
+    Ctx::new().by("keeper.testnet").at(T0 + 42_000).set();
+    let _ = c.execute_step(1.into(), None);
+    let heir = v(&c).owner_id.clone();
+    Ctx::new().by(heir.as_str()).set();
+    assert_eq!(c.claim(1.into()).0, reserve - DAO_BOND);
+    assert_eq!(v(&c).balance, 0);
 }
 
 #[test]
