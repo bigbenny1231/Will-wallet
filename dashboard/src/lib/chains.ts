@@ -63,7 +63,11 @@ export async function stepArgsFor(v: VaultView, fromAddressFallback?: string): P
   if (p.chain === "base" || p.chain === "monad") {
     // Some stored payouts have an empty from_address (e.g. created without the derived addresses): derive it
     // in the browser from the contract id and token id, exactly as the MPC path does.
-    const from = p.from_address || fromAddressFallback || deriveFor(v.token_id)[p.chain];
+    // `from_address` is free text the owner wrote; the contract never signs with it. Only a well-formed EVM address
+    // goes to the RPC: anything else would make eth_getTransactionCount fail and stop settlement at step 3
+    // (the keeper has the same rule, SECURITY_REVIEW_3 K-1).
+    const stored = p.from_address ?? "";
+    const from = /^0x[0-9a-fA-F]{40}$/.test(stored) ? stored : fromAddressFallback || deriveFor(v.token_id)[p.chain];
     if (!from) throw new Error(`No source address recorded for this ${p.chain === "base" ? "Base" : "Monad"} payout`);
     return { evm: await getEvmStepArgs(from, p.chain) };
   }
