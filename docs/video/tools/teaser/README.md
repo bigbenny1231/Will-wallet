@@ -26,7 +26,27 @@ ffmpeg -framerate 30 -i frames/f%04d.png -i teaser.wav -c:v libx264 -preset slow
        -c:a aac -b:a 192k -shortest -movflags +faststart dmw-teaser.mp4
 ```
 
-`vo.mp3` is one line from a stock ElevenLabs voice ("Daniel", `eleven_multilingual_v2`). Everything else in the sound
-is synthesised in `synth.py`. The mp4 is not committed.
+## Sound, second mix (`synth2.py`)
+
+The first mix (`synth.py`, `vo.mp3`) was synthesised apart from one spoken line. The second replaces the music and
+the voice with ElevenLabs output and keeps only the sounds that must land on a frame (the heart, the monitor tone, the
+stamps) synthesised:
+
+| File in `el/` | What | Made with |
+| --- | --- | --- |
+| `cueA.mp3` | 24 s cue: a rising build, an orchestral hit, a decaying drone | Music API, `music_v1`, from `planA.json` |
+| `sfx_riser.mp3`, `sfx_hit.mp3`, `sfx_chord.mp3` | riser into the flatline, the impact, the chord under the end card | sound-generation API |
+| `vo_brian_l1.mp3`, `vo_brian_l2.mp3` | "If you die tonight... your agent keeps spending." and the tagline, stock voice "Brian" | `eleven_multilingual_v2` |
+| `vo_cinematic_l2.mp3` | the tagline in a slower trailer voice from the account's library (the alternate cut) | `eleven_multilingual_v2` |
+
+`synth2.py` finds the cue's own hit (10.5 s into the cue) and places the cue so that hit lands on the flatline at
+4.08 s, ends the riser on the same frame, and cuts everything to silence at "Settled.".
+
+```bash
+for f in el/vo_*.mp3; do ffmpeg -i $f -af silenceremove=start_periods=1:start_threshold=-45dB -ar 48000 -ac 1 ${f%.mp3}.wav; done
+python3 synth2.py brian teaser-brian.wav          # or: cinematic teaser-cinematic.wav
+```
+
+The words in the finished mix were checked by transcribing it; nobody has listened to it by ear in the build.
 
 One frame at the flatline is a full-screen light flash. There is one, not a series.
