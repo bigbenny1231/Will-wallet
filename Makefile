@@ -1,7 +1,8 @@
 SHELL := /bin/bash
 .DEFAULT_GOAL := help
 # .env is read by the scripts themselves (scripts/lib.sh, keeper/src/config.ts); it is not exported into
-# every make recipe, so cargo and npm never see KEEPER_PRIVATE_KEY.
+# every make recipe. scripts/lib.sh does export it to what the scripts start, so the two places that run npm ci or
+# cargo from a script (ensure_deps, deploy.sh) unset the key variables first.
 
 TOKEN ?= $(shell cat .demo/vault_id 2>/dev/null || echo 1)
 KEEPER_DEPS := keeper/node_modules/.package-lock.json

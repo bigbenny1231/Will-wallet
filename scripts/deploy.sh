@@ -10,7 +10,7 @@
 # the key is saved to keys/<acct>.json, which is gitignored). A keeper account dmw-keeper-<rand>.testnet
 # is created too if .env has none, and registered on the contract with set_keeper.
 #
-# Writes .env: NEAR_NETWORK, DMW_CONTRACT, DMW_CONTRACT_KEY, DMW_CONTRACT_KEYFILE, KEEPER_ACCOUNT_ID,
+# Writes .env: NEAR_NETWORK, DMW_CONTRACT, DMW_CONTRACT_KEYFILE (a path, not the key), KEEPER_ACCOUNT_ID,
 # KEEPER_PRIVATE_KEY, BASE_RPC, SOLANA_RPC.
 #
 # Expect (~1-2 min with a warm cargo cache): build, faucet lines, a deploy tx link, an init tx link,
@@ -40,7 +40,8 @@ if [ ! -f "keys/$ACCOUNT.json" ] && [ ! -f "$HOME/.near-credentials/testnet/$ACC
 fi
 
 say "building"
-./contracts/dmw/build.sh
+# cargo and its build scripts do not need the keys that load_env exported from .env
+env -u KEEPER_PRIVATE_KEY -u DMW_CONTRACT_KEY -u DMW_AGENT_KEY -u DMW_PULSE_KEY ./contracts/dmw/build.sh
 WASM=contracts/dmw/target/near/dmw.wasm
 [ -f "$WASM" ] || WASM=contracts/dmw/target/wasm32-unknown-unknown/release/dmw.wasm
 
@@ -55,8 +56,9 @@ fi
 set_env NEAR_NETWORK testnet
 set_env DMW_CONTRACT "$ACCOUNT"
 if [ -f "keys/$ACCOUNT.json" ]; then
+  # Only the path: the contract account's full-access key stays in keys/ (0600) and is not copied into .env,
+  # where every script that sources .env would export it to its child processes. Nothing reads it from there.
   set_env DMW_CONTRACT_KEYFILE "keys/$ACCOUNT.json"
-  set_env DMW_CONTRACT_KEY "$(key_of "$ACCOUNT")"
 fi
 set_env BASE_RPC "${BASE_RPC:-https://sepolia.base.org}"
 set_env SOLANA_RPC "${SOLANA_RPC:-https://api.devnet.solana.com}"

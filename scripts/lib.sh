@@ -15,7 +15,7 @@ set_env() {
   else
     printf '%s=%s\n' "$1" "$2" >> .env
   fi
-  chmod 600 .env   # holds KEEPER_PRIVATE_KEY and DMW_CONTRACT_KEY; also tightens a .env made by hand (AUDIT_FINAL_OFFCHAIN F-01)
+  chmod 600 .env   # holds KEEPER_PRIVATE_KEY; also tightens a .env made by hand (AUDIT_FINAL_OFFCHAIN F-01)
   export "$1=$2"
 }
 
@@ -24,7 +24,8 @@ ensure_deps() {
   local d=$1
   if [ ! -f "$d/node_modules/.package-lock.json" ] || [ "$d/package-lock.json" -nt "$d/node_modules/.package-lock.json" ]; then
     say "installing $d dependencies (npm ci)"
-    (cd "$d" && npm ci --no-audit --no-fund --loglevel=error) || die "npm ci failed in $d"
+    # load_env exports all of .env to child processes; package install scripts must not inherit the keys.
+    (cd "$d" && env -u KEEPER_PRIVATE_KEY -u DMW_CONTRACT_KEY -u DMW_AGENT_KEY -u DMW_PULSE_KEY npm ci --no-audit --no-fund --loglevel=error) || die "npm ci failed in $d"
   fi
 }
 
