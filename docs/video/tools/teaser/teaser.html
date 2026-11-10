@@ -1,0 +1,282 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<style>
+@font-face { font-family: "Instrument Serif"; font-style: normal; src: url("../../../../site/fonts/instrument-serif-latin-400-normal.woff2") format("woff2"); }
+@font-face { font-family: "Instrument Serif"; font-style: italic; src: url("../../../../site/fonts/instrument-serif-latin-400-italic.woff2") format("woff2"); }
+@font-face { font-family: "Inter Tight"; font-weight: 500; src: url("../../../../site/fonts/inter-tight-latin-500-normal.woff2") format("woff2"); }
+@font-face { font-family: "JetBrains Mono"; src: url("../../../../site/fonts/jetbrains-mono-latin-400-normal.woff2") format("woff2"); }
+html, body { margin: 0; background: #000; overflow: hidden; }
+canvas { display: block; }
+</style></head>
+<body><canvas id="c"></canvas>
+<script>
+// Dead Man's Wallet teaser. Every frame is a pure function of its index: renderFrame(i) draws frame i at FPS.
+const FPS = 30, DUR = 10.6;
+const INK = '#0B0C0F', BONE = '#EDE7DC', BONE2 = '#A9A399', BRASS = '#C8A96A', LIFE = '#3DDC84', WARN = '#F5B942', DEAD = '#FF4D4D', STILL = '#7A7F87';
+const q = new URLSearchParams(location.search);
+const W = +(q.get('w') || 1920), H = +(q.get('h') || 1080);
+const c = document.getElementById('c'); c.width = W; c.height = H;
+const ctx = c.getContext('2d');
+const glow = document.createElement('canvas'); glow.width = W; glow.height = H; const g = glow.getContext('2d');
+const u = Math.min(W, H) / 1080;            // design unit
+const wide = W / H > 1.3;
+const CY = H * (wide ? 0.47 : 0.44);        // the line
+const PEN = W * 0.70;                        // where the pen writes
+const SPEED = W * 0.52;                      // px per second the paper moves
+const AMP = H * 0.27;
+
+// ---- the timeline ----
+const BEATS = [0.40, 1.15, 1.80, 2.35, 2.80, 3.15, 3.42, 3.64, 3.82, 3.96];
+const T_FLAT = 4.08, T_TRIG = 4.50, T_STEPS = 4.95, STEP = 0.45, T_SETTLED = 7.20, T_END = 7.65, T_LAST = 10.02;
+const WORDS = [
+  [0.40, 1.15, 'If you die tonight,', 'serif'],
+  [1.15, 1.80, 'your agent', 'serif'],
+  [1.80, 2.35, 'keeps spending.', 'serif'],
+  [2.35, 2.80, 'Your', 'big'], [2.80, 3.15, 'crypto', 'big'], [3.15, 3.42, 'dies', 'big'], [3.42, 3.64, 'with', 'big'], [3.64, 4.08, 'you.', 'big'],
+];
+const STEPS = [['I', 'Heirs paid on NEAR.'], ['II', 'Agent key deleted.'], ['III', 'Base. Monad. Solana. Signed.'], ['IV', 'Estate DAO proposal filed.'], ['V', 'Will NFT to the heir.']];
+
+// ---- helpers ----
+const clamp = (x, a = 0, b = 1) => Math.max(a, Math.min(b, x));
+const lerp = (a, b, k) => a + (b - a) * k;
+const easeOut = (k) => 1 - Math.pow(1 - clamp(k), 4);
+const gauss = (d, m, s) => Math.exp(-0.5 * ((d - m) / s) ** 2);
+function rng(seed) { let a = seed >>> 0; return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function hex(h) { return [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)]; }
+function mix(a, b, k) { const A = hex(a), B = hex(b); return `rgb(${A.map((v, i) => Math.round(lerp(v, B[i], clamp(k)))).join(',')})`; }
+function rgba(h, a) { const A = hex(h); return `rgba(${A[0]},${A[1]},${A[2]},${a})`; }
+
+// One heartbeat: P, QRS, T. k squeezes it when the beats come fast.
+function shape(d, k) { d /= k; return 0.10 * gauss(d, -0.105, 0.022) - 0.15 * gauss(d, -0.024, 0.0075) + 1.0 * gauss(d, 0, 0.0095) - 0.32 * gauss(d, 0.026, 0.0095) + 0.24 * gauss(d, 0.20, 0.046); }
+const KS = BEATS.map((b, i) => clamp(((BEATS[i + 1] ?? T_FLAT) - b) / 0.75, 0.30, 1));
+function ecg(tau) { if (tau >= T_FLAT) return 0; let y = 0; for (let i = 0; i < BEATS.length; i++) { const d = tau - BEATS[i]; if (d > -0.2 && d < 0.5) y += shape(d, KS[i]); } return y; }
+const sinceBeat = (t) => { let s = 99; for (const b of BEATS) if (t >= b) s = t - b; return s; };
+const beatIndex = (t) => { let n = -1; for (let i = 0; i < BEATS.length; i++) if (t >= BEATS[i]) n = i; return n; };
+
+function text(str, x, y, font, color, o = {}) {
+  ctx.save();
+  ctx.font = font; ctx.textAlign = o.align || 'left'; ctx.textBaseline = o.base || 'alphabetic';
+  if (o.spacing) ctx.letterSpacing = o.spacing;
+  ctx.globalAlpha = o.alpha ?? 1;
+  if (o.split) { // a few frames of colour fringing on the cut
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.fillStyle = rgba('#FF3B3B', 0.55 * o.split); ctx.fillText(str, x - 9 * u * o.split, y);
+    ctx.fillStyle = rgba('#28E0FF', 0.45 * o.split); ctx.fillText(str, x + 9 * u * o.split, y);
+    ctx.globalCompositeOperation = 'source-over';
+  }
+  if (o.shadow) { ctx.shadowColor = o.shadow; ctx.shadowBlur = (o.blur ?? 40) * u; }
+  ctx.fillStyle = color; ctx.fillText(str, x, y);
+  ctx.restore();
+}
+function fit(str, font, size, maxW) { ctx.font = font.replace('SIZE', size + 'px'); const w = ctx.measureText(str).width; return w > maxW ? size * maxW / w : size; }
+
+// ECG paper: a faint brass grid that brightens on each beat.
+function paper(t, k) {
+  ctx.save(); ctx.strokeStyle = rgba(BRASS, 0.035 + 0.05 * k); ctx.lineWidth = 1;
+  const s = 54 * u, ox = (-(t * SPEED * 0.35) % s + s) % s;
+  ctx.beginPath();
+  for (let x = ox; x < W; x += s) { ctx.moveTo(Math.round(x) + .5, 0); ctx.lineTo(Math.round(x) + .5, H); }
+  for (let y = CY % s; y < H; y += s) { ctx.moveTo(0, Math.round(y) + .5); ctx.lineTo(W, Math.round(y) + .5); }
+  ctx.stroke(); ctx.restore();
+}
+
+// The seal ring the pen sits in: double brass rim, an inscription that turns slowly.
+function ring(cx, cy, R, t, state, word, a = 1, o = {}) {
+  ctx.save(); ctx.globalAlpha = a;
+  ctx.strokeStyle = BRASS; ctx.lineWidth = Math.max(1.5, R * 0.0066); ctx.beginPath(); ctx.arc(cx, cy, R, 0, 7); ctx.stroke();
+  ctx.lineWidth = Math.max(1, R * 0.0032); ctx.beginPath(); ctx.arc(cx, cy, R * 0.971, 0, 7); ctx.stroke();
+  ctx.lineWidth = Math.max(1, R * 0.004); ctx.beginPath(); ctx.arc(cx, cy, R * 0.763, 0, 7); ctx.stroke();
+  const unit = `DEAD MAN’S WALLET · VAULT 0042 · ${word} · `, s = unit + unit;
+  const fs = R * 0.07; ctx.font = `500 ${fs}px "Inter Tight"`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  const rr = R * 0.862, rot = (o.rot ?? t * 0.10) - Math.PI / 2;
+  for (let i = 0; i < s.length; i++) {
+    const ang = rot + (i / s.length) * Math.PI * 2;
+    ctx.save(); ctx.translate(cx + Math.cos(ang) * rr, cy + Math.sin(ang) * rr); ctx.rotate(ang + Math.PI / 2);
+    const wi = unit.lastIndexOf(word), ci = i % unit.length, inWord = ci >= wi && ci < wi + word.length;
+    ctx.fillStyle = inWord ? state : BRASS; ctx.fillText(s[i], 0, 0); ctx.restore();
+  }
+  ctx.restore();
+}
+
+function grainAndVignette(i) {
+  const r = rng(1000 + i), n = 220, id = new ImageData(n, n);
+  for (let p = 0; p < n * n; p++) { const v = 255 * r(); id.data[p * 4] = id.data[p * 4 + 1] = id.data[p * 4 + 2] = v; id.data[p * 4 + 3] = 255; }
+  const tile = document.createElement('canvas'); tile.width = tile.height = n; tile.getContext('2d').putImageData(id, 0, 0);
+  ctx.save(); ctx.globalCompositeOperation = 'overlay'; ctx.globalAlpha = 0.085; ctx.fillStyle = ctx.createPattern(tile, 'repeat'); ctx.fillRect(0, 0, W, H); ctx.restore();
+  const v = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.35, W / 2, H / 2, Math.hypot(W, H) * 0.62);
+  v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(1, 'rgba(0,0,0,0.72)');
+  ctx.fillStyle = v; ctx.fillRect(0, 0, W, H);
+}
+
+function bloom(strength = 1) {
+  ctx.save(); ctx.globalCompositeOperation = 'lighter';
+  ctx.filter = `blur(${Math.round(46 * u)}px)`; ctx.globalAlpha = 0.85 * strength; ctx.drawImage(glow, 0, 0);
+  ctx.filter = `blur(${Math.round(14 * u)}px)`; ctx.globalAlpha = 0.9 * strength; ctx.drawImage(glow, 0, 0);
+  ctx.filter = `blur(${Math.round(4 * u)}px)`; ctx.globalAlpha = 0.8; ctx.drawImage(glow, 0, 0);
+  ctx.filter = 'none'; ctx.globalAlpha = 1; ctx.drawImage(glow, 0, 0);
+  ctx.restore();
+}
+
+// ---- act I and II: the trace ----
+function trace(t, color, upto = PEN) {
+  g.clearRect(0, 0, W, H);
+  const step = 1.25, xs = [];
+  for (let x = upto; x > -40; x -= step) { const tau = t - (PEN - x) / SPEED; if (tau < 0) break; xs.push([x, CY - ecg(tau) * AMP]); }
+  if (xs.length < 2) return;
+  // the trail thins out to the left
+  const grad = g.createLinearGradient(0, 0, PEN, 0); grad.addColorStop(0, rgba(color, 0)); grad.addColorStop(0.35, rgba(color, 0.55)); grad.addColorStop(1, rgba(color, 1));
+  g.strokeStyle = grad; g.lineWidth = 4.2 * u; g.lineJoin = 'round'; g.lineCap = 'round';
+  g.beginPath(); g.moveTo(xs[0][0], xs[0][1]); for (const p of xs) g.lineTo(p[0], p[1]); g.stroke();
+  // the pen
+  g.fillStyle = '#fff'; g.beginPath(); g.arc(xs[0][0], xs[0][1], 6.5 * u, 0, 7); g.fill();
+  g.fillStyle = rgba(color, 0.9); g.beginPath(); g.arc(xs[0][0], xs[0][1], 13 * u, 0, 7); g.fill();
+}
+
+function actAlive(t, i) {
+  const sb = sinceBeat(t), k = Math.exp(-sb / 0.16), n = beatIndex(t);
+  const flat = t >= T_FLAT, sf = t - T_FLAT;
+  const color = flat ? mix(LIFE, DEAD, sf / 0.10) : LIFE;
+  const colHex = flat ? (sf > 0.05 ? DEAD : LIFE) : LIFE;
+  // shake: a kick on every beat, a hard one on the flatline
+  const r = rng(77 + i), kick = (flat ? 30 * Math.exp(-sf / 0.22) : 9 * k * (1 + n * 0.22)) * u;
+  ctx.save(); ctx.translate((r() - .5) * kick, (r() - .5) * kick);
+  const z = 1 + (flat ? 0.02 * Math.exp(-sf / 0.3) : 0.012 * k); ctx.translate(W / 2, H / 2); ctx.scale(z, z); ctx.translate(-W / 2, -H / 2);
+  paper(t, k);
+  // light pooling under the pen
+  const pool = ctx.createRadialGradient(PEN, CY, 0, PEN, CY, H * 0.75);
+  pool.addColorStop(0, rgba(colHex, 0.13 + 0.16 * k)); pool.addColorStop(1, rgba(colHex, 0));
+  ctx.fillStyle = pool; ctx.fillRect(0, 0, W, H);
+  ring(PEN, CY, H * 0.40 * (1 + 0.018 * k), t, colHex, flat ? 'TRIGGERED' : 'ALIVE', 0.55 + 0.35 * k);
+  trace(t, colHex);
+  bloom(0.75 + 0.9 * k + (flat ? 1.2 * Math.exp(-sf / 0.25) : 0));
+  // anamorphic streak on the spike
+  if (k > 0.25 && !flat) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; const sg = ctx.createLinearGradient(0, 0, W, 0); sg.addColorStop(0, rgba(LIFE, 0)); sg.addColorStop(PEN / W, rgba(LIFE, 0.55 * k)); sg.addColorStop(1, rgba(LIFE, 0)); ctx.fillStyle = sg; ctx.fillRect(0, CY - 2.5 * u, W, 5 * u); ctx.restore(); }
+  // words
+  const tx = W * 0.065, ty = H * (wide ? 0.855 : 0.86);
+  for (const [a, b, str, kind] of WORDS) {
+    if (t < a || t >= b) continue;
+    const age = t - a, pop = easeOut(age / 0.14), split = Math.max(0, 1 - age / 0.10);
+    if (kind === 'serif') {
+      const fs = fit(str, '400 SIZE "Instrument Serif"', 196 * u, W * (wide ? 0.60 : 0.86));
+      ctx.save(); ctx.translate(tx, ty); ctx.scale(lerp(1.10, 1, pop), lerp(1.10, 1, pop));
+      text(str, 0, 0, `400 ${fs}px "Instrument Serif"`, BONE, { split, shadow: 'rgba(0,0,0,.9)' }); ctx.restore();
+    } else {
+      const fs = fit(str, 'italic 400 SIZE "Instrument Serif"', 360 * u, W * (wide ? 0.52 : 0.8));
+      ctx.save(); ctx.translate(tx, ty + 16 * u); ctx.scale(lerp(1.22, 1, pop), lerp(1.22, 1, pop));
+      text(str, 0, 0, `italic 400 ${fs}px "Instrument Serif"`, str === 'dies' || str === 'you.' ? BONE : BONE, { split, shadow: 'rgba(0,0,0,.9)' }); ctx.restore();
+    }
+  }
+  // small caps: what you are looking at
+  text(flat ? 'NO HEARTBEAT' : 'HEARTBEAT · VAULT 0042', tx, H * 0.105, `500 ${27 * u}px "Inter Tight"`, flat ? DEAD : BRASS, { spacing: `${4 * u}px`, alpha: 0.95 });
+  if (n >= 0) {
+    const since = t - BEATS[n];
+    if (wide) {
+      text(`${since.toFixed(2)} s`, W * 0.935, H * 0.105, `400 ${30 * u}px "JetBrains Mono"`, flat ? DEAD : BONE, { align: 'right', alpha: 0.95 });
+      text('SINCE THE LAST BEAT', W * 0.935, H * 0.105 + 38 * u, `500 ${18 * u}px "Inter Tight"`, flat ? DEAD : BONE2, { align: 'right', spacing: `${3 * u}px`, alpha: 0.85 });
+    } else {
+      text(`${since.toFixed(2)} s since the last beat`, tx, H * 0.105 + 46 * u, `400 ${26 * u}px "JetBrains Mono"`, flat ? DEAD : BONE, { alpha: 0.92, shadow: 'rgba(0,0,0,.9)', blur: 14 });
+    }
+  }
+  ctx.restore();
+  // the cut to flatline: one frame of bone, then red bleeding off
+  if (flat && sf < 1 / FPS + 1e-6) { ctx.fillStyle = rgba(BONE, 0.82); ctx.fillRect(0, 0, W, H); }
+  else if (flat) { ctx.fillStyle = rgba(DEAD, 0.20 * Math.exp(-sf / 0.16)); ctx.fillRect(0, 0, W, H); }
+}
+
+// ---- act III: the flat line becomes the settlement timeline ----
+function actSettle(t, i) {
+  const settled = t >= T_SETTLED, col = settled ? STILL : DEAD;
+  const trig = t < T_STEPS, cutAt = trig ? T_TRIG : settled ? T_SETTLED : T_STEPS + Math.floor((t - T_STEPS) / STEP) * STEP;
+  const age = t - cutAt, hit = Math.exp(-age / 0.10), n = trig ? -1 : settled ? 5 : Math.floor((t - T_STEPS) / STEP);
+  const r = rng(300 + i), kick = (settled ? 0 : 16 * hit) * u;
+  ctx.save(); ctx.translate((r() - .5) * kick, (r() - .5) * kick);
+  const z = 1 + 0.03 * hit * (settled ? 0 : 1); ctx.translate(W / 2, H / 2); ctx.scale(z, z); ctx.translate(-W / 2, -H / 2);
+  paper(t, hit * 0.6);
+  ring(PEN, CY, H * 0.40 * (1 + 0.012 * hit), t, col, settled ? 'SETTLED' : 'TRIGGERED', settled ? 0.22 : 0.20 + 0.25 * hit);
+  // the line and its ticks
+  g.clearRect(0, 0, W, H);
+  g.strokeStyle = col; g.lineWidth = 3.6 * u; g.beginPath(); g.moveTo(0, CY); g.lineTo(W, CY); g.stroke();
+  const x0 = W * 0.16, x1 = W * 0.84;
+  for (let s = 0; s <= Math.min(n, 4); s++) {
+    const x = lerp(x0, x1, s / 4), cur = s === n && !settled, h = (cur ? lerp(64, 30, easeOut(age / 0.2)) : 30) * u;
+    g.strokeStyle = cur ? '#fff' : settled ? STILL : BRASS; g.lineWidth = (cur ? 6 : 3.4) * u; g.beginPath(); g.moveTo(x, CY - h); g.lineTo(x, CY + h); g.stroke();
+  }
+  bloom(0.5 + 1.5 * hit * (settled ? 0.2 : 1));
+  for (let s = 0; s <= Math.min(n, 4); s++) {
+    const x = lerp(x0, x1, s / 4);
+    text(STEPS[s][0], x, CY + 88 * u, `italic 400 ${46 * u}px "Instrument Serif"`, settled ? STILL : s === n ? BONE : BRASS, { align: 'center' });
+  }
+  const split = Math.max(0, 1 - age / 0.09), pop = easeOut(age / 0.13);
+  if (trig) {
+    const fs = fit('Triggered.', 'italic 400 SIZE "Instrument Serif"', 300 * u, W * 0.8);
+    ctx.save(); ctx.translate(W / 2, CY - 70 * u); ctx.scale(lerp(1.25, 1, pop), lerp(1.25, 1, pop));
+    text('Triggered.', 0, 0, `italic 400 ${fs}px "Instrument Serif"`, DEAD, { align: 'center', split, shadow: rgba(DEAD, 0.55), blur: 60 }); ctx.restore();
+    text('THE CONTRACT EXECUTES', W / 2, CY + 150 * u, `500 ${30 * u}px "Inter Tight"`, BONE2, { align: 'center', spacing: `${5 * u}px` });
+  } else if (settled) {
+    const fs = fit('Settled.', 'italic 400 SIZE "Instrument Serif"', 300 * u, W * 0.8);
+    text('Settled.', W / 2, CY - 70 * u, `italic 400 ${fs}px "Instrument Serif"`, mix(BONE, STILL, age / 0.25), { align: 'center', alpha: 1 - 0.5 * clamp((age - 0.25) / 0.2) });
+  } else {
+    const [num, label] = STEPS[n];
+    // the numeral, huge and brass, behind the label
+    const ns = (wide ? 560 : 500) * u;
+    ctx.save(); ctx.translate(W * 0.065, CY - 60 * u); ctx.scale(lerp(1.35, 1, pop), lerp(1.35, 1, pop));
+    text(num, 0, 0, `italic 400 ${ns}px "Instrument Serif"`, BRASS, { alpha: 0.92, split }); ctx.restore();
+    const fs = fit(label, '400 SIZE "Instrument Serif"', 176 * u, W * 0.87);
+    ctx.save(); ctx.translate(W * 0.065, H * (wide ? 0.87 : 0.84)); ctx.scale(lerp(1.08, 1, pop), lerp(1.08, 1, pop));
+    text(label, 0, 0, `400 ${fs}px "Instrument Serif"`, BONE, { split, shadow: 'rgba(0,0,0,.9)' }); ctx.restore();
+    text(wide ? `STEP ${n + 1} OF 5 · ONE NEAR TRANSACTION` : `STEP ${n + 1} OF 5`, W * 0.935, H * 0.105, `500 ${27 * u}px "Inter Tight"`, BRASS, { align: 'right', spacing: `${4 * u}px` });
+  }
+  ctx.restore();
+  if (!settled && age < 1 / FPS + 1e-6 && !trig) { ctx.fillStyle = rgba(BRASS, 0.16); ctx.fillRect(0, 0, W, H); }
+}
+
+// ---- the end card ----
+function actEnd(t, i) {
+  const a = clamp((t - T_END) / 0.25), since = t - T_LAST, alive = since >= 0, k = alive ? Math.exp(-since / 0.28) : 0;
+  const state = alive ? mix(STILL, LIFE, since / 0.12) : STILL, stateHex = alive && since > 0.06 ? LIFE : STILL;
+  const R = (wide ? 0.36 : 0.27) * H, cx = wide ? W * 0.255 : W / 2, cy = wide ? H * 0.5 : H * 0.325;
+  ctx.save(); ctx.globalAlpha = a;
+  paper(0, k * 0.8);
+  const pool = ctx.createRadialGradient(cx, cy, 0, cx, cy, R * 2.4); pool.addColorStop(0, rgba(stateHex, 0.10 + 0.30 * k)); pool.addColorStop(1, rgba(stateHex, 0));
+  ctx.fillStyle = pool; ctx.fillRect(0, 0, W, H);
+  // the trace inside the seal: flat while settled, one beat when it comes back
+  g.clearRect(0, 0, W, H); g.save(); g.beginPath(); g.arc(cx, cy, R * 0.755, 0, 7); g.clip();
+  g.strokeStyle = state; g.lineWidth = 4 * u; g.lineJoin = 'round'; g.beginPath();
+  const span = R * 1.5;
+  for (let x = -span / 2; x <= span / 2; x += 1.5) { const d = x / span * 0.62; const y = alive ? shape(d - 0.02, 1) * R * 0.42 * clamp(since / 0.08) : 0; (x === -span / 2 ? g.moveTo : g.lineTo).call(g, cx + x, cy - R * 0.05 - y); }
+  g.stroke(); g.restore();
+  bloom(0.5 + 1.8 * k);
+  ring(cx, cy, R * (1 + 0.02 * k), t, stateHex, alive ? 'ALIVE' : 'SETTLED', 1, { rot: (t - T_END) * 0.06 });
+  text(alive ? 'Alive' : 'Settled', cx, cy + R * 0.40, `italic 400 ${R * 0.19}px "Instrument Serif"`, BONE, { align: 'center' });
+  text('NO. 0042', cx, cy + R * 0.53, `500 ${R * 0.052}px "Inter Tight"`, BONE2, { align: 'center', spacing: `${R * 0.012}px` });
+  // the words
+  const tx = wide ? W * 0.485 : W / 2, al = wide ? 'left' : 'center', y0 = wide ? H * 0.44 : H * 0.70, mw = wide ? W * 0.47 : W * 0.88;
+  const rise = (d) => ({ alpha: clamp((t - T_END - d) / 0.3), dy: lerp(14 * u, 0, easeOut((t - T_END - d) / 0.5)) });
+  let p = rise(0.05); const ts = fit('Dead Man’s Wallet', '400 SIZE "Instrument Serif"', 176 * u, mw);
+  text('Dead Man’s Wallet', tx, y0 + p.dy, `400 ${ts}px "Instrument Serif"`, BONE, { align: al, alpha: p.alpha });
+  p = rise(0.22); const gs = fit('Your crypto shouldn’t die with you.', 'italic 400 SIZE "Instrument Serif"', 78 * u, mw);
+  text('Your crypto shouldn’t die with you.', tx, y0 + 104 * u + p.dy, `italic 400 ${gs}px "Instrument Serif"`, BONE, { align: al, alpha: p.alpha });
+  p = rise(0.45);
+  ctx.save(); ctx.globalAlpha = a * p.alpha * 0.5; ctx.fillStyle = BRASS; const hw = 92 * u; ctx.fillRect(wide ? tx : tx - hw / 2, y0 + 152 * u, hw, 2); ctx.restore();
+  text('A NEAR CONTRACT · TESTNET · BUILT AT NEAR HACKATHON', tx, y0 + 206 * u + p.dy, `500 ${fit('A NEAR CONTRACT · TESTNET · BUILT AT NEAR HACKATHON', '500 SIZE "Inter Tight"', 25 * u, mw * 0.84)}px "Inter Tight"`, BRASS, { align: al, alpha: p.alpha, spacing: `${3 * u}px` });
+  p = rise(0.6);
+  text('will-wallet-site.vercel.app', tx, y0 + 258 * u + p.dy, `400 ${29 * u}px "JetBrains Mono"`, BONE2, { align: al, alpha: p.alpha });
+  ctx.restore();
+}
+
+function renderFrame(i) {
+  const t = i / FPS;
+  ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over'; ctx.filter = 'none';
+  ctx.fillStyle = INK; ctx.fillRect(0, 0, W, H);
+  if (t < T_TRIG) actAlive(t, i);
+  else if (t < T_END) actSettle(t, i);
+  else actEnd(t, i);
+  grainAndVignette(i);
+  // open on black
+  if (t < 0.2) { ctx.fillStyle = `rgba(0,0,0,${1 - t / 0.2})`; ctx.fillRect(0, 0, W, H); }
+  // the breath between "Settled." and the end card
+  if (t >= T_END - 0.12 && t < T_END) { ctx.fillStyle = `rgba(0,0,0,${clamp((t - (T_END - 0.12)) / 0.1)})`; ctx.fillRect(0, 0, W, H); }
+}
+window.renderFrame = renderFrame; window.FRAMES = Math.round(DUR * FPS);
+window.ready = Promise.all(['400 60px "Instrument Serif"', 'italic 400 60px "Instrument Serif"', '500 20px "Inter Tight"', '400 20px "JetBrains Mono"'].map((f) => document.fonts.load(f))).then(() => true);
+</script></body></html>
