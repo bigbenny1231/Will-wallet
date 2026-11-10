@@ -31,6 +31,15 @@ interface AnthropicMsg {
   content: string | AnthropicBlock[];
 }
 
+/**
+ * Tool arguments as a plain object. A model can answer with valid JSON that is not an object (`null`, a number,
+ * a string, an array); the agent loop reads properties of `args`, so anything else becomes `{}` and the tool
+ * reports the missing fields back to the model instead of the run crashing (SECURITY_REVIEW_3 A-1).
+ */
+export function asArgs(v: unknown): Record<string, unknown> {
+  return v !== null && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : {};
+}
+
 export function toAnthropicMessages(history: Message[]): AnthropicMsg[] {
   const out: AnthropicMsg[] = [{ role: 'user', content: FIRST_USER_MESSAGE }];
   for (const m of history) {
@@ -52,7 +61,7 @@ export function toAnthropicMessages(history: Message[]): AnthropicMsg[] {
 
 export function fromAnthropicResponse(r: { content?: AnthropicBlock[] }): BrainStep {
   const text = (r.content ?? []).filter((b): b is Extract<AnthropicBlock, { type: 'text' }> => b.type === 'text').map((b) => b.text).join(' ').trim();
-  const calls: ToolCall[] = (r.content ?? []).filter((b): b is Extract<AnthropicBlock, { type: 'tool_use' }> => b.type === 'tool_use').map((b) => ({ id: b.id, name: b.name, args: b.input ?? {} }));
+  const calls: ToolCall[] = (r.content ?? []).filter((b): b is Extract<AnthropicBlock, { type: 'tool_use' }> => b.type === 'tool_use').map((b) => ({ id: b.id, name: b.name, args: asArgs(b.input) }));
   return { ...(text ? { thought: text } : {}), calls };
 }
 
@@ -128,7 +137,7 @@ export function fromOpenAIResponse(r: { choices?: { message?: OAIMsg }[] }): Bra
   const calls: ToolCall[] = (msg?.tool_calls ?? []).map((c) => {
     let args: Record<string, unknown> = {};
     try {
-      args = JSON.parse(c.function.arguments || '{}');
+      args = asArgs(JSON.parse(c.function.arguments || '{}'));
     } catch {
       /* malformed arguments: pass empty, the tool will report the problem back to the model */
     }

@@ -55,6 +55,16 @@ describe('LLM brains map the tool protocol', () => {
     expect(fromOpenAIResponse({ choices: [{ message: { role: 'assistant', tool_calls: [{ id: 'x', type: 'function', function: { name: 'pay', arguments: '{oops' } }] } }] }).calls[0].args).toEqual({});
     expect(fromAnthropicResponse({})).toEqual({ calls: [] });
   });
+  it('A-1: tool arguments that are valid JSON but not an object become {} (no crash in the agent loop)', () => {
+    for (const raw of ['null', '5', '"all of it"', '[1,2]', 'true']) {
+      const step = fromOpenAIResponse({ choices: [{ message: { role: 'assistant', tool_calls: [{ id: 'x', type: 'function', function: { name: 'pay', arguments: raw } }] } }] });
+      expect(step.calls[0].args, raw).toEqual({});
+    }
+    for (const input of [null, 5, 'all of it', [1, 2]]) {
+      const step = fromAnthropicResponse({ content: [{ type: 'tool_use', id: 't', name: 'pay', input }] } as never);
+      expect(step.calls[0].args, JSON.stringify(input)).toEqual({});
+    }
+  });
 });
 
 describe('brain selection and env hygiene', () => {

@@ -97,10 +97,18 @@ async function main() {
     return;
   }
   transcript.add(`*Scenario:* ${inline(String(scenario.description ?? ''))}`);
-  const summary = await runAgent({ brain, wallet, scenario, transcript, maxSteps: a['max-steps'] ? Number(a['max-steps']) : 12 });
-  const out = save(transcript, a.out);
-  console.log(`transcript saved to ${out}`);
-  if (summary.injectionPaid) process.exitCode = 1;
+  // The transcript is the record of what the agent did with real funds: save it whatever happens. A brain or RPC
+  // error part-way through must not lose the payments already made (SECURITY_REVIEW_3 A-1).
+  try {
+    const summary = await runAgent({ brain, wallet, scenario, transcript, maxSteps: a['max-steps'] ? Number(a['max-steps']) : 12 });
+    if (summary.injectionPaid) process.exitCode = 1;
+  } catch (e) {
+    transcript.add(`*The run stopped on an error: ${inline(String((e as Error)?.message ?? e))}*`);
+    throw e;
+  } finally {
+    const out = save(transcript, a.out);
+    console.log(`transcript saved to ${out}`);
+  }
 }
 
 function save(t: Transcript, out?: string): string {
