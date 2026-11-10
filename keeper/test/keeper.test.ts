@@ -8,6 +8,7 @@ import { startPulse } from '../src/commands/pulse.js';
 import { driveVault, makeDeps, runKeeper, tickOnce, type Logger } from '../src/keeperLoop.js';
 import { MockBackend, mockChains } from '../src/mock.js';
 import { bumpedEvmArgs, clampEvm, msUntilResign } from '../src/resign.js';
+import { seedBackend } from './helpers.js';
 import { backoffDelay, foreignTxLink, isTransient, nearTxLink, parseEvents, withRetry } from '../src/util.js';
 
 const quiet: Logger = { ok() {}, warn() {}, err() {}, info() {} };
@@ -242,12 +243,61 @@ describe('relay failures', () => {
     const deps = makeDeps({ backend, chains, contractId: 'c', now: () => clock.t, log: quiet });
     const r = await tickOnce(deps);
     expect(r.error).toBeUndefined();
-    expect(params).toHaveBeenCalledWith('0xMOCKfromMonad', 'monad');
+    expect(params).toHaveBeenCalledWith('0x000000000000000000000000000000000000d0ad', 'monad');
     expect(bcast.mock.calls[0][1]).toBe('monad');
     const v = await backend.getVault('1');
     expect(v.foreign[0].chain).toBe('monad');
     expect(v.foreign[0].status).toBe('broadcast');
     expect(foreignTxLink('monad', '0xabc')).toBe('https://testnet.monadexplorer.com/tx/0xabc');
+  });
+
+  it('K-1: a malformed from_address is never sent to the RPC; the derived address is used and step 3 goes through', async () => {
+    for (const bad of ['yyyy', '', '0x1234', 'not an address; DROP', '0x' + 'g'.repeat(40)]) {
+      const clock = { t: 1_000_000 };
+      const { backend } = seedBackend(clock, [{ foreign: 'base', patch: (v) => void (v.foreign[0].from_address = bad) }]);
+      await backend.getVaults();
+      clock.t += 25_000;
+      const chains = mockChains();
+      // a real node rejects a malformed address: fail the test the same way if one ever reaches it
+      chains.evmParams = vi.fn(async (from: string) => {
+        if (!/^0x[0-9a-fA-F]{40}$/.test(from) && !from.startsWith('0xMOCK')) throw new Error(`eth_getTransactionCount: invalid argument 0: ${from} (-32602)`);
+        return { nonce: 0, max_fee_per_gas: '1500000000', max_priority_fee_per_gas: '1000000', gas_limit: '21000' };
+      });
+      const deps = makeDeps({ backend, chains, contractId: 'c', now: () => clock.t, log: quiet });
+      const r = await tickOnce(deps);
+      expect(r.error, `from_address ${JSON.stringify(bad)}`).toBeUndefined();
+      const derived = (await chains.deriveAddresses('c', '1')).base;
+      expect(chains.evmParams).toHaveBeenCalledWith(derived, 'base');
+      expect((await backend.getVault('1')).state, `from_address ${JSON.stringify(bad)}`).toBe('Settled');
+    }
+  });
+
+  it('F-08: when the landed-lookup fails, a stale solana payout is NOT re-signed (unknown is not "not landed")', async () => {
+    const clock = { t: 1_000_000 };
+    const backend = fresh(clock, { foreign: 'solana' });
+    await backend.getVaults();
+    clock.t += 25_000;
+    const chains = mockChains();
+    chains.broadcastSolana = async () => {
+      throw new Error('sendTransaction: Blockhash not found');
+    };
+    const resign = vi.spyOn(backend, 'resignForeign');
+    const warns: string[] = [];
+    const deps = makeDeps({ backend, chains, contractId: 'c', now: () => clock.t, log: { ...quiet, warn: (_t, m) => warns.push(m) } });
+    await tickOnce(deps);
+    clock.t += 310_000; // past the re-sign cooldown
+    chains.txLanded = async () => {
+      throw new Error('getSignatureStatuses: HTTP 429, no result in the answer');
+    };
+    const later = makeDeps({ backend, chains, contractId: 'c', now: () => clock.t, log: { ...quiet, warn: (_t, m) => warns.push(m) } });
+    await tickOnce(later);
+    expect(resign).not.toHaveBeenCalled();
+    expect(warns.some((w) => /could not check whether .* landed/.test(w))).toBe(true);
+    // once the lookup answers "not landed", the re-sign goes ahead
+    clock.t += 61_000;
+    chains.txLanded = async () => false;
+    await tickOnce(later);
+    expect(resign).toHaveBeenCalledTimes(1);
   });
 
   it('monad fee cap is 1000 gwei (Base 100 gwei)', () => {

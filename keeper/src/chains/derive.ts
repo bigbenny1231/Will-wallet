@@ -33,6 +33,7 @@ async function viewDerivedKey(
       jsonrpc: '2.0', id: 'dmw', method: 'query',
       params: { request_type: 'call_function', finality: 'final', account_id: signer, method_name: 'derived_public_key', args_base64: args },
     }),
+    signal: AbortSignal.timeout(15_000),
   });
   const j = (await r.json()) as { result?: { result?: number[]; error?: string }; error?: unknown };
   if (!j.result?.result) throw new Error(`derived_public_key failed: ${JSON.stringify(j.error ?? j.result?.error)}`);

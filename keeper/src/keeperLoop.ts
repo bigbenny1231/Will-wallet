@@ -56,9 +56,23 @@ export interface ActionRecord {
   ok: boolean;
 }
 
+/** `from_address` is free text the owner wrote (the contract only caps its length and never signs with it). */
+const EVM_ADDRESS = /^0x[0-9a-fA-F]{40}$/;
+
+/**
+ * The address an EVM payout is sent from. The stored `from_address` is used only when it is a well-formed EVM
+ * address; anything else (a typo, or text put there on purpose) falls back to the derived address, so a bad
+ * value cannot make `eth_getTransactionCount` fail and leave the vault stuck in step 3 (SECURITY_REVIEW_3 K-1).
+ */
+export async function evmSourceAddress(deps: Pick<KeeperDeps, 'chains' | 'contractId'>, v: VaultView, chain: 'base' | 'monad', index: number): Promise<string> {
+  const stored = v.foreign[index]?.from_address ?? '';
+  if (EVM_ADDRESS.test(stored)) return stored;
+  return (await deps.chains.deriveAddresses(deps.contractId, v.token_id))[chain];
+}
+
 export async function stepArgsFor(deps: KeeperDeps, v: VaultView, chain: ChainName, index: number): Promise<StepArgs> {
   if (chain === 'base' || chain === 'monad') {
-    const from = v.foreign[index].from_address || (await deps.chains.deriveAddresses(deps.contractId, v.token_id))[chain];
+    const from = await evmSourceAddress(deps, v, chain, index);
     // The contract sets the nonce itself (SPEC 2.7) and ignores ours; we still send it. Fees/gas stay inside its per-chain caps.
     return { evm: clampEvm(await deps.chains.evmParams(from, chain), chain) };
   }
@@ -119,10 +133,22 @@ async function handleStale(deps: KeeperDeps, v: VaultView, index: number, chain:
       return { kind: 'wait' };
     }
     const oldId = payoutTxId(p);
-    if (oldId && (await chains.txLanded(chain, oldId).catch(() => false))) {
-      log.ok('resign', `${label}: the old tx ${oldId} is on chain, not signing again`);
-      deps.landed.add(`${key}:${oldId}`);
-      return { kind: 'landed', hash: oldId };
+    if (oldId) {
+      let landed: boolean;
+      try {
+        landed = await chains.txLanded(chain, oldId);
+      } catch (e) {
+        // Unknown is not "no": signing again while the old tx may be on chain could pay a Solana heir twice
+        // (AUDIT_FINAL_OFFCHAIN F-08). Park the payout and look again later.
+        park(RELAY_COOLDOWN.other, 'landed-check');
+        log.warn('resign', `${label}: could not check whether ${oldId} landed (${errMsg(e)}); not signing again, retry in ${RELAY_COOLDOWN.other / 1000}s`);
+        return { kind: 'wait' };
+      }
+      if (landed) {
+        log.ok('resign', `${label}: the old tx ${oldId} is on chain, not signing again`);
+        deps.landed.add(`${key}:${oldId}`);
+        return { kind: 'landed', hash: oldId };
+      }
     }
     const n = deps.resigns.get(key) ?? 0;
     if (n >= MAX_RESIGNS) {
@@ -312,7 +338,8 @@ export async function driveVaultView(deps: KeeperDeps, initial: VaultView): Prom
             } else if (kind === 'unfunded') {
               const prev = deps.relayBlock.get(key);
               deps.relayBlock.set(key, { until: deps.now() + RELAY_COOLDOWN.unfunded, reason: 'unfunded' });
-              const from = p.from_address || (await deps.chains.deriveAddresses(deps.contractId, id).then((a) => (action.chain === 'solana' ? a.solana : a[action.chain])).catch(() => 'the derived address'));
+              // Report the address that really has to be funded: the derived one. The owner-written `from_address` is shown only if derivation fails.
+              const from = await deps.chains.deriveAddresses(deps.contractId, id).then((a) => (action.chain === 'solana' ? a.solana : a[action.chain])).catch(() => p.from_address || 'the derived address');
               if (prev?.reason === 'unfunded') log.info('relay', `${label} still unfunded; status stays ${p.status}, retry in ${RELAY_COOLDOWN.unfunded / 1000}s`);
               else log.warn('relay', `${label} NOT broadcast: source ${from} is unfunded (${errMsg(e)}). Status stays ${p.status}; fund it and the keeper will relay. Retry in ${RELAY_COOLDOWN.unfunded / 1000}s`);
               out.push({ kind: 'broadcast', tokenId: id, ok: false, detail: 'unfunded' });

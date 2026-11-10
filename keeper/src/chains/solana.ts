@@ -5,14 +5,27 @@ export const SOLANA_DEVNET_RPC = 'https://api.devnet.solana.com';
 export const solscanTx = (sig: string) => `https://explorer.solana.com/tx/${sig}?cluster=devnet`;
 export const solanaExplorerAddress = (a: string) => `https://explorer.solana.com/address/${a}?cluster=devnet`;
 
+/** No RPC call may hold a bounded run (`--max-seconds`) open: every request gives up after this long. */
+const RPC_TIMEOUT_MS = 15_000;
+
 async function rpc<T>(url: string, method: string, params: unknown[]): Promise<T> {
   const r = await fetch(url, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
+    signal: AbortSignal.timeout(RPC_TIMEOUT_MS),
   });
-  const j = (await r.json()) as { result?: T; error?: { code: number; message: string; data?: { err?: unknown } } };
+  // A rate limit or gateway page is not an answer. Without this check a body with neither `result` nor `error`
+  // read as success, and a broadcast nobody accepted was marked on NEAR (SECURITY_REVIEW_3 K-3).
+  let j: { result?: T; error?: { code: number; message: string; data?: { err?: unknown } } };
+  try {
+    j = (await r.json()) as typeof j;
+  } catch {
+    throw new Error(`${method}: HTTP ${r.status}, not a JSON-RPC answer`);
+  }
+  if (j === null || typeof j !== 'object') throw new Error(`${method}: HTTP ${r.status}, not a JSON-RPC answer`);
   if (j.error) throw new Error(`${method}: ${j.error.message}${j.error.data?.err ? ` ${JSON.stringify(j.error.data.err)}` : ''}`);
+  if (!r.ok || !('result' in j)) throw new Error(`${method}: HTTP ${r.status}, no result in the answer`);
   return j.result as T;
 }
 

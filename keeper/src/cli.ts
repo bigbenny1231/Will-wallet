@@ -22,8 +22,14 @@ const run = (fn: () => Promise<void>) =>
     process.exit(1);
   });
 
-const tokenSet = (ids: unknown): Set<string> | undefined =>
-  ids ? new Set<string>(String(ids).split(',').map((x) => x.trim()).filter(Boolean)) : undefined;
+/** `--token` given but empty (`--token ""`, `--token ,`) is refused: read as "no filter" it would drive every vault. */
+function tokenSet(ids: unknown): Set<string> | undefined {
+  if (ids === undefined) return undefined;
+  const set = new Set<string>(String(ids).split(',').map((x) => x.trim()).filter(Boolean));
+  if (set.size === 0) throw new Error('--token needs at least one vault token id');
+  for (const id of set) if (!/^\d+$/.test(id)) throw new Error(`--token: "${id}" is not a vault token id`);
+  return set;
+}
 
 /** An empty prefix would match every vault on the contract, so it is refused instead of being read as "no filter". */
 function ownerPrefixOf(raw: unknown): string | undefined {
