@@ -9,7 +9,7 @@ Dashboard route: `/vault/6`. Created 2026-11-07.
 | Owner | `dmw-andrew-8d2e.testnet` (key in `keys/dmw-andrew-8d2e.testnet.json`, gitignored) |
 | Heirs | `dmw-sarah-8d2e.testnet` 6000 bps (primary, gets the Will NFT), `dmw-ben-8d2e.testnet` 4000 bps |
 | Agent allowlist | `dmw-api-8d2e.testnet` |
-| Timing | created at 90 s / grace 2, then `set_timing(86400, 1)`: stays Alive for 24 h from the creation beat, trigger 48 h after the last beat |
+| Timing | created at 90 s / grace 2; now `set_timing(1209600, 1)` (14 days, set 2026-11-08 right after an owner heartbeat; earlier settings were 86400 s and 604800 s): Warning from 2026-11-22 05:04 UTC, poke legal from 2026-12-06 05:04 UTC unless the owner beats again |
 | Balance | 5 NEAR (+0.1 storage). Adding a pulse key and an agent key takes 1 NEAR each from the vault balance |
 | Policy | per_tx_max 0.5 NEAR, daily_max 1 NEAR, allowlist `[dmw-api-8d2e.testnet]` |
 | Bounty | 0.05 NEAR |

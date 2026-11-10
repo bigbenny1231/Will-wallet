@@ -35,8 +35,9 @@ The keeper (off-chain) relays the signed foreign transactions and records their 
 | Derivation paths | `base-<token_id>`, `monad-<token_id>` (secp256k1, domain 0), `sol-<token_id>` (ed25519, domain 1) |
 
 The foreign *source* addresses are derived from `(contract_account_id, path)` and are
-computed **off-chain** (keeper `derive` command, dashboard) with chainsig.js
-`deriveAddressAndPublicKey`. The owner funds those addresses while alive. No private key
+computed **off-chain**: the keeper `derive` command calls the `derived_public_key` view on the MPC signer, and the
+dashboard uses chainsig.js key derivation. Both give the same addresses (byte-identical to chainsig.js
+`deriveAddressAndPublicKey`). The owner funds those addresses while alive. No private key
 for them exists anywhere; the contract requests signatures at settlement time.
 
 ## 2. Contract: `contracts/dmw` (Rust, near-sdk 5.x, cargo-near)
@@ -90,7 +91,7 @@ for them exists anywhere; the contract requests signatures at settlement time.
   "daily_spent": "yocto string", "daily_window_start_ms": ...,
   "dao_id": null | "estate.sputnik-v2.testnet",
   "dao_proposal_id": null | 7,
-  "step": 0..5,                 // next step to execute when Triggered
+  "step": 0..6,                 // next step to execute when Triggered; 6 once Settled
   "foreign_index": 0,           // next foreign payout to sign within step 3
   "guardian_id": null | "gina.testnet",   // §2.8
   "max_pause_s": 0,                       // §2.8, 0 when no guardian
@@ -186,7 +187,7 @@ red `#e74c3c` Triggered, grey `#7f8c8d` Settled), vault id, state word, "next be
 These are the places where the shipped contract (`contracts/dmw`, deployed at `dmw-x8cx.testnet`) differs from or adds to §2.1–2.5:
 
 - **`token_id` input** is accepted as a JSON number (`1`) or a string (`"1"`). Views always return a string.
-- **Key gas allowance is 1 NEAR, not 0.25.** Gas burned by function-call keys comes out of the contract account, which pools every vault's NEAR. So `add_*_key` takes the allowance from the vault's own `balance` (the vault needs ≥ 1 NEAR) and gives it back if AddKey fails. A heartbeat at 10 TGas costs ~0.011 NEAR of allowance, so one key covers ~90 beats. Tell the keeper to attach **≤ 10 TGas** for `heartbeat` (the allowance is charged for prepaid gas, not gas actually used).
+- **Key gas allowance is 1 NEAR, not 0.25.** Gas burned by function-call keys comes out of the contract account, which pools every vault's NEAR. So `add_*_key` takes the allowance from the vault's own `balance` (the vault needs ≥ 1 NEAR) and gives it back if AddKey fails. A heartbeat sent with 10 TGas burns about 0.0003 NEAR (measured on testnet, Nov 10 2026). About 0.011 NEAR of allowance is held for the prepaid gas when the call is sent and the unused part comes back to the key's allowance, so one 1 NEAR key covers a few thousand beats, not ~90 as this note first said. Keep the keeper at **≤ 10 TGas** for `heartbeat`: the prepaid amount must still fit in the remaining allowance when the call is sent.
 - **Keys work only after AddKey succeeds** (`on_key_added` callback). There is a global registry `public_key -> token_id`, so one key can belong to only one vault. This stops a vault from listing someone else's key (or the contract's full-access key) and getting it deleted in step 2 or by `remove_key`.
 - **`agent_pay` denies with `vault_not_alive` in Warning too.** The agent is disarmed as soon as a beat is missed. Check order: `vault_not_alive`, `receiver_not_allowlisted`, `over_per_tx_max`, `over_daily_max`, `insufficient_balance`. If `policy` is omitted, everything is denied (all limits 0). Authorization failures (not an agent key of this vault) still panic.
 - **Step 1 reserve** is 1.5 NEAR when a DAO is set (proposal bond + gas), otherwise 0.1 NEAR. This replaces "0.05 + bounty", since the bounty is already paid at `poke`. Whatever is left is claimable by the NFT owner after Settled. The `step_1` log `detail` is `"<account> <amount> NEAR, ..."` (the dashboard parses it).
@@ -206,7 +207,7 @@ These are the places where the shipped contract (`contracts/dmw`, deployed at `d
   - **Keys follow the NFT owner.** Changing the Will NFT owner while Alive/Warning revokes every pulse and agent key. A key whose AddKey lands after an owner change is deleted.
   - **Key auth checks the signer account.** Key auth also requires `signer_account_id == contract`.
   - **No `agent_pay` to the contract.** `agent_pay` panics if `receiver_id` is the contract itself.
-- **Limits:** ≤ 10 heirs, ≤ 5 keys per kind, ≤ 4 foreign payouts, ≤ 10 allowlist entries, interval 10 s..10 y, `grace_missed` ≤ 1000. The log keeps the last 40 entries.
+- **Limits:** ≤ 10 heirs, ≤ 5 keys per kind, ≤ 4 foreign payouts in total, of which at most 1 on Monad (review 2, H-4; the per-chain cap is `get_config().chains[].max_payouts`), ≤ 10 allowlist entries, interval 10 s..10 y, `grace_missed` ≤ 1000. The log keeps the last 40 entries.
 - **Defaults:** bounty 0.01 NEAR; storage fee 0.1 NEAR flat. `set_dao({token_id, dao_id: null})` clears the DAO. `set_foreign_payouts({token_id, payouts})` forces `status: "pending"`.
 - **NFT:** approvals (NEP-178) are not supported (`approval_id` must be null). `nft_transfer_call` reverts if the receiver returns `true`. `extra.heirs` is the heir count.
 - **Extra views:** `get_config()`. `get_vaults({from_index, limit})` takes JSON numbers (limit ≤ 100).
@@ -261,7 +262,7 @@ Commands (`npm run <cmd>` or `npx dmw <cmd>`):
 
 | cmd | does |
 | --- | --- |
-| `derive --token <id>` | prints derived Base, Monad and Solana source addresses for the vault (chainsig.js) |
+| `derive --token <id>` | prints derived Base, Monad and Solana source addresses for the vault (from the MPC signer's `derived_public_key` view) |
 | `pulse --token <id> --key <ed25519:...> [--interval 60]` | heartbeat daemon; prints a countdown; Ctrl-C = "death" |
 | `keeper [--poll 5] [--once] [--token <id,id,...>]` | `--token` restricts the loop to those vaults (default: every vault; `pulse` takes a single `--token`). Loop: `get_vaults`, `poke` any vault past deadline, `execute_step` any Triggered vault (fetching nonce/fees from the payout chain's RPC, Base or Monad, and blockhash from Solana for step 3), relay any `signed` payout (eth_sendRawTransaction / sendTransaction), then `mark_broadcast`. Logs every action with explorer links |
 | `agent-demo --token <id> --key <agent key>` | runs two `agent_pay` calls: one allowed (small, allowlisted) and one denied (over cap, unknown receiver); prints the on-chain log lines |
@@ -274,7 +275,7 @@ Commands (`npm run <cmd>` or `npx dmw <cmd>`):
 > `dmw-guest-` vaults every ten minutes. Details in `keeper/README.md`.
 
 Config via `.env` (`.env.example` committed): `NEAR_NETWORK`, `DMW_CONTRACT`, `KEEPER_ACCOUNT_ID`, `KEEPER_PRIVATE_KEY`, `BASE_RPC`, `MONAD_RPC`, `SOLANA_RPC`.
-Solana blockhashes expire in ~60–90 s; keeper fetches a fresh one right before `execute_step` and retries once with a new blockhash if the sign callback reports failure.
+Solana blockhashes expire in ~60–90 s; the keeper fetches a fresh one right before `execute_step`. It never retries at once: if the payout comes out `failed`, or its signed tx goes stale before it is relayed, the keeper waits until `get_sign_track().resign_allowed_after_ms` (5 min after the last request) and then calls `resign_foreign` with a new blockhash. For a stale signed tx it first checks that the old signature never landed; if that lookup fails it waits and looks again instead of signing. After 2 re-signs of one payout it pauses that payout for 5 min.
 
 ## 4. Dashboard: `dashboard/` (Vite + React + TypeScript, wallet-selector with MyNearWallet + Meteor)
 
@@ -286,13 +287,20 @@ Routes:
 Design: dark, calm, one accent; large type (recorded at 125%). No marketing copy in the app.
 
 > Note (2026-11-09): added since v1, no contract change.
+> - The create wizard has its own route, `/create`; `/` lists vaults and links to it. `/pulse` is the standalone phone
+>   page: paired from the vault page by QR code or link, it holds a pulse key in `localStorage` and sends `heartbeat`.
 > - `/try`, the guest run: a throwaway `dmw-guest-<hex>.testnet` account from the testnet faucet, held in the browser,
 >   drives a 30 s vault from `create_vault` to `claim` (see `dashboard/README.md`, "Guest run"). Heirs are implicit
 >   accounts. The register folds unfinished guest vaults into their own group.
 > - `/vault/:id` gains "The record" (the vault log as the Will NFT's history) and derives a missing `from_address`
 >   in the browser. `/heir` leads with the wallet; Google sign-in shows only where NEAR Auth accepts the origin.
 
-## 5. Site: `site/` (static, hand-written `index.html` + `styles.css` + `app.js`, self-hosted fonts, no CDN, no Tailwind)
+## 5. Site: `site/` (static, no build step to serve: `index.html` + `styles.css` + ES modules in `js/`, self-hosted fonts, no CDN, no Tailwind; the WebGL seal `js/seal3d.bundle.js` is three.js bundled by `design/seal3d/build.mjs`)
+
+> The paragraph below is the original brief. The shipped page (v4) has: the hold-to-stop hero, a trust strip, the vault 17
+> story, "run one yourself" (links to the dashboard's `/try`), the live estate graph of vault 6, the demo video, the quiz,
+> a builders section, the heir claim band, the security model, the attorney section, the FAQ and a "follow mainnet" link
+> to GitHub releases (there is no waitlist backend). `site/README.md` lists the modules.
 
 Landing page per the mockup in the plan doc: hero "Your crypto shouldn't die with you.", vault card, trust strip,
 three steps, heir claim band, FAQ, a "follow mainnet" link to GitHub releases (no waitlist backend exists), footer disclaimer

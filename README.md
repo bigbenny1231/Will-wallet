@@ -26,7 +26,8 @@ What is in the build:
   on and off: six are prevented, one (fake invoices to the allowlisted provider) is bounded by the daily cap. Offline,
   no LLM, no chain; the recorded report is [`agent/ATTACK_SUITE.md`](agent/ATTACK_SUITE.md).
 - **Guardian pause.** The owner can name a guardian who can pause the vault once per heartbeat cycle, for at most
-  a length the owner sets (SPEC §2.8). It closes the "dead pulse key triggers a live owner" finding (M-1).
+  a length the owner sets (SPEC §2.8). It mitigates the "dead pulse key triggers a live owner" finding (M-1): a pause taken before the deadline buys time for a
+  wallet heartbeat; the pulse key's gas allowance still runs out.
 - **NEAR plus three signing targets.** Heirs are paid on NEAR; Base Sepolia, Monad testnet and Solana devnet
   payouts are signed through Chain Signatures. The keeper has the same relay code for Monad as for Base. No foreign
   payout has been relayed yet (every derived source address on `dmw-x8cx.testnet` holds 0 and has nonce 0).
@@ -35,7 +36,8 @@ What is in the build:
   identity's MPC key controls and lists vaults that name it. A full Google login has not been completed end to end:
   the popup was shown reaching Google's sign-in page, and the identity-to-account step is tested with a known `sub`
   and in mock mode. The heir cannot claim or sign through it yet, and the owner must name the implicit account id,
-  which the heir has to send them first. On any other origin the button reads "NEAR Auth (coming)"
+  which the heir has to send them first. On any other origin there is no Google button; the heir page says that
+  sign-in with Google works from a local copy and waits for production credentials
   ([`dashboard/docs/near-auth.md`](dashboard/docs/near-auth.md)).
 - **The record.** Each vault page lists the Will NFT's history from the contract's own log: who created it, what
   the agent paid or was denied, the trigger, each settlement step, and who holds it now.
@@ -79,10 +81,10 @@ No `.env`, keys or near-cli credentials are needed beforehand. `make deploy` cre
 git clone https://github.com/bigbenny1231/will-wallet deadmans-wallet && cd deadmans-wallet
 make check     # verify toolchain   -> "All good." (optional tools only warn)
 make build     # build the contract -> contracts/dmw/target/near/dmw.wasm and its code hash (about 1 min)
-make test      # unit tests         -> contract "104 passed", keeper "81 passed", dashboard "88 passed", agent "60 passed" (runs npm ci first)
+make test      # unit tests         -> contract "105 passed", keeper "90 passed", dashboard "99 passed", agent "61 passed" (runs npm ci first)
 make attacks   # offline attacks    -> "7 attacks, 0 escaped policy, worst bounded loss 1 NEAR" (no keys, no chain)
 make deploy    # faucet accounts    -> creates dmw-<rand>.testnet + dmw-keeper-<rand>.testnet, deploys, inits,
-               #                       calls set_keeper, writes .env, ends with "deployed dmw-xxxxxx.testnet"
+               #                       calls set_keeper, writes .env, prints "deployed dmw-xxxxxx.testnet", ends with "next: make demo"
 make demo      # live demo          -> see below (about 1.5 min)
 make kill      # owner disappears   -> follows the keeper until Settled (about 4 min)
 make stop      # stop the background pulse and keeper
@@ -91,8 +93,9 @@ make status TOKEN=1                 # print a vault at any time
 
 `make demo` creates faucet accounts (owner, two heirs, an API provider), creates a vault with a 60-second
 heartbeat and grace of 1, adds a **pulse key** (can only call `heartbeat`) and an **agent key** (can only
-call `agent_pay`), sets one Base and one Solana payout, runs the agent demo (one payment allowed, one denied
-with its reason), then starts the pulse (one beat every 20 s) and the keeper in the background. Real output
+call `agent_pay`), starts the pulse in the background (one beat every 20 s, so the vault stays Alive during the rest
+of the setup), sets one Base and one Solana payout, runs the agent demo (one payment allowed, one denied with its
+reason), then starts the keeper in the background. Real output
 from a fresh clone (Nov 7 2026):
 
 ```
@@ -217,7 +220,7 @@ until someone pokes it; the `guest-sweep` workflow does that every ten minutes f
 
 | Claim | Where to look |
 | --- | --- |
-| The pulse key can only call `heartbeat`, the agent key only `agent_pay` | your own `make demo` contract: `node scripts/near-admin.mjs keys <contract>` shows `FunctionCall` keys with `method_names` `["heartbeat"]` / `["agent_pay"]`. On `dmw-x8cx.testnet` (checked Nov 7 2026) the list was the deployer's FullAccess key, one `["agent_pay"]` key (vault 13) and one `["heartbeat"]` key (vault 15). Both vaults have short intervals, and settlement deletes their keys; a guest run adds two keys of its own for a few minutes |
+| The pulse key can only call `heartbeat`, the agent key only `agent_pay` | your own `make demo` contract: `node scripts/near-admin.mjs keys <contract>` shows `FunctionCall` keys with `method_names` `["heartbeat"]` / `["agent_pay"]`. On `dmw-x8cx.testnet` (checked Nov 10 2026) the list is the deployer's FullAccess key and one `["agent_pay"]` key (vault 13, the vault of the live agent transcript; 86400 s interval, grace 2). Vault 13's deadline is Nov 10 2026 16:56 UTC; once it is poked and settled after that, this key is deleted too and only the FullAccess key remains. The `["heartbeat"]` key of vault 15 was deleted when that vault settled on Nov 7. A guest run adds two keys of its own for a few minutes |
 | An autonomous agent is refused when a prompt injection tells it to drain the vault | [`agent/LIVE_TRANSCRIPT.md`](agent/LIVE_TRANSCRIPT.md): three real runs against vault 13 on `dmw-x8cx.testnet` with the scripted brain (wrapper refuses; contract denies when the wrapper's checks are off; the vigilant scripted brain refuses on its own), with the setup transactions |
 | A guardian can pause once and the deadline moves | [TESTNET_SMOKE.md](contracts/TESTNET_SMOKE.md) vault 14: [`set_guardian`](https://testnet.nearblocks.io/txns/HqomRLAzzUd6KYTuz2bsNU1qYEsuC9RyBQUtuToFShcG), [`pause`](https://testnet.nearblocks.io/txns/FNZntghrMV7pj2S5qLvqqu4zrpLKJZ933mNQSyMm163o) (deadline +153 s, state Warning), a second [`pause`](https://testnet.nearblocks.io/txns/Chnrufz6tF2Z6qrSijL9xPgRuoukz8oNDfKMxqddY7Ub) rejected `already_paused`, an early [`poke`](https://testnet.nearblocks.io/txns/31xYgVNdcpY2sqaT369SVVFDf5oohmry8ifjzN23qEDn) rejected `not_due` |
 | The contract signs a Monad transaction | TESTNET_SMOKE.md vault 14, [step 3](https://testnet.nearblocks.io/txns/DFmmyrRWNTUdsn3KLXuoHfjuaAcMoY7c71i2EUN3p976): `v1.signer-prod.testnet` signs path `monad-14`; the stored tx decodes to chain id 10143 from the derived address `0x360D0232…0e13`. Relay is pending funding (the RPC answers `insufficient balance`) |
@@ -225,7 +228,7 @@ until someone pokes it; the `guest-sweep` workflow does that every ten minutes f
 | Settlement deletes the keys | TESTNET_SMOKE.md item 8, key list before/after |
 | The contract itself requests MPC signatures | `docs/chainsig-notes.md`: NEAR txs where `dmw` calls `v1.signer-prod.testnet.sign`. The probe contract `ecrecover`s the Base signature on-chain to the derived address; for `dmw` the signed Base tx recovers off-chain (viem) to the derived address |
 | Step 4 files and ratifies a Sputnik proposal | TESTNET_SMOKE.md, last section: vault 10 on `dmw-x8cx.testnet`, [`add_proposal` from the contract](https://testnet.nearblocks.io/txns/FAzezve68HDjUDsNzsb8qV7KnE6SNE8kVap6S5Hmkd6e), proposal 0 on `estate-82bd1f.sputnik-v2.testnet`, [approved and executed](https://testnet.nearblocks.io/txns/5y9hspPGwhmzfU2ivNggFQhPrTaHtznqpaB5dNcfBgeB) |
-| The live contract is this source | `view_account dmw-x8cx.testnet` → code hash `HAxzQkJdB9fdJtVANeCrLr46ZZzy88VdLBD3pFE87pqZ`. It corresponds to commit `b57b048` (same code as the final-audit fix; only the NEP-330 repository link changed), built with rustc 1.97.0 and cargo-near 0.23.0 using `cargo near build non-reproducible-wasm`. `make build` on the current tree with those toolchain versions gives the same hash (re-checked Nov 7 2026; the contract source has not changed since `7ac4fed`); another toolchain gives a different one. It is **not** a reproducible build: `contract_source_metadata` returns `link` but `build_info: null` |
+| The live contract is this source | `view_account dmw-x8cx.testnet` → code hash. **Status on Nov 10 2026: the live hash is `HAxzQkJdB9fdJtVANeCrLr46ZZzy88VdLBD3pFE87pqZ`, the build of commit `b57b048` (contract source unchanged up to `0348a3e`). That code has finding C-2; the fix is in this tree and is deployed by `node scripts/near-admin.mjs deploy dmw-x8cx.testnet contracts/release/dmw.wasm`, after which the live hash is `6s9oqxvBZfhWncW6irGH6zXTebeYUKTHh1pk1WSDxjYH`.** Both hashes come from rustc 1.97.0 and cargo-near 0.23.0 with `cargo near build non-reproducible-wasm`: a fresh clone of `0348a3e` gave the first and two separate clones of this tree gave the second (Nov 10 2026, `docs/FINAL_REVIEW.md`), and `make build` prints it; another toolchain gives a different one. It is **not** a reproducible build: `contract_source_metadata` returns `link` but `build_info: null` |
 | The Will NFT holds funds and redraws itself | `nft_token {"token_id":"4"}` → `media` is an on-chain SVG data URI (grey, Settled) |
 
 ## How NEAR fits
@@ -242,8 +245,9 @@ until someone pokes it; the `guest-sweep` workflow does that every ten minutes f
   code; see the security model). Transactions are built in-contract with `omni-transaction`.
 - **NEP-171 + on-chain SVG.** The will is a token the contract owns the balance of; its image is
   computed from state (green / amber / red / grey) at read time.
-- **Sputnik DAO.** Step 4 files a `FunctionCall` proposal in the estate's DAO so a council can ratify. Run live
-  once on testnet (vault 10, proposal 0 on `estate-82bd1f.sputnik-v2.testnet`). Ratifying only records an event.
+- **Sputnik DAO.** Step 4 files a `FunctionCall` proposal in the estate's DAO so a council can ratify. Filed live
+  twice on testnet, both on `estate-82bd1f.sputnik-v2.testnet`: vault 10 (proposal 0, which the council approved, so the
+  vault logged `dao_ratified`) and the audit's worst-case vault 18 (proposal 1, filed only). Ratifying only records an event.
 - **Permissionless keepers.** `poke` and `execute_step` are callable by anyone; `poke` pays the vault's bounty,
   `execute_step` pays none. The keeper only supplies EVM fees and gas limit (the contract sets the nonce) or a
   Solana blockhash, never destinations or amounts.
@@ -278,12 +282,18 @@ For estate attorneys: [one-page PDF](docs/one-pager/attorney-one-pager.pdf) (sou
 "Neither can touch the plan" in the section above holds for pulse and agent keys. It does not hold against the
 deployer key until that key is removed.
 
-Two review rounds by a separate AI agent that did not write the code (not a third-party audit). Round 1 found
+Three review rounds by AI agents that did not write the code (not a third-party audit). Round 1 found
 1 Critical, 3 High, 4 Medium, 6 Low, 5 Info: a double-payout path on foreign chains via caller-chosen nonces, fake
 `mark_broadcast` hashes, unbounded EVM gas, and keys surviving an NFT transfer. Round 2 (guardian pause, Monad) found
 1 High, 2 Medium, 3 Low, 4 Info. Every Critical/High item, and Medium M-6, is fixed with regression tests and
-redeployed; the other Medium/Low items are documented with their mitigations. Full findings:
-[`docs/SECURITY_REVIEW.md`](docs/SECURITY_REVIEW.md), [`docs/SECURITY_REVIEW_2.md`](docs/SECURITY_REVIEW_2.md).
+redeployed; the other Medium/Low items are documented with their mitigations. Round 3 (Nov 10, the whole repository)
+found 1 Critical, 3 Medium, 14 Low: a vault's "DAO" could keep the step-4 bond and still have it credited back, paid
+out of other vaults' NEAR (C-2). It was reproduced on a private testnet copy and is fixed in the source and in
+`contracts/release/dmw.wasm`, with the three Mediums and 11 of the Lows; the row "The live contract is this source"
+above says whether the live contract runs the fixed code yet. Full findings:
+[`docs/SECURITY_REVIEW.md`](docs/SECURITY_REVIEW.md), [`docs/SECURITY_REVIEW_2.md`](docs/SECURITY_REVIEW_2.md),
+[`docs/SECURITY_REVIEW_3.md`](docs/SECURITY_REVIEW_3.md). The live tests of the same day, with their transactions, are in
+[`docs/FINAL_REVIEW.md`](docs/FINAL_REVIEW.md).
 
 Five later passes, all by AI agents that did not write the code, are in `docs/`: [`AUDIT_CLAIMS.md`](docs/AUDIT_CLAIMS.md) (every public claim checked against the repo and the chain), [`AUDIT_REPO_HYGIENE.md`](docs/AUDIT_REPO_HYGIENE.md) (secrets, licences, pre-publication), [`AUDIT_FINAL_OFFCHAIN.md`](docs/AUDIT_FINAL_OFFCHAIN.md) (keeper, dashboard, agent, site, CSP), [`AUDIT_FINAL_CONTRACT.md`](docs/AUDIT_FINAL_CONTRACT.md) (final contract audit; the EVM gas floor H-5 came from it) and [`AUDIT_ONCHAIN_STATE.md`](docs/AUDIT_ONCHAIN_STATE.md) (live state of `dmw-x8cx.testnet`: keys, solvency, vaults, MPC signatures). None is a third-party audit.
 
@@ -305,7 +315,7 @@ What happens when something or someone fails. Each line is how the deployed cont
 | No keeper is running | An overdue vault waits. Nothing is lost | `poke` and `execute_step` are open to any account, and the poke pays a bounty |
 | The MPC network does not answer in step III | That payout is marked `failed` after 10 minutes and settlement moves on | `resign_foreign` can request the signature again |
 | A derived source address is unfunded | The payout stays `signed` and is never relayed. This is the state of every foreign payout on testnet today | The owner must fund the address while alive; the dashboard shows it |
-| An heir's account does not exist | That transfer fails and returns to the vault; the Will NFT holder can claim it after settlement | Name accounts that exist, or implicit accounts |
+| An heir's account does not exist | That transfer fails and returns to the vault; the Will NFT holder (the heir with the largest share) can claim it after settlement. If the missing account is that primary heir, the Will NFT goes to the missing name too, and the remainder can only be claimed by whoever later controls that account | Name accounts that exist, or implicit accounts; the sole or largest heir must exist |
 | The owner loses their own NEAR key | Nobody can change the plan, and the vault settles to the heirs when the heartbeats stop | This is the product working, not a recovery path |
 | The deployer key is compromised | The contract can be replaced and every vault drained | A testnet trust assumption; see the security model |
 
@@ -319,6 +329,7 @@ What happens when something or someone fails. Each line is how the deployed cont
 | `keeper/` | TypeScript CLI: `pulse`, `keeper` (`--token` / `--owner-prefix` limit it to some vaults, `--until-idle` for a bounded sweep), `due`, `agent-demo`, `derive`, `dao create`; webhook notices; `src/chains/` for Base, Monad and Solana |
 | `dashboard/` | Vite + React app: guest run (`/try`), create vault, live Will NFT, agent log, keys, guardian, settlement timeline, the record, heir view, phone pulse (`/pulse`) |
 | `site/` | public landing page |
+| `design/` | shared design sources: the seal and logo SVGs, tokens, the pulse and QR scripts, the WebGL seal (`seal3d/`, three.js + esbuild), and `build_site.py`, which copies and inlines them into `site/` (and the icons into `dashboard/public/icons`) |
 | `scripts/` | `near-admin.mjs` (faucet/deploy/call without near-cli), `deploy.sh`, `demo.sh`, `kill.sh`, `check.sh` |
 | `docs/` | Chain Signatures notes, security review, diagrams, attorney one-pager, judge dry runs (`JUDGE_DRY_RUN.md`, `_2` to `_5`), the audits (`AUDIT_*.md`) |
 | `SPEC.md` | the interface every component was built against |
@@ -334,11 +345,15 @@ Third-party libraries (all from their package registries, none modified):
   near-api-js 6, chainsig.js (address derivation in the browser), @auth0/auth0-spa-js (NEAR Auth login), qrcode,
   @noble/hashes, bs58, buffer, @fontsource (Instrument Serif, Inter Tight, JetBrains Mono, OFL); dev: Vite 8,
   Tailwind 4 with PostCSS, TypeScript, vitest.
-- Site: no runtime dependencies; the same three OFL fonts, self-hosted.
-- Tooling outside the shipped code: Playwright and ffmpeg (demo video, screenshots), Docker image
+- Site: three.js 0.187 (MIT), bundled with esbuild from `design/seal3d/` into `site/js/seal3d.bundle.js` for the WebGL
+  seal; nothing is loaded from a CDN. The same three OFL fonts, self-hosted.
+- Tooling outside the shipped code: Playwright and ffmpeg (demo video, screenshots), esbuild (site seal bundle),
+  Python 3 with numpy (`design/build_site.py`, the diagram generators, the teaser scripts), ElevenLabs (AI voice of the
+  narrated demo cut; voice, music and sound effects of the teaser, see `docs/video/`), Docker image
   `sourcescan/cargo-near` (optional reproducible build).
 - External services on testnet: `v1.signer-prod.testnet` (MPC), `sputnik-v2.testnet`, the NEAR Auth shared testnet
-  Auth0 client, the NEAR faucet, and the public RPCs listed in `SPEC.md`.
+  Auth0 client, the NEAR faucet, the public RPCs listed in `SPEC.md`, and `rpc.testnet.near.org` as the site's fallback
+  NEAR RPC.
 
 No template or boilerplate was used. Licences of bundled material: [`docs/THIRD_PARTY_NOTICES.md`](docs/THIRD_PARTY_NOTICES.md).
 
@@ -347,8 +362,9 @@ No template or boilerplate was used. Licences of bundled material: [`docs/THIRD_
 the whole repository as AI-generated. The two security reviews were also done by an AI agent.
 
 **Baseline.** None: no code predates the hackathon (the author's statement; the window opened with the 2026-10-19
-announcement). The work was done in a scratch workspace and committed to this repo in sequence on Nov 7 2026, which
-is why every commit carries that date. The submitted tree will be tagged `hackathon-submission`.
+announcement). The work up to Nov 7 2026 was done in a scratch workspace and committed to this repo in sequence
+that day, which is why the history starts on Nov 7 and most commits carry that date; later commits are dated Nov 8 to
+Nov 10, as they were made. The submitted tree will be tagged `hackathon-submission`.
 
 The author leads no other hackathon project.
 

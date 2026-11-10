@@ -105,7 +105,7 @@ All of these used raw testnet RPC calls (`view_access_key_list`, `call_function`
    `result: "1"`, and beats every 20 s (`scripts/demo.sh:62` `--interval 20`).
 9. README:63-71 keeper log: it shows heir amounts, "bounty paid", "keys deleted" and "signed by
    v1.signer-prod.testnet". The real lines are `step vault 1 step N/5 <link>`. The amounts (1.29/0.86) come
-   from the 6 NEAR smoke run; this demo pays 1.08/0.72.
+   from the 5 NEAR smoke run; this demo pays 1.08/0.72.
 10. README:52 and `scripts/demo.sh:84` print `http://localhost:5173/vault/N`, but the dashboard defaults to
     `dmw-x8cx.testnet` (`dashboard/src/config.ts:5`, `dashboard/.env.example:2`). A judge who follows the hint
     sees **a different vault** (x8cx vault 1, stuck in Warning), not the one they just created. The root

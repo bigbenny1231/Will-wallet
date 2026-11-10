@@ -10,10 +10,10 @@ TX="node contracts/tools/tx.mjs"
 run() { echo; echo "\$ $*"; "$@"; }
 vault_field() { $NA view "$C" get_vault "{\"token_id\":\"$TOKEN\"}" | python3 -c "import json,sys;v=json.load(sys.stdin);print($1)"; }
 
-echo "## create vault (interval 120 s while we set it up, grace 1, 6 NEAR + 0.1 storage)"
+echo "## create vault (interval 120 s while we set it up, grace 1, 5 NEAR + 0.1 storage)"
 echo "## (testnet txs take ~5-10 s each, so the alive phase runs at 120 s and set_timing drops it to 20 s before the owner goes silent)"
 out=$($TX call "$OWNER" "$C" create_vault "{\"heartbeat_interval_s\":120,\"grace_missed\":1,\"heirs\":[{\"account_id\":\"$H1\",\"bps\":6000},{\"account_id\":\"$H2\",\"bps\":4000}],\"policy\":{\"per_tx_max\":\"500000000000000000000000\",\"daily_max\":\"800000000000000000000000\",\"allowlist\":[\"$H2\"]},\"bounty\":\"50000000000000000000000\"}" 100 5.1)
-echo "\$ $TX call $OWNER $C create_vault {...} 100 6.1"; echo "$out"
+echo "\$ $TX call $OWNER $C create_vault {...} 100 5.1"; echo "$out"
 TOKEN=$(echo "$out" | sed -n 's/.*result: "\([0-9]*\)".*/\1/p')
 echo "TOKEN=$TOKEN"
 

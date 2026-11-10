@@ -2,6 +2,11 @@
 
 Run 2026-11-08 (UTC) against the two public Vercel deployments, built from master at `fd4459f`/`1b8437a`.
 
+> Status on 2026-11-10: F2, F3 and F4 below are fixed (the site links to the dashboard, `/try`, `/vault/6` and `/heir`;
+> the dashboard serves `/robots.txt` and a meta description; the demo video is the 3.2 MB re-cut). F1 is still open
+> until the GitHub repository is made public. Everything below is the 2026-11-08 snapshot; the later run is in
+> `docs/FINAL_REVIEW.md`.
+
 - Site: https://will-wallet-site.vercel.app
 - Dashboard: https://will-wallet.vercel.app
 

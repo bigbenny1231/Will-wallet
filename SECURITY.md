@@ -4,9 +4,11 @@ Testnet reference implementation. Not audited. Not a will. Do not hold real fund
 
 ## Reporting a vulnerability
 
-- Email **security@deadmanswallet.dev** with a description and, if you can, a reproduction (testnet tx links help).
-- Or open an issue at https://github.com/bigbenny1231/will-wallet/issues. For anything that could put funds
-  at risk, open an issue that only asks for a private channel, and leave out the details.
+- Open an issue at https://github.com/bigbenny1231/will-wallet/issues with a description and, if you can, a
+  reproduction (testnet tx links help). For anything that could put funds at risk, open an issue that only asks for
+  a private channel, and leave out the details.
+- Email is not available yet: the `deadmanswallet.dev` domain is not registered, so `security@deadmanswallet.dev`
+  does not receive mail.
 
 Please give us a reasonable chance to fix it before public disclosure.
 

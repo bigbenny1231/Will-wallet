@@ -18,6 +18,12 @@ and the one-pager (`docs/one-pager/`, `site/assets/attorney-one-pager.pdf`).
 The OFL permits bundling and embedding with software of any licence, provided the copyright notice and licence
 text travel with the font files (they do) and the fonts are not sold on their own.
 
+## JavaScript bundled into the landing page
+
+- three.js 0.187 (MIT, Copyright 2010-2026 three.js authors, https://github.com/mrdoob/three.js): built into
+  `site/js/seal3d.bundle.js` by `design/seal3d/build.mjs` (esbuild, minified). Licence text:
+  `site/js/LICENSE-three.txt`.
+
 ## Rust crates linked into the contracts
 
 - `near-sdk`, `near-contract-standards`: MIT OR Apache-2.0.

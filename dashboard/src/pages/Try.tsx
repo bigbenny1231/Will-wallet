@@ -36,7 +36,7 @@ interface Line {
 
 const ACTS = [
   { name: "Alive", text: "This browser beats with a pulse key. Your agent pays an invoice, then is told to drain the vault and is refused." },
-  { name: "Silence", text: "You hold to stop. The vault waits one missed beat, then anyone may poke it." },
+  { name: "Silence", text: "You hold to stop. The vault waits two missed beats, about a minute, then anyone may poke it." },
   { name: "Settlement", text: "Five steps: heirs paid on NEAR, keys deleted, Base and Solana payouts signed by NEAR’s MPC network, the Will NFT handed over." },
 ];
 

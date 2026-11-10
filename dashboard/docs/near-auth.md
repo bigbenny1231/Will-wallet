@@ -55,8 +55,8 @@ The shared testnet Auth0 client accepts exactly one callback URL: `http://localh
   We did not finish a Google login in the sandbox (no Google account there), so the last step, reading the `sub` and
   deriving the key, is checked against the same code path with a known `sub` (see the test and the RPC call above)
   and end to end in mock mode (`shots/v3-heir-google.png`).
-- Any other origin, including the public deployment: the button is shown disabled with the label
-  **NEAR Auth (coming)** and the reason. Turning it on needs our own Auth0 client from NEAR Auth with the deployment's
+- Any other origin, including the public deployment: there is no Google button; the page says that sign-in with
+  Google works from a local copy and waits for production credentials. Turning it on needs our own Auth0 client from NEAR Auth with the deployment's
   URL registered, then `VITE_NEAR_AUTH_CLIENT_ID` and `VITE_NEAR_AUTH_ORIGINS`.
 
 ## What the heir page does
@@ -80,4 +80,4 @@ The shared testnet Auth0 client accepts exactly one callback URL: `http://localh
 
 "Heirs can sign in with Google through NEAR Auth on testnet (shared credentials, `localhost:3000` only). The Google
 identity resolves to the NEAR implicit account its MPC key controls, and the page lists what was left to it. On the
-public site the button reads 'NEAR Auth (coming)' until we have production credentials."
+public site there is no Google button until we have production credentials; the page says so."

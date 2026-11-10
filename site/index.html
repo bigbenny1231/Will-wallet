@@ -187,8 +187,8 @@
 <section class="trust" aria-label="What this is">
   <ul class="wrap trust-list">
     <li><strong>Open source</strong><span>MIT licence, every line on GitHub</span></li>
-    <li><strong>333 tests pass</strong><span>Contract 104, keeper 81, dashboard 88, agent 60</span></li>
-    <li><strong>Reviewed twice</strong><span>By a separate AI agent. Not a third-party audit</span></li>
+    <li><strong>355 tests pass</strong><span>Contract 105, keeper 90, dashboard 99, agent 61</span></li>
+    <li><strong>Reviewed three times</strong><span>By separate AI agents. Not a third-party audit</span></li>
     <li><strong>Testnet only</strong><span>Not a will. Meant to sit alongside one</span></li>
   </ul>
 </section>
@@ -196,7 +196,7 @@
 <section class="story" id="how" aria-labelledby="how-h">
   <div class="wrap story-head">
     <h2 id="how-h">Vault 17, as it happened.</h2>
-    <p>7 November 2026, 18:35 to 18:44 UTC, on NEAR testnet. Scroll and the line is drawn in the order it happened, spaced by the time between events. Every time and link below comes from the chain.</p>
+    <p>7 November 2026, 18:35 to 18:44 UTC, on NEAR testnet. Scroll and the line is drawn in the order it happened, spaced by the time between events. Every transaction time and link below comes from the chain; the hold to stop is timed from the recording, and the warning is the contract&#8217;s deadline, one interval after the last heartbeat.</p>
   </div>
   <div class="wrap story-grid">
     <div class="story-clock" aria-hidden="true">
@@ -300,7 +300,7 @@
         <li class="ev ev-act" data-t="1794076752000" data-phase="silence">
           <h3 class="kin" data-kin="silence">II. Silence</h3>
           <p class="ev-lede">When the beats stop, the vault waits.</p>
-          <p>Vault 17 waited one missed 60-second beat. Yours can wait years. Only when the grace runs out can anyone start settlement.</p>
+          <p>Vault 17 waited two missed 60-second beats: one to turn amber, one of grace. Yours can wait years. Only when the grace runs out can anyone start settlement.</p>
         </li>
         <li class="ev ev-note" data-t="1794076754000"><time>18:39:14</time><span>Hold to stop, on the phone</span></li>
         <li class="ev ev-warn" data-t="1794076811000" data-state="warn"><time>18:40:11</time><span>Warning. The seal turns amber</span></li>
@@ -330,8 +330,8 @@
     </div>
     <ol class="try-acts">
       <li><span class="try-n">I</span><span><strong>Alive.</strong> The page beats with a pulse key. Your agent pays an invoice, then obeys a planted message and is refused by the contract.</span></li>
-      <li><span class="try-n">II</span><span><strong>Silence.</strong> You hold to stop. One missed beat later, anyone may poke the vault.</span></li>
-      <li><span class="try-n">III</span><span><strong>Settlement.</strong> Five transactions: heirs paid, keys deleted, Base and Solana payouts signed by NEAR&#8217;s MPC network, the Will NFT handed over.</span></li>
+      <li><span class="try-n">II</span><span><strong>Silence.</strong> You hold to stop. Two missed beats later, about a minute, anyone may poke the vault.</span></li>
+      <li><span class="try-n">III</span><span><strong>Settlement.</strong> Five steps in six transactions: heirs paid, keys deleted, Base and Solana payouts signed by NEAR&#8217;s MPC network, the estate DAO step skipped, the Will NFT handed over.</span></li>
     </ol>
     <p class="try-cta">
       <a class="pill" data-link="try" href="https://will-wallet.vercel.app/try">Begin a guest run</a>
@@ -581,7 +581,7 @@
       <details><summary>What if I lose my phone, or someone takes it?</summary>
         <p>The phone holds a pulse key and nothing else. A thief can only send heartbeats, which postpones settlement until you remove the key from your own account. A lost phone stops sending them, so pair a new one, or send a heartbeat from your wallet, before the grace runs out.</p></details>
       <details><summary>What if my guardian turns against me, or disappears?</summary>
-        <p>A guardian can pause once per heartbeat cycle, for at most the length you set, and nothing more: no funds, no heirs, no keys. The worst a hostile guardian can do is delay settlement once. A guardian who disappears changes nothing; the vault runs on your heartbeat alone.</p></details>
+        <p>A guardian can pause once per heartbeat cycle, for at most the length you set. A pause moves no funds, changes no heirs and touches no keys, but while it runs your agent cannot pay. Your next heartbeat ends the pause and allows one more, so a hostile guardian can delay settlement once and can keep switching your agent off until you remove them. A guardian who disappears changes nothing; the vault runs on your heartbeat alone.</p></details>
       <details><summary>Can it be stopped once it starts?</summary>
         <p>Until someone pokes the vault, one heartbeat from you restores it, however late. After the poke it cannot be stopped: the five steps run to the end. That is why the grace period should be generous. A cancel window after the poke is not in this build.</p></details>
       <details><summary>Is this a will?</summary>

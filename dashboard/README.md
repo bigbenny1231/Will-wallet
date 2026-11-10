@@ -107,8 +107,8 @@ paused_until_ms` the console reads "Paused." with an amber "paused until" line u
 
 `npm run dev:auth` serves on `http://localhost:3000`, the only origin the shared NEAR Auth testnet client accepts.
 There "Continue with Google" opens NEAR Auth's Google login, derives the identity's MPC key and shows the implicit
-account it controls and that account's inheritances. On other origins the button is disabled and labelled
-"NEAR Auth (coming)". Details and limits: `docs/near-auth.md`.
+account it controls and that account's inheritances. On other origins there is no Google button: the heir page
+says that sign-in with Google works from a local copy and waits for production credentials. Details and limits: `docs/near-auth.md`.
 
 ## Design
 

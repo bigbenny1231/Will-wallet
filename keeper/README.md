@@ -6,7 +6,7 @@ Node 22, TypeScript, run through `tsx` (no build step). Spec: [`SPEC.md`](../SPE
 ```bash
 cd keeper && npm install
 cp .env.example .env        # then fill it in; see the table below
-npm test                    # 81 unit tests, no network
+npm test                    # 90 unit tests, no network
 ```
 
 ## Do X, see Y
@@ -137,7 +137,7 @@ What to expect:
 - `DMW_NOTIFY_WEBHOOK` is not passed to the workflow. Guest vaults have no owner to notify.
 - GitHub may start scheduled runs late, and it disables schedules in a repository with no activity for 60 days.
 
-What has been tested: the filter, the sweep and the pre-check are unit-tested against the mock backend (`test/sweep.test.ts`). The pre-check was run read-only against `dmw-x8cx.testnet` on 2026-11-09 and reported 19 vaults, none of them a guest vault, `work=false`. The sweep step's shell script was dry-run locally with a stub in place of the faucet and the mock backend. The workflow itself has not run on GitHub yet, and no live sweep transaction has been sent.
+What has been tested: the filter, the sweep and the pre-check are unit-tested against the mock backend (`test/sweep.test.ts`). The pre-check was run read-only against `dmw-x8cx.testnet` on 2026-11-09, before the first guest run on the live contract, and reported 19 vaults, none of them a guest vault, `work=false`. The sweep step's shell script was dry-run locally with a stub in place of the faucet and the mock backend. The same command settled an abandoned guest vault on a private testnet copy on 2026-11-09 (see `dashboard/README.md`). The workflow has run on GitHub on its schedule since 2026-11-10 04:31 UTC. Its first live sweep was vault 24 on `dmw-x8cx.testnet`, a guest vault created at 04:56 UTC and left alone on purpose: the next scheduled run made a one-off account (`dmw-sweep-d8d431e9f8.testnet`), poked the vault and ran all five steps to Settled (`docs/FINAL_REVIEW.md`).
 
 ## Layout
 

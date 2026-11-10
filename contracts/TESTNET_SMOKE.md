@@ -7,7 +7,7 @@ Real run against NEAR testnet on 2026-11-07 (contract redeployed from this tree 
 | Contract | [`dmw-x8cx.testnet`](https://testnet.nearblocks.io/address/dmw-x8cx.testnet) |
 | Vault owner | [`dmw-owner-cdeb.testnet`](https://testnet.nearblocks.io/address/dmw-owner-cdeb.testnet) (faucet account) |
 | Heirs | `dmw-heir-cdeb.testnet` 6000 bps (primary), `heir-kvo.testnet` 4000 bps |
-| Vault | token `4`, 6 NEAR + 0.1 NEAR storage, policy per_tx 0.5 / daily 0.8 NEAR, allowlist `[heir-kvo.testnet]`, bounty 0.05 NEAR |
+| Vault | token `4`, 5 NEAR + 0.1 NEAR storage, policy per_tx 0.5 / daily 0.8 NEAR, allowlist `[heir-kvo.testnet]`, bounty 0.05 NEAR |
 
 Reproduce: `contracts/smoke.sh dmw-x8cx.testnet <owner> <heir1> <heir2>` (accounts from
 `node scripts/near-admin.mjs create <name>.testnet`; tx helper: `contracts/tools/tx.mjs`).
@@ -19,9 +19,9 @@ that last beat.
 
 ## What it shows
 
-1. `create_vault` mints Will NFT #4 (NEP-171 `nft_mint` event). Balance = 6 NEAR.
+1. `create_vault` mints Will NFT #4 (NEP-171 `nft_mint` event). Balance = 5 NEAR.
 2. `add_pulse_key` / `add_agent_key` add **function-call keys to the contract account**
-   (scoped to `heartbeat` / `agent_pay`, allowance 1 NEAR each, reserved from the vault balance: 6 -> 4 NEAR).
+   (scoped to `heartbeat` / `agent_pay`, allowance 1 NEAR each, reserved from the vault balance: 5 -> 3 NEAR).
 3. `heartbeat` signed by the pulse key, with signer = the contract account (`by: "pulse_key"`).
 4. Access-key scope: the pulse key cannot call `agent_pay`. The RPC rejects it before execution.
 5. `agent_pay`: allowed 0.3, denied `over_per_tx_max` (0.9), denied `receiver_not_allowlisted`,
@@ -40,9 +40,9 @@ Private keys of the generated pulse/agent keys were never written to disk or to 
 ## Full output
 
 ```text
-## create vault (interval 120 s while we set it up, grace 1, 6 NEAR + 0.1 storage)
+## create vault (interval 120 s while we set it up, grace 1, 5 NEAR + 0.1 storage)
 ## (testnet txs take ~5-10 s each, so the alive phase runs at 120 s and set_timing drops it to 20 s before the owner goes silent)
-$ node contracts/tools/tx.mjs call dmw-owner-cdeb.testnet dmw-x8cx.testnet create_vault {...} 100 6.1
+$ node contracts/tools/tx.mjs call dmw-owner-cdeb.testnet dmw-x8cx.testnet create_vault {...} 100 5.1
 tx https://testnet.nearblocks.io/txns/J7PMUfXwQfmgRQ6X6K37z5jhhVpF6HoaWMESB9fwno5P
   log: EVENT_JSON:{"standard":"dmw","version":"1.0.0","event":"vault_created","data":{"token_id":"4","owner_id":"dmw-owner-cdeb.testnet","balance":"5000000000000000000000000","heartbeat_interval_s":120,"grace_missed":1}}
   log: EVENT_JSON:{"standard":"nep171","version":"1.0.0","event":"nft_mint","data":[{"owner_id":"dmw-owner-cdeb.testnet","token_ids":["4"]}]}
@@ -356,11 +356,13 @@ These came after the smoke run above (its 21 transaction links are the ones befo
 
 ### Code redeployed from a reproducible build (state kept)
 
-`dmw-x8cx.testnet` now runs the `cargo near build reproducible-wasm` output of commit `88cd83b`
+After this deploy (Nov 7 2026) `dmw-x8cx.testnet` ran the `cargo near build reproducible-wasm` output of commit `88cd83b`
 (image `sourcescan/cargo-near:0.23.0-rust-1.99.1`). Code hash **`G6eiYJj6gkVt4QaJPHYBQz4eov4fU5ihwsUFqSog25hM`**,
 and a second build in a separate clone gave the same hash. Redeploy tx:
 [E8SpKyY…](https://testnet.nearblocks.io/txns/E8SpKyYSRq4RTRFCp4qCiXukwrm5rtKvne53NWEUf2wE). `contract_source_metadata`
-now returns `link` and `build_info` (NEP-330 1.3.0). Vault state, including showcase vault 6, was not changed.
+then returned `link` and `build_info` (NEP-330 1.3.0). Vault state, including showcase vault 6, was not changed.
+Later deploys replaced that code with non-reproducible builds (`build_info` is null again); the current hash is in the
+README row "The live contract is this source".
 
 ### Cleanup of the leftover vaults 1-3
 
