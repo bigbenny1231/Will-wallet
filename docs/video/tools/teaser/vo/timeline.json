@@ -1,0 +1,41 @@
+{
+ "DUR": 10.467,
+ "BEATS": [
+  0.35,
+  1.15,
+  1.806,
+  2.344,
+  2.785,
+  3.147,
+  3.444,
+  3.687,
+  3.886
+ ],
+ "T_FLAT": 4.137,
+ "T_TRIG": 4.687,
+ "T_STEPS": 5.736,
+ "STEP": 0.32,
+ "T_SETTLED": 7.336,
+ "T_END": 7.756,
+ "T_LAST": 9.847,
+ "WORDS": [
+  [
+   0.95,
+   2.552,
+   "If you die tonight,",
+   "serif"
+  ],
+  [
+   2.552,
+   4.137,
+   "your agent keeps spending.",
+   "serif"
+  ]
+ ],
+ "TRIG_TEXT": "Not anymore.",
+ "VO": {
+  "a": 0.95,
+  "b": 4.687,
+  "c": 7.886
+ }
+}

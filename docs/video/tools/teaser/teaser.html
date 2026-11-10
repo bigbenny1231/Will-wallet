@@ -11,7 +11,9 @@ canvas { display: block; }
 <body><canvas id="c"></canvas>
 <script>
 // Dead Man's Wallet teaser. Every frame is a pure function of its index: renderFrame(i) draws frame i at FPS.
-const FPS = 30, DUR = 10.6;
+// The timeline (TL) is written by build.py from the voice's word timings, so the cuts land on the words.
+const TL = {"DUR": 10.467, "BEATS": [0.35, 1.15, 1.806, 2.344, 2.785, 3.147, 3.444, 3.687, 3.886], "T_FLAT": 4.137, "T_TRIG": 4.687, "T_STEPS": 5.736, "STEP": 0.32, "T_SETTLED": 7.336, "T_END": 7.756, "T_LAST": 9.847, "WORDS": [[0.95, 2.552, "If you die tonight,", "serif"], [2.552, 4.137, "your agent keeps spending.", "serif"]], "TRIG_TEXT": "Not anymore.", "VO": {"a": 0.95, "b": 4.687, "c": 7.886}};
+const FPS = 30, DUR = TL.DUR;
 const INK = '#0B0C0F', BONE = '#EDE7DC', BONE2 = '#A9A399', BRASS = '#C8A96A', LIFE = '#3DDC84', WARN = '#F5B942', DEAD = '#FF4D4D', STILL = '#7A7F87';
 const q = new URLSearchParams(location.search);
 const W = +(q.get('w') || 1920), H = +(q.get('h') || 1080);
@@ -26,14 +28,9 @@ const SPEED = W * 0.52;                      // px per second the paper moves
 const AMP = H * 0.27;
 
 // ---- the timeline ----
-const BEATS = [0.40, 1.15, 1.80, 2.35, 2.80, 3.15, 3.42, 3.64, 3.82, 3.96];
-const T_FLAT = 4.08, T_TRIG = 4.50, T_STEPS = 4.95, STEP = 0.45, T_SETTLED = 7.20, T_END = 7.65, T_LAST = 10.02;
-const WORDS = [
-  [0.40, 1.15, 'If you die tonight,', 'serif'],
-  [1.15, 1.80, 'your agent', 'serif'],
-  [1.80, 2.35, 'keeps spending.', 'serif'],
-  [2.35, 2.80, 'Your', 'big'], [2.80, 3.15, 'crypto', 'big'], [3.15, 3.42, 'dies', 'big'], [3.42, 3.64, 'with', 'big'], [3.64, 4.08, 'you.', 'big'],
-];
+const BEATS = TL.BEATS;
+const T_FLAT = TL.T_FLAT, T_TRIG = TL.T_TRIG, T_STEPS = TL.T_STEPS, STEP = TL.STEP, T_SETTLED = TL.T_SETTLED, T_END = TL.T_END, T_LAST = TL.T_LAST;
+const WORDS = TL.WORDS;
 const STEPS = [['I', 'Heirs paid on NEAR.'], ['II', 'Agent key deleted.'], ['III', 'Base. Monad. Solana. Signed.'], ['IV', 'Estate DAO proposal filed.'], ['V', 'Will NFT to the heir.']];
 
 // ---- helpers ----
@@ -186,8 +183,8 @@ function actAlive(t, i) {
 // ---- act III: the flat line becomes the settlement timeline ----
 function actSettle(t, i) {
   const settled = t >= T_SETTLED, col = settled ? STILL : DEAD;
-  const trig = t < T_STEPS, cutAt = trig ? T_TRIG : settled ? T_SETTLED : T_STEPS + Math.floor((t - T_STEPS) / STEP) * STEP;
-  const age = t - cutAt, hit = Math.exp(-age / 0.10), n = trig ? -1 : settled ? 5 : Math.floor((t - T_STEPS) / STEP);
+  const trig = t < T_STEPS, cutAt = trig ? T_TRIG : settled ? T_SETTLED : T_STEPS + Math.min(4, Math.floor((t - T_STEPS) / STEP)) * STEP;
+  const age = t - cutAt, hit = Math.exp(-age / 0.10), n = trig ? -1 : settled ? 5 : Math.min(4, Math.floor((t - T_STEPS) / STEP));
   const r = rng(300 + i), kick = (settled ? 0 : 16 * hit) * u;
   ctx.save(); ctx.translate((r() - .5) * kick, (r() - .5) * kick);
   const z = 1 + 0.03 * hit * (settled ? 0 : 1); ctx.translate(W / 2, H / 2); ctx.scale(z, z); ctx.translate(-W / 2, -H / 2);
@@ -208,10 +205,9 @@ function actSettle(t, i) {
   }
   const split = Math.max(0, 1 - age / 0.09), pop = easeOut(age / 0.13);
   if (trig) {
-    const fs = fit('Triggered.', 'italic 400 SIZE "Instrument Serif"', 300 * u, W * 0.8);
+    const fs = fit(TL.TRIG_TEXT, 'italic 400 SIZE "Instrument Serif"', 250 * u, W * 0.86);
     ctx.save(); ctx.translate(W / 2, CY - 70 * u); ctx.scale(lerp(1.25, 1, pop), lerp(1.25, 1, pop));
-    text('Triggered.', 0, 0, `italic 400 ${fs}px "Instrument Serif"`, DEAD, { align: 'center', split, shadow: rgba(DEAD, 0.55), blur: 60 }); ctx.restore();
-    text('THE CONTRACT EXECUTES', W / 2, CY + 150 * u, `500 ${30 * u}px "Inter Tight"`, BONE2, { align: 'center', spacing: `${5 * u}px` });
+    text(TL.TRIG_TEXT, 0, 0, `italic 400 ${fs}px "Instrument Serif"`, DEAD, { align: 'center', split, shadow: rgba(DEAD, 0.55), blur: 60 }); ctx.restore();
   } else if (settled) {
     const fs = fit('Settled.', 'italic 400 SIZE "Instrument Serif"', 300 * u, W * 0.8);
     text('Settled.', W / 2, CY - 70 * u, `italic 400 ${fs}px "Instrument Serif"`, mix(BONE, STILL, age / 0.25), { align: 'center', alpha: 1 - 0.5 * clamp((age - 0.25) / 0.2) });
@@ -226,6 +222,7 @@ function actSettle(t, i) {
     text(label, 0, 0, `400 ${fs}px "Instrument Serif"`, BONE, { split, shadow: 'rgba(0,0,0,.9)' }); ctx.restore();
     text(wide ? `STEP ${n + 1} OF 5 · ONE NEAR TRANSACTION` : `STEP ${n + 1} OF 5`, W * 0.935, H * 0.105, `500 ${27 * u}px "Inter Tight"`, BRASS, { align: 'right', spacing: `${4 * u}px` });
   }
+  if (trig) { text('NO HEARTBEAT', W * 0.065, H * 0.105, `500 ${27 * u}px "Inter Tight"`, DEAD, { spacing: `${4 * u}px`, alpha: 0.95 }); }
   ctx.restore();
   if (!settled && age < 1 / FPS + 1e-6 && !trig) { ctx.fillStyle = rgba(BRASS, 0.16); ctx.fillRect(0, 0, W, H); }
 }

@@ -6,7 +6,7 @@ const [w, h, out, list] = process.argv.slice(2);
   const b = await chromium.launch({ args: ['--allow-file-access-from-files'] });
   const page = await b.newPage({ viewport: { width: +w, height: +h }, deviceScaleFactor: 1 });
   const errs = []; page.on('pageerror', (e) => errs.push(String(e))); page.on('console', (m) => { if (m.type() === 'error') errs.push(m.text()); });
-  await page.goto('file://' + path.resolve(__dirname, 'teaser.html') + `?w=${w}&h=${h}`);
+  await page.goto('file://' + path.resolve(__dirname, process.env.TEASER || 'teaser.html') + `?w=${w}&h=${h}`);
   await page.evaluate(() => window.ready);
   const n = await page.evaluate(() => window.FRAMES);
   const frames = list ? list.split(',').map(Number) : [...Array(n).keys()];
