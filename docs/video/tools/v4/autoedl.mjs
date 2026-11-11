@@ -61,34 +61,35 @@ const cuts = []; let on = null;
 for (const e of E) { if (e.name === 'banner_on') on = R(e); if (e.name === 'banner_off' && on !== null) { cuts.push([on - 0.2, R(e) + 0.6]); on = null; } }
 if (on !== null) cuts.push([on - 0.2, rawEnd]);
 
-// merge windows
-W.sort((a, b) => a[0] - b[0]);
-const M = [];
-for (const w of W) { const l = M[M.length - 1]; if (l && w[0] <= l[1] + 1.2) { l[1] = Math.max(l[1], w[1]); l[2] += ' + ' + w[2]; } else M.push([...w]); }
-// timeline of [a, b, speed] covering 0.6 .. end of the Settled window, minus cuts
-const span = [];
-for (let i = 0; i < M.length; i++) {
-  span.push([M[i][0], M[i][1], 1, M[i][2]]);
-  if (i + 1 < M.length) span.push([M[i][1], M[i + 1][0], 0, 'fast']);
-}
+// speeds for the fast stretches: each lasts 1 to 3.5 s on screen; if the cut is still over TARGET, every 1x window is
+// trimmed from its tail (k < 1, never under 2 s) and the trimmed part joins the fast stretch after it
+const SPEEDS = [3, 4, 6, 8, 10, 12, 16];
+const TARGET = +(process.env.TARGET || 164), CARDS = 5 + 1.5 * 3 + 6, SLACK = TARGET < 150 ? 4 : 8;
+const pick = (len, maxOut) => SPEEDS.find(s => len / s <= maxOut) ?? SPEEDS[SPEEDS.length - 1];
 const minus = (segs, cut) => segs.flatMap(([a, b, s, l]) => {
   if (cut[1] <= a || cut[0] >= b) return [[a, b, s, l]];
   const out = []; if (cut[0] > a) out.push([a, cut[0], s, l]); if (cut[1] < b) out.push([cut[1], b, s, l]); return out;
 });
-let segs = span; for (const c of cuts) segs = minus(segs, c);
-segs = segs.filter(([a, b]) => b - a > 0.15);
-
-// speeds for the fast stretches: each lasts 1 to 3.5 s on screen, then everything is scaled to fit TARGET
-const SPEEDS = [3, 4, 6, 8, 10, 12, 16];
-const TARGET = 164, CARDS = 5 + 1.5 * 3 + 6;
-const pick = (len, maxOut) => SPEEDS.find(s => len / s <= maxOut) ?? SPEEDS[SPEEDS.length - 1];
-let maxOut = 3.5, edl;
-for (let iter = 0; iter < 12; iter++) {
-  edl = segs.map(([a, b, s, l]) => [a, b, s === 1 ? 1 : (b - a < 1.4 ? 1 : pick(b - a, maxOut)), l]);
-  const total = CARDS + edl.reduce((x, [a, b, s]) => x + (b - a) / s, 0);
-  if (total <= TARGET + 8 || maxOut <= 0.8) break;
-  maxOut -= 0.3;
+function build(k) {
+  const Wk = W.map(([a, b, l]) => [a, Math.max(a + Math.min(2, b - a), a + (b - a) * k), l]).sort((x, y) => x[0] - y[0]);
+  const M = [];
+  for (const w of Wk) { const l = M[M.length - 1]; if (l && w[0] <= l[1] + 1.2) { l[1] = Math.max(l[1], w[1]); l[2] += ' + ' + w[2]; } else M.push([...w]); }
+  const span = [];
+  for (let i = 0; i < M.length; i++) { span.push([M[i][0], M[i][1], 1, M[i][2]]); if (i + 1 < M.length) span.push([M[i][1], M[i + 1][0], 0, 'fast']); }
+  let segs = span; for (const c of cuts) segs = minus(segs, c);
+  segs = segs.filter(([a, b]) => b - a > 0.15);
+  let maxOut = 3.5, edl, total;
+  for (let iter = 0; iter < 12; iter++) {
+    edl = segs.map(([a, b, s, l]) => [a, b, s === 1 ? 1 : (b - a < 1.4 ? 1 : pick(b - a, maxOut)), l]);
+    total = CARDS + edl.reduce((x, [a, b, s]) => x + (b - a) / s, 0);
+    if (total <= TARGET + SLACK || maxOut <= 0.8) break;
+    maxOut -= 0.3;
+  }
+  return { edl, total, maxOut };
 }
+let k = 1, built = build(1);
+while (built.total > TARGET + SLACK && k > 0.4) { k -= 0.05; built = build(k); }
+const { edl, maxOut } = built;
 
 // cards: cold + act1 first, act2 before the hold, act3 before the first step, end last
 const withCards = [['card', 'cold', 5], ['card', 'act1', 1.5]];
@@ -133,6 +134,6 @@ fs.writeFileSync(S + '/captions.json', JSON.stringify(capT.map(c => ({ text: c.t
 const speeds = {}; for (const m of map) if (m.e[0] !== 'card' && m.e[2] > 1) (speeds[m.e[2]] ||= []).push([m.o, m.o + m.len]);
 fs.writeFileSync(S + '/edl.json', JSON.stringify({ map, capT, speeds, TOTAL, cuts }, null, 1));
 
-console.log(`raw ${rawEnd.toFixed(1)} s -> ${TOTAL.toFixed(1)} s (${Math.floor(TOTAL / 60)}:${String(Math.round(TOTAL % 60)).padStart(2, '0')}), ${cuts.length} banner cut(s), longest fast stretch ${maxOut.toFixed(1)} s`);
+console.log(`window scale ${k.toFixed(2)}; raw ${rawEnd.toFixed(1)} s -> ${TOTAL.toFixed(1)} s (${Math.floor(TOTAL / 60)}:${String(Math.round(TOTAL % 60)).padStart(2, '0')}), ${cuts.length} banner cut(s), longest fast stretch ${maxOut.toFixed(1)} s`);
 for (const m of map) console.log(m.o.toFixed(1).padStart(6), m.len.toFixed(1).padStart(5), m.e[0] === 'card' ? 'card ' + m.e[1] : `${m.e[0].toFixed(1)}-${m.e[1].toFixed(1)} @${m.e[2]}x ${m.e[3]}`);
 for (const c of capT) console.log('cap', c.s.toFixed(1).padStart(6), c.e.toFixed(1).padStart(6), (c.text.length / (c.e - c.s)).toFixed(1) + ' ch/s', c.text.slice(0, 50));
