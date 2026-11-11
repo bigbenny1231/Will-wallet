@@ -70,7 +70,7 @@ const minus = (segs, cut) => segs.flatMap(([a, b, s, l]) => {
   if (cut[1] <= a || cut[0] >= b) return [[a, b, s, l]];
   const out = []; if (cut[0] > a) out.push([a, cut[0], s, l]); if (cut[1] < b) out.push([cut[1], b, s, l]); return out;
 });
-function build(k) {
+function build(k, maxOut0 = 3.5) {
   const Wk = W.map(([a, b, l]) => [a, Math.max(a + Math.min(2, b - a), a + (b - a) * k), l]).sort((x, y) => x[0] - y[0]);
   const M = [];
   for (const w of Wk) { const l = M[M.length - 1]; if (l && w[0] <= l[1] + 1.2) { l[1] = Math.max(l[1], w[1]); l[2] += ' + ' + w[2]; } else M.push([...w]); }
@@ -78,7 +78,7 @@ function build(k) {
   for (let i = 0; i < M.length; i++) { span.push([M[i][0], M[i][1], 1, M[i][2]]); if (i + 1 < M.length) span.push([M[i][1], M[i + 1][0], 0, 'fast']); }
   let segs = span; for (const c of cuts) segs = minus(segs, c);
   segs = segs.filter(([a, b]) => b - a > 0.15);
-  let maxOut = 3.5, edl, total;
+  let maxOut = maxOut0, edl, total;
   for (let iter = 0; iter < 12; iter++) {
     edl = segs.map(([a, b, s, l]) => [a, b, s === 1 ? 1 : (b - a < 1.4 ? 1 : pick(b - a, maxOut)), l]);
     total = CARDS + edl.reduce((x, [a, b, s]) => x + (b - a) / s, 0);
@@ -89,6 +89,9 @@ function build(k) {
 }
 let k = 1, built = build(1);
 while (built.total > TARGET + SLACK && k > 0.4) { k -= 0.05; built = build(k); }
+// a quick run (no RPC stalls) comes out short: let the fast stretches play slower, then the 1x windows run longer
+for (let mo = 4; built.total < TARGET - 4 && mo <= 9; mo += 0.5) built = build(k, mo);
+while (built.total < TARGET - 4 && k < 1.5) { k += 0.05; built = build(k, 9); }
 const { edl, maxOut } = built;
 
 // cards: cold + act1 first, act2 before the hold, act3 before the first step, end last
@@ -129,7 +132,21 @@ const caps = [
 ];
 caps[2][0] = caps[1][1] + 0.4;
 const capT = caps.map(([a, b, text, note]) => ({ s: out(a), e: out(b), text, note })).map(c => ({ ...c, e: Math.max(c.e, c.s + 2.2) }));
-for (let i = 0; i + 1 < capT.length; i++) if (capT[i].e > capT[i + 1].s - 0.15) capT[i].e = capT[i + 1].s - 0.15;
+// every caption stays up long enough to read (12 characters a second, at least 2.6 s): push the next one later, and if
+// the last one would run past the footage, pull the earlier ones back
+const minDur = c => Math.max(2.6, (c.text.length + 0.5 * (c.note || '').length) / 12);
+const footEnd = TOTAL - 6 - 0.2;
+for (let i = 0; i < capT.length; i++) {
+  if (i > 0) capT[i].s = Math.max(capT[i].s, capT[i - 1].e + 0.15);
+  capT[i].e = Math.max(capT[i].e, capT[i].s + minDur(capT[i]));
+  if (i + 1 < capT.length && capT[i].e > capT[i + 1].s - 0.15 && capT[i + 1].s - 0.15 - capT[i].s >= minDur(capT[i])) capT[i].e = capT[i + 1].s - 0.15;
+}
+let limit = footEnd;
+for (let i = capT.length - 1; i >= 0; i--) {
+  if (capT[i].e > limit) capT[i].e = limit;
+  if (capT[i].e - capT[i].s < minDur(capT[i])) capT[i].s = capT[i].e - minDur(capT[i]);
+  limit = capT[i].s - 0.15;
+}
 fs.writeFileSync(S + '/captions.json', JSON.stringify(capT.map(c => ({ text: c.text, note: c.note })), null, 1));
 const speeds = {}; for (const m of map) if (m.e[0] !== 'card' && m.e[2] > 1) (speeds[m.e[2]] ||= []).push([m.o, m.o + m.len]);
 fs.writeFileSync(S + '/edl.json', JSON.stringify({ map, capT, speeds, TOTAL, cuts }, null, 1));

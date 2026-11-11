@@ -18,9 +18,11 @@ for f in setup.out agent.out keeper.log demo.out; do
   if [ -f "$S/raw-pack/$f" ]; then cp "$S/raw-pack/$f" "$OUTDIR/"; elif [ -f "$S/$f" ]; then cp "$S/$f" "$OUTDIR/"; fi
 done
 # one still per caption (its midpoint) plus the end card, for review without downloading the video
-node -e 'const e=require(process.argv[1]);const ts=e.capT.map(c=>(c.s+c.e)/2);ts.push(e.TOTAL-2);console.log(ts.map(t=>t.toFixed(2)).join(" "))' "$S/edl.json" | tr ' ' '\n' | nl -nrz -w2 | while read -r i t; do
-  "$FF" -y -v error -ss "$t" -i "$S/dmw-demo-v4.mp4" -frames:v 1 -vf scale=1280:-2 "$OUTDIR/stills/$i.jpg"
-done
+node -e '
+const { execFileSync } = require("child_process"); const [edl, mp4, dir, ff] = process.argv.slice(1);
+const e = require(edl); const ts = e.capT.map(c => (c.s + c.e) / 2); ts.push(e.TOTAL - 2);
+ts.forEach((t, i) => execFileSync(ff, ["-y", "-v", "error", "-ss", t.toFixed(2), "-i", mp4, "-frames:v", "1", "-vf", "scale=1280:-2", `${dir}/${String(i + 1).padStart(2, "0")}.jpg`]));
+console.log("stills", ts.length);' "$S/edl.json" "$S/dmw-demo-v4.mp4" "$OUTDIR/stills" "$FF"
 # X cut: a standard X account takes videos up to 2:20, so the same run is cut a second time to 2:20 or less
 if [ "${X_CUT:-1}" = 1 ]; then
   X="$S/x"; rm -rf "$X"; mkdir -p "$X"; ln -sf "$S/raw.mp4" "$X/raw.mp4"; cp "$S/events.json" "$S/endinfo.json" "$X/"

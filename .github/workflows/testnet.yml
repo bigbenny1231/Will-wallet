@@ -50,6 +50,8 @@ jobs:
       TERM: dumb
       NO_COLOR: '1'
       OUT: ${{ github.workspace }}/results/${{ github.run_id }}
+      # saved logs never keep workflow-command lines (a mask line carries the key it masks)
+      SAVE: grep --line-buffered -v '^::'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -73,19 +75,19 @@ jobs:
           set -o pipefail
           # mask each key the moment it exists: run deploy.sh with a watcher that masks new key files
           ( while sleep 0.2; do ./scripts/ci/mask.sh; done ) & W=$!
-          NEW=1 DMW_WASM=contracts/release/dmw.wasm ./scripts/deploy.sh 2>&1 | tee "$OUT/deploy.log"
+          NEW=1 DMW_WASM=contracts/release/dmw.wasm ./scripts/deploy.sh 2>&1 | tee >(eval "$SAVE" > "$OUT/deploy.log")
           kill $W || true; ./scripts/ci/mask.sh
           C=$(sed -n 's/^DMW_CONTRACT=//p' .env); echo "C=$C" >> "$GITHUB_ENV"
-          node scripts/near-admin.mjs view "$C" contract_source_metadata '{}' | tee -a "$OUT/deploy.log" || true
+          node scripts/near-admin.mjs view "$C" contract_source_metadata '{}' | tee >(eval "$SAVE" >> "$OUT/deploy.log") || true
           curl -s "$NEAR_RPC" -H 'content-type: application/json' -d "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"query\",\"params\":{\"request_type\":\"view_account\",\"finality\":\"final\",\"account_id\":\"$C\"}}" \
-            | node -e 'const r=JSON.parse(require("fs").readFileSync(0,"utf8")).result; console.log("on-chain code_hash", r.code_hash)' | tee -a "$OUT/deploy.log"
-          sha256sum contracts/release/dmw.wasm | tee -a "$OUT/deploy.log"
+            | node -e 'const r=JSON.parse(require("fs").readFileSync(0,"utf8")).result; console.log("on-chain code_hash", r.code_hash)' | tee >(eval "$SAVE" >> "$OUT/deploy.log")
+          sha256sum contracts/release/dmw.wasm | tee >(eval "$SAVE" >> "$OUT/deploy.log")
       - name: Showcase vault
         if: inputs.task == 'all'
         run: |
           set -o pipefail
           ( while sleep 0.2; do ./scripts/ci/mask.sh; done ) & W=$!
-          ./scripts/showcase.sh 2>&1 | tee "$OUT/showcase.log"
+          ./scripts/showcase.sh 2>&1 | tee >(eval "$SAVE" > "$OUT/showcase.log")
           kill $W || true; ./scripts/ci/mask.sh
           cp .demo/showcase.json "$OUT/"
       - name: Lock the contract (delete its full-access key)
@@ -93,8 +95,8 @@ jobs:
         run: |
           set -o pipefail
           C=$(sed -n 's/^DMW_CONTRACT=//p' .env)
-          node scripts/near-admin.mjs lock "$C" 2>&1 | tee "$OUT/lock.log"
-          node scripts/near-admin.mjs keys "$C" | tee -a "$OUT/lock.log"
+          node scripts/near-admin.mjs lock "$C" 2>&1 | tee >(eval "$SAVE" > "$OUT/lock.log")
+          node scripts/near-admin.mjs keys "$C" | tee >(eval "$SAVE" >> "$OUT/lock.log")
           rm -f "keys/$C.json"
 
       # ---------------- live checks ----------------
@@ -105,7 +107,7 @@ jobs:
           C=$(sed -n 's/^DMW_CONTRACT=//p' .env); S=$(openssl rand -hex 2)
           for a in dmw-smoke-owner-$S dmw-smoke-h1-$S dmw-smoke-h2-$S; do node scripts/near-admin.mjs create $a.testnet; done
           ./scripts/ci/mask.sh; sleep 4
-          ./contracts/smoke.sh "$C" dmw-smoke-owner-$S.testnet dmw-smoke-h1-$S.testnet dmw-smoke-h2-$S.testnet 2>&1 | tee "$OUT/smoke.log"
+          ./contracts/smoke.sh "$C" dmw-smoke-owner-$S.testnet dmw-smoke-h1-$S.testnet dmw-smoke-h2-$S.testnet 2>&1 | tee >(eval "$SAVE" > "$OUT/smoke.log")
       - name: C-2 drain attempt (attacker DAO keeps the bond; the vault must not be credited twice)
         if: inputs.task == 'all' || inputs.task == 'verify' || inputs.task == 'finish'
         run: |
@@ -115,7 +117,7 @@ jobs:
           node scripts/near-admin.mjs create $A; ./scripts/ci/mask.sh
           for _ in $(seq 15); do node scripts/near-admin.mjs keys $A >/dev/null 2>&1 && break; sleep 2; done
           node scripts/near-admin.mjs sub $A heir 0.5; node scripts/near-admin.mjs sub $A dao 1.5; ./scripts/ci/mask.sh; sleep 3
-          ./contracts/attack-c2.sh "$C" $A heir.$A dao.$A 2>&1 | tee "$OUT/attack-c2.log"
+          ./contracts/attack-c2.sh "$C" $A heir.$A dao.$A 2>&1 | tee >(eval "$SAVE" > "$OUT/attack-c2.log")
 
       # ---------------- video ----------------
       - name: Video tools (ffmpeg, Playwright Chromium, dashboard build)
@@ -134,7 +136,7 @@ jobs:
         run: |
           set -o pipefail
           ( while sleep 0.2; do ./scripts/ci/mask.sh; done ) & W=$!
-          ./docs/video/tools/v4/record.sh 2>&1 | tee "$OUT/record.log"
+          ./docs/video/tools/v4/record.sh 2>&1 | tee >(eval "$SAVE" > "$OUT/record.log")
           kill $W || true
       - if: (inputs.task == 'all' || inputs.task == 'record' || inputs.task == 'finish') && always()
         uses: actions/upload-artifact@v4
@@ -144,7 +146,7 @@ jobs:
         run: |
           set -o pipefail
           [ -d /tmp/v4/raw-pack ] && cp -a /tmp/v4/raw-pack/. /tmp/v4/ || true
-          ./docs/video/tools/v4/edit.sh "$OUT" 2>&1 | tee "$OUT/edit.log"
+          ./docs/video/tools/v4/edit.sh "$OUT" 2>&1 | tee >(eval "$SAVE" > "$OUT/edit.log")
       - if: (inputs.task == 'all' || inputs.task == 'record' || inputs.task == 'finish' || inputs.task == 'edit') && always()
         uses: actions/upload-artifact@v4
         with: { name: dmw-video, path: '${{ env.OUT }}/*.mp4', retention-days: 30, if-no-files-found: ignore }
