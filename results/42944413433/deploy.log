@@ -1,0 +1,96 @@
+== creating dmw-9a0101.testnet (testnet faucet)
+created dmw-9a0101.testnet  key saved to keys/dmw-9a0101.testnet.json
+== using prebuilt contracts/release/dmw.wasm
+== deploying to dmw-9a0101.testnet and calling new({owner_id: dmw-9a0101.testnet})
+tx https://testnet.nearblocks.io/txns/CrUK8JX1op31CcFD3NKtwNYZ3iL2ux9djdV5pD8DR8QZ
+tx https://testnet.nearblocks.io/txns/GiWxLemyQkx3nE21tBHg4zg3KqdVq9BscihvyXXPkpbx
+== keeper account dmw-keeper-b92d84.testnet (testnet faucet)
+created dmw-keeper-b92d84.testnet  key saved to keys/dmw-keeper-b92d84.testnet.json
+== set_keeper dmw-keeper-b92d84.testnet
+tx https://testnet.nearblocks.io/txns/ETfd4PWpjpjuivUn4PwvaE2XK8VYjwonrWpzURpfYuMX
+== get_config
+{
+  "owner_id": "dmw-9a0101.testnet",
+  "next_id": 1,
+  "storage_fee": "100000000000000000000000",
+  "key_allowance": "1000000000000000000000000",
+  "reserve_with_dao": "1500000000000000000000000",
+  "reserve_no_dao": "100000000000000000000000",
+  "dao_bond": "1000000000000000000000000",
+  "mpc_signer": "v1.signer-prod.testnet",
+  "keeper": "dmw-keeper-b92d84.testnet",
+  "chains": [
+    {
+      "chain": "base",
+      "kind": "evm",
+      "chain_id": 84532,
+      "path": "base-<token_id>",
+      "domain_id": 0,
+      "rpc": "https://sepolia.base.org",
+      "explorer_tx": "https://sepolia.basescan.org/tx/",
+      "max_fee_per_gas": "100000000000",
+      "max_payouts": 4,
+      "min_gas_limit": "50000"
+    },
+    {
+      "chain": "monad",
+      "kind": "evm",
+      "chain_id": 10143,
+      "path": "monad-<token_id>",
+      "domain_id": 0,
+      "rpc": "https://testnet-rpc.monad.xyz",
+      "explorer_tx": "https://testnet.monadexplorer.com/tx/",
+      "max_fee_per_gas": "1000000000000",
+      "max_payouts": 1,
+      "min_gas_limit": "50000"
+    },
+    {
+      "chain": "solana",
+      "kind": "solana",
+      "cluster": "devnet",
+      "path": "sol-<token_id>",
+      "domain_id": 1,
+      "rpc": "https://api.devnet.solana.com",
+      "explorer_tx": "https://explorer.solana.com/tx/"
+    }
+  ],
+  "min_pause_s": 10,
+  "max_pause_s": 7776000
+}
+
+deployed dmw-9a0101.testnet   https://testnet.nearblocks.io/address/dmw-9a0101.testnet
+written to .env: DMW_CONTRACT=dmw-9a0101.testnet, KEEPER_ACCOUNT_ID=dmw-keeper-b92d84.testnet (keys in keys/, gitignored)
+next: make demo
+{
+  "version": "0.1.0",
+  "link": "https://github.com/bigbenny1231/will-wallet",
+  "standards": [
+    {
+      "standard": "nep171",
+      "version": "1.2.0"
+    },
+    {
+      "standard": "nep177",
+      "version": "2.0.0"
+    },
+    {
+      "standard": "nep181",
+      "version": "1.0.0"
+    },
+    {
+      "standard": "nep297",
+      "version": "1.0.0"
+    },
+    {
+      "standard": "dmw",
+      "version": "1.0.0"
+    },
+    {
+      "standard": "nep330",
+      "version": "1.3.0"
+    }
+  ],
+  "build_info": null
+}
+on-chain code_hash 6s9oqxvBZfhWncW6irGH6zXTebeYUKTHh1pk1WSDxjYH
+57236f167f42db375ef136feb87cae890d1442fd03c19726c2f8d53b876a8d36  contracts/release/dmw.wasm
