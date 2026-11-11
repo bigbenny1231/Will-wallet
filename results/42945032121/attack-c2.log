@@ -1,0 +1,23 @@
+## deploy the attacker's "DAO" (dao.dmw-att-14c9.testnet, contracts/tools/evil-dao)
+tx https://testnet.nearblocks.io/txns/BUJgVxUy3LoTT2FujruZWBPZRLZEG66mfmuG6LYP1Gsq
+start: attacker 8.2858  heir 0.2000  dao 1.5000  contract 17.1936 NEAR
+
+## create_vault: 10 s interval, grace 0, heir 100 %, 1.7 NEAR
+tx https://testnet.nearblocks.io/txns/21pZToLbKTpuqEzfgNXcdQBzXLhQmbAupQ75eN2Ckitn
+  log: EVENT_JSON:{"standard":"dmw","version":"1.0.0","event":"vault_created","data":{"token_id":"3","owner_id":"dmw-att-14c9.testnet","balance":"1600000000000000000000000","heartbeat_interval_s":10,"grace_missed":0}}
+  log: EVENT_JSON:{"standard":"nep171","version":"1.0.0","event":"nft_mint","data":[{"owner_id":"dmw-att-14c9.testnet","token_ids":["3"]}]}
+  result: "3"
+TOKEN=3
+
+## set_dao -> dao.dmw-att-14c9.testnet
+tx https://testnet.nearblocks.io/txns/3pNbfbr17zUK1J5GECCKsn9zX97Sqn9FFK7wiJ42Fos8
+  log: EVENT_JSON:{"standard":"dmw","version":"1.0.0","event":"dao_set","data":{"token_id":"3","dao_id":"dao.dmw-att-14c9.testnet"}}
+  result: (empty)
+
+## wait for the deadline, then poke
+tx https://testnet.nearblocks.io/txns/A9cYaUxsMir6mYFwkqxuE4w71zK8xsxvJ85uhu317vEQ
+  log: EVENT_JSON:{"standard":"dmw","version":"1.0.0","event":"triggered","data":{"token_id":"3","by":"heir.dmw-att-14c9.testnet","bounty":"10000000000000000000000","trigger_at_ms":1794363507440}}
+  result: "10000000000000000000000"
+
+## execute_step (step 1)
+  error: Sender heir.dmw-att-14c9.testnet does not have enough balance 0.2094889211080336 for operation costing 0.300919061570554
