@@ -8,6 +8,7 @@ name: testnet
 #                 contracts/attack-c2.sh), and the demo video (docs/video/tools/v4)
 #   task=verify   only the live checks, on `contract`
 #   task=record   only the demo video, on `contract`
+#   task=finish   the C-2 attack check and the demo video, on `contract` (an `all` run that stopped after the smoke test)
 #   task=edit     re-edit the video from the raw footage of an earlier record run (`raw_run`), no chain access
 #
 # Keys. No key leaves the runner: every account here is a throwaway testnet faucet account whose key lives only in
@@ -19,7 +20,7 @@ on:
   workflow_dispatch:
     inputs:
       task:
-        description: all | verify | record | edit
+        description: all | verify | record | finish | edit
         required: true
         default: all
       contract:
@@ -60,7 +61,7 @@ jobs:
           mkdir -p "$OUT"
 
       - name: Contract from the input
-        if: inputs.task == 'verify' || inputs.task == 'record'
+        if: inputs.task == 'verify' || inputs.task == 'record' || inputs.task == 'finish'
         run: |
           case "${{ inputs.contract }}" in *.testnet) ;; *) echo "contract input must be a .testnet account"; exit 1;; esac
           printf 'NEAR_NETWORK=testnet\nDMW_CONTRACT=%s\n' "${{ inputs.contract }}" > .env; chmod 600 .env
@@ -106,17 +107,19 @@ jobs:
           ./scripts/ci/mask.sh; sleep 4
           ./contracts/smoke.sh "$C" dmw-smoke-owner-$S.testnet dmw-smoke-h1-$S.testnet dmw-smoke-h2-$S.testnet 2>&1 | tee "$OUT/smoke.log"
       - name: C-2 drain attempt (attacker DAO keeps the bond; the vault must not be credited twice)
-        if: inputs.task == 'all' || inputs.task == 'verify'
+        if: inputs.task == 'all' || inputs.task == 'verify' || inputs.task == 'finish'
         run: |
           set -o pipefail
-          C=$(sed -n 's/^DMW_CONTRACT=//p' .env); S=$(openssl rand -hex 2)
-          for a in dmw-att-$S dmw-att-heir-$S dmw-att-dao-$S; do node scripts/near-admin.mjs create $a.testnet; done
-          ./scripts/ci/mask.sh; sleep 4
-          ./contracts/attack-c2.sh "$C" dmw-att-$S.testnet dmw-att-heir-$S.testnet dmw-att-dao-$S.testnet 2>&1 | tee "$OUT/attack-c2.log"
+          C=$(sed -n 's/^DMW_CONTRACT=//p' .env); A=dmw-att-$(openssl rand -hex 2).testnet
+          # one faucet account; the heir and the "DAO" are its sub-accounts (the faucet allows ~10 accounts per IP per 12 h)
+          node scripts/near-admin.mjs create $A; ./scripts/ci/mask.sh
+          for _ in $(seq 15); do node scripts/near-admin.mjs keys $A >/dev/null 2>&1 && break; sleep 2; done
+          node scripts/near-admin.mjs sub $A heir 0.2; node scripts/near-admin.mjs sub $A dao 1.5; ./scripts/ci/mask.sh; sleep 3
+          ./contracts/attack-c2.sh "$C" $A heir.$A dao.$A 2>&1 | tee "$OUT/attack-c2.log"
 
       # ---------------- video ----------------
       - name: Video tools (ffmpeg, Playwright Chromium, dashboard build)
-        if: inputs.task == 'all' || inputs.task == 'record' || inputs.task == 'edit'
+        if: inputs.task == 'all' || inputs.task == 'record' || inputs.task == 'finish' || inputs.task == 'edit'
         run: |
           sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg >/dev/null
           mkdir -p /tmp/pw && cd /tmp/pw && npm init -y >/dev/null && npm i --no-audit --no-fund playwright@1.63.0 >/dev/null && npx playwright install --with-deps chromium >/dev/null
@@ -127,22 +130,22 @@ jobs:
         uses: actions/download-artifact@v4
         with: { name: dmw-raw, path: /tmp/v4, run-id: '${{ inputs.raw_run }}', github-token: '${{ github.token }}' }
       - name: Record the demo run
-        if: inputs.task == 'all' || inputs.task == 'record'
+        if: inputs.task == 'all' || inputs.task == 'record' || inputs.task == 'finish'
         run: |
           set -o pipefail
           ( while sleep 0.2; do ./scripts/ci/mask.sh; done ) & W=$!
           ./docs/video/tools/v4/record.sh 2>&1 | tee "$OUT/record.log"
           kill $W || true
-      - if: (inputs.task == 'all' || inputs.task == 'record') && always()
+      - if: (inputs.task == 'all' || inputs.task == 'record' || inputs.task == 'finish') && always()
         uses: actions/upload-artifact@v4
         with: { name: dmw-raw, path: /tmp/v4/raw-pack, retention-days: 30, if-no-files-found: ignore }
       - name: Edit
-        if: inputs.task == 'all' || inputs.task == 'record' || inputs.task == 'edit'
+        if: inputs.task == 'all' || inputs.task == 'record' || inputs.task == 'finish' || inputs.task == 'edit'
         run: |
           set -o pipefail
           [ -d /tmp/v4/raw-pack ] && cp -a /tmp/v4/raw-pack/. /tmp/v4/ || true
           ./docs/video/tools/v4/edit.sh "$OUT" 2>&1 | tee "$OUT/edit.log"
-      - if: (inputs.task == 'all' || inputs.task == 'record' || inputs.task == 'edit') && always()
+      - if: (inputs.task == 'all' || inputs.task == 'record' || inputs.task == 'finish' || inputs.task == 'edit') && always()
         uses: actions/upload-artifact@v4
         with: { name: dmw-video, path: '${{ env.OUT }}/*.mp4', retention-days: 30, if-no-files-found: ignore }
 

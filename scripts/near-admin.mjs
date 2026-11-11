@@ -7,6 +7,7 @@
 //   node scripts/near-admin.mjs call-with-key <signerAcct> <ed25519:key> <contract> <method> '<json>' [gasTgas]
 //   node scripts/near-admin.mjs send <from> <to> <near>
 //   node scripts/near-admin.mjs keys <acct>
+//   node scripts/near-admin.mjs sub <parent> <prefix> [near]       -> creates <prefix>.<parent> funded by the parent (no faucet)
 //   node scripts/near-admin.mjs lock <acct>                      -> deletes the account's own full-access key (irreversible)
 import { createRequire } from 'node:module';
 import { readFileSync, writeFileSync, mkdirSync, existsSync, chmodSync } from 'node:fs';
@@ -77,6 +78,18 @@ try {
     console.log(JSON.stringify(r, null, 2));
   } else if (cmd === 'send') {
     show(await account(a[0]).transfer({ receiverId: a[1], amount: toYocto(a[2]) }));
+  } else if (cmd === 'sub') {
+    // Sub-account <prefix>.<parent>, paid for by the parent (no faucet call; the faucet allows about 10 accounts per
+    // IP per 12 h). The new key is saved to keys/ like `create`.
+    const [parent, prefix, amount] = a;
+    const name = `${prefix}.${parent}`;
+    const kp = KeyPair.fromRandom('ed25519');
+    show(await account(parent).createSubAccount(name, kp.getPublicKey(), toYocto(amount || '1')));
+    mkdirSync(KEYS, { recursive: true, mode: 0o700 }); chmodSync(KEYS, 0o700);
+    const file = join(KEYS, `${name}.json`);
+    writeFileSync(file, JSON.stringify({ account_id: name, public_key: kp.getPublicKey().toString(), private_key: kp.toString() }, null, 2), { mode: 0o600 });
+    chmodSync(file, 0o600);
+    console.log(`created ${name} (${amount || 1} NEAR from ${parent})  key saved to keys/${name}.json`);
   } else if (cmd === 'lock') {
     // Delete the account's own full-access key (the one in keys/<acct>.json). Afterwards nobody can deploy new code to
     // the account or call owner-only methods as it; function-call keys stay. Irreversible: a fix means a fresh account.
