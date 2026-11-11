@@ -1,5 +1,20 @@
 # Demo video
 
+## v4 (tooling ready, to be recorded on the new contract)
+
+`dmw-x8cx.testnet` still runs the code with finding C-2 and its deploy key is lost, so it cannot be fixed in place.
+v3 was filmed on it. v4 re-films the same story on the fresh contract that the `testnet` workflow deploys
+(`.github/workflows/testnet.yml`, task `all` or `record`): same stage, same scenes, same caption narration, same length
+target (about 2:50). Tools in [`tools/v4/`](tools/v4/), runnable on any machine with NEAR testnet access:
+
+- `record.sh`: `setup.sh` (the v3 vault: `make demo`, +1.5 NEAR, a phone pulse key, Base + Monad + Solana payouts, a
+  guardian), a production dashboard build on :5173, the stage on :5057 (`serve.mjs`), then `run.mjs`, which drives the
+  run with no manual steps and writes every story moment to `events.json`.
+- `edit.sh`: `autoedl.mjs` builds the cut from `events.json` (story beats at 1x, the stretches between them at 3x to 16x
+  and marked on screen, dashboard RPC-timeout banners cut), `assets.mjs` renders the cards and captions, `cut.mjs` cuts
+  and overlays. v3 needed hand-picked raw times and three patches; v4 needs neither (the act labels switch before the act
+  cards, and the keeper pane no longer turns "errors in a row" into a row).
+
 ## v3 (current)
 
 `dmw-demo-v3.mp4` (1920x1080, 30 fps, 2:50, H.264 crf 18 + silent AAC, 51 MB) and `dmw-demo-v3-720p.mp4` (1280x720,
