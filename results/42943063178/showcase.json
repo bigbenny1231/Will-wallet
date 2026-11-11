@@ -1,0 +1,14 @@
+{
+ "token": "1",
+ "owner": "dmw-andrew-edbc.testnet",
+ "heirs": [
+  "dmw-sarah-edbc.testnet",
+  "dmw-ben-edbc.testnet"
+ ],
+ "api": "dmw-api-edbc.testnet",
+ "sources": {
+  "base": "0xe8DCc7d14Cd9d1B313d329f01169cB981FcEDb92",
+  "monad": "0x4103D844081fFBB4354B8D2793157F1FE44f8909",
+  "solana": "Ct9QKUJVn1Ns7v8z1XcpGoiGsakHpCTg9QEqpBBDPFPN"
+ }
+}
