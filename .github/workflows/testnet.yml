@@ -119,7 +119,7 @@ jobs:
         if: inputs.task == 'all' || inputs.task == 'record' || inputs.task == 'edit'
         run: |
           sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg >/dev/null
-          mkdir -p /tmp/pw && cd /tmp/pw && npm init -y >/dev/null && npm i --no-audit --no-fund playwright@1.56.1 >/dev/null && npx playwright install --with-deps chromium >/dev/null
+          mkdir -p /tmp/pw && cd /tmp/pw && npm init -y >/dev/null && npm i --no-audit --no-fund playwright@1.63.0 >/dev/null && npx playwright install --with-deps chromium >/dev/null
           echo "PW_MODULE=/tmp/pw/node_modules/playwright/index.mjs" >> "$GITHUB_ENV"
           cd "$GITHUB_WORKSPACE/dashboard" && npm ci --no-audit --no-fund --loglevel=error
       - name: Raw footage from the record run
