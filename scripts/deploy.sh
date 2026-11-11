@@ -4,6 +4,7 @@
 #   make deploy                     (or ./scripts/deploy.sh)
 #   ./scripts/deploy.sh <acct.testnet> [owner.testnet]
 #   NEW=1 make deploy               ignore DMW_CONTRACT in .env and deploy to a fresh account
+#   DMW_WASM=contracts/release/dmw.wasm make deploy   deploy a prebuilt wasm instead of building
 #
 # Target account: the argument, else DMW_CONTRACT from .env, else a new dmw-<rand>.testnet.
 # Accounts that do not exist yet are created through the testnet faucet (scripts/near-admin.mjs;
@@ -33,17 +34,25 @@ if account_exists "$ACCOUNT"; then
 else
   say "creating $ACCOUNT (testnet faucet)"
   $ADMIN create "$ACCOUNT" || die "faucet could not create $ACCOUNT"
-  sleep 2
+  # give the RPC node a moment to see the new account (up to 30 s)
+  for _ in $(seq 15); do account_exists "$ACCOUNT" && break; sleep 2; done
 fi
 if [ ! -f "keys/$ACCOUNT.json" ] && [ ! -f "$HOME/.near-credentials/testnet/$ACCOUNT.json" ]; then
   die "no full-access key for $ACCOUNT in keys/ or ~/.near-credentials/testnet/"
 fi
 
-say "building"
-# cargo and its build scripts do not need the keys that load_env exported from .env
-env -u KEEPER_PRIVATE_KEY -u DMW_CONTRACT_KEY -u DMW_AGENT_KEY -u DMW_PULSE_KEY ./contracts/dmw/build.sh
-WASM=contracts/dmw/target/near/dmw.wasm
-[ -f "$WASM" ] || WASM=contracts/dmw/target/wasm32-unknown-unknown/release/dmw.wasm
+if [ -n "${DMW_WASM:-}" ]; then
+  # A prebuilt wasm, e.g. DMW_WASM=contracts/release/dmw.wasm (the reviewed release build, docs/FINAL_REVIEW.md)
+  [ -f "$DMW_WASM" ] || die "DMW_WASM=$DMW_WASM does not exist"
+  WASM=$DMW_WASM
+  say "using prebuilt $WASM"
+else
+  say "building"
+  # cargo and its build scripts do not need the keys that load_env exported from .env
+  env -u KEEPER_PRIVATE_KEY -u DMW_CONTRACT_KEY -u DMW_AGENT_KEY -u DMW_PULSE_KEY ./contracts/dmw/build.sh
+  WASM=contracts/dmw/target/near/dmw.wasm
+  [ -f "$WASM" ] || WASM=contracts/dmw/target/wasm32-unknown-unknown/release/dmw.wasm
+fi
 
 if $ADMIN view "$ACCOUNT" get_config '{}' >/dev/null 2>&1; then
   say "redeploying code to $ACCOUNT (already initialised, state is kept)"

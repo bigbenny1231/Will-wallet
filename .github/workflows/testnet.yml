@@ -1,0 +1,164 @@
+name: testnet
+
+# Manual testnet jobs that need the open internet (NEAR RPC, the faucet, Chain Signatures). Run from the Actions tab
+# or the API (workflow_dispatch). Nothing here runs on push.
+#
+#   task=all      fresh contract account, deploy contracts/release/dmw.wasm, init, set_keeper, showcase vault, then
+#                 LOCK the contract (its full-access key is deleted), the live checks (contracts/smoke.sh,
+#                 contracts/attack-c2.sh), and the demo video (docs/video/tools/v4)
+#   task=verify   only the live checks, on `contract`
+#   task=record   only the demo video, on `contract`
+#   task=edit     re-edit the video from the raw footage of an earlier record run (`raw_run`), no chain access
+#
+# Keys. No key leaves the runner: every account here is a throwaway testnet faucet account whose key lives only in
+# this job's keys/ folder and is masked in the log the moment it exists (scripts/ci/mask.sh). The contract account
+# keeps no full-access key after setup, so nobody (this workflow included) can change its code afterwards; a fix is a
+# fresh deploy. Non-secret results (tx links, logs, video, stills) are pushed to the branch `ci/testnet-results` under
+# results/<run id>/, after a check that no private key is among them.
+on:
+  workflow_dispatch:
+    inputs:
+      task:
+        description: all | verify | record | edit
+        required: true
+        default: all
+      contract:
+        description: contract account for verify and record (e.g. dmw-abc123.testnet)
+        required: false
+        default: ''
+      raw_run:
+        description: run id of the record run whose raw footage to re-edit (edit)
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: testnet
+  cancel-in-progress: false
+
+jobs:
+  testnet:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      NEAR_NETWORK: testnet
+      NEAR_RPC: https://rpc.testnet.fastnear.com
+      TERM: dumb
+      NO_COLOR: '1'
+      OUT: ${{ github.workspace }}/results/${{ github.run_id }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - name: Install keeper and agent dependencies
+        run: |
+          (cd keeper && npm ci --no-audit --no-fund --loglevel=error)
+          (cd agent && npm ci --no-audit --no-fund --loglevel=error)
+          mkdir -p "$OUT"
+
+      - name: Contract from the input
+        if: inputs.task == 'verify' || inputs.task == 'record'
+        run: |
+          case "${{ inputs.contract }}" in *.testnet) ;; *) echo "contract input must be a .testnet account"; exit 1;; esac
+          printf 'NEAR_NETWORK=testnet\nDMW_CONTRACT=%s\n' "${{ inputs.contract }}" > .env; chmod 600 .env
+
+      # ---------------- deploy ----------------
+      - name: Deploy the release build to a fresh account
+        if: inputs.task == 'all'
+        run: |
+          set -o pipefail
+          # mask each key the moment it exists: run deploy.sh with a watcher that masks new key files
+          ( while sleep 0.2; do ./scripts/ci/mask.sh; done ) & W=$!
+          NEW=1 DMW_WASM=contracts/release/dmw.wasm ./scripts/deploy.sh 2>&1 | tee "$OUT/deploy.log"
+          kill $W || true; ./scripts/ci/mask.sh
+          C=$(sed -n 's/^DMW_CONTRACT=//p' .env); echo "C=$C" >> "$GITHUB_ENV"
+          node scripts/near-admin.mjs view "$C" contract_source_metadata '{}' | tee -a "$OUT/deploy.log" || true
+          curl -s "$NEAR_RPC" -H 'content-type: application/json' -d "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"query\",\"params\":{\"request_type\":\"view_account\",\"finality\":\"final\",\"account_id\":\"$C\"}}" \
+            | node -e 'const r=JSON.parse(require("fs").readFileSync(0,"utf8")).result; console.log("on-chain code_hash", r.code_hash)' | tee -a "$OUT/deploy.log"
+          sha256sum contracts/release/dmw.wasm | tee -a "$OUT/deploy.log"
+      - name: Showcase vault
+        if: inputs.task == 'all'
+        run: |
+          set -o pipefail
+          ( while sleep 0.2; do ./scripts/ci/mask.sh; done ) & W=$!
+          ./scripts/showcase.sh 2>&1 | tee "$OUT/showcase.log"
+          kill $W || true; ./scripts/ci/mask.sh
+          cp .demo/showcase.json "$OUT/"
+      - name: Lock the contract (delete its full-access key)
+        if: inputs.task == 'all'
+        run: |
+          set -o pipefail
+          C=$(sed -n 's/^DMW_CONTRACT=//p' .env)
+          node scripts/near-admin.mjs lock "$C" 2>&1 | tee "$OUT/lock.log"
+          node scripts/near-admin.mjs keys "$C" | tee -a "$OUT/lock.log"
+          rm -f "keys/$C.json"
+
+      # ---------------- live checks ----------------
+      - name: Smoke test (create vault, heartbeat, agent allowed and denied, trigger, five steps, claim)
+        if: inputs.task == 'all' || inputs.task == 'verify'
+        run: |
+          set -o pipefail
+          C=$(sed -n 's/^DMW_CONTRACT=//p' .env); S=$(openssl rand -hex 2)
+          for a in dmw-smoke-owner-$S dmw-smoke-h1-$S dmw-smoke-h2-$S; do node scripts/near-admin.mjs create $a.testnet; done
+          ./scripts/ci/mask.sh; sleep 4
+          ./contracts/smoke.sh "$C" dmw-smoke-owner-$S.testnet dmw-smoke-h1-$S.testnet dmw-smoke-h2-$S.testnet 2>&1 | tee "$OUT/smoke.log"
+      - name: C-2 drain attempt (attacker DAO keeps the bond; the vault must not be credited twice)
+        if: inputs.task == 'all' || inputs.task == 'verify'
+        run: |
+          set -o pipefail
+          C=$(sed -n 's/^DMW_CONTRACT=//p' .env); S=$(openssl rand -hex 2)
+          for a in dmw-att-$S dmw-att-heir-$S dmw-att-dao-$S; do node scripts/near-admin.mjs create $a.testnet; done
+          ./scripts/ci/mask.sh; sleep 4
+          ./contracts/attack-c2.sh "$C" dmw-att-$S.testnet dmw-att-heir-$S.testnet dmw-att-dao-$S.testnet 2>&1 | tee "$OUT/attack-c2.log"
+
+      # ---------------- video ----------------
+      - name: Video tools (ffmpeg, Playwright Chromium, dashboard build)
+        if: inputs.task == 'all' || inputs.task == 'record' || inputs.task == 'edit'
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg >/dev/null
+          mkdir -p /tmp/pw && cd /tmp/pw && npm init -y >/dev/null && npm i --no-audit --no-fund playwright@1.56.1 >/dev/null && npx playwright install --with-deps chromium >/dev/null
+          echo "PW_MODULE=/tmp/pw/node_modules/playwright/index.mjs" >> "$GITHUB_ENV"
+          cd "$GITHUB_WORKSPACE/dashboard" && npm ci --no-audit --no-fund --loglevel=error
+      - name: Raw footage from the record run
+        if: inputs.task == 'edit'
+        uses: actions/download-artifact@v4
+        with: { name: dmw-raw, path: /tmp/v4, run-id: '${{ inputs.raw_run }}', github-token: '${{ github.token }}' }
+      - name: Record the demo run
+        if: inputs.task == 'all' || inputs.task == 'record'
+        run: |
+          set -o pipefail
+          ( while sleep 0.2; do ./scripts/ci/mask.sh; done ) & W=$!
+          ./docs/video/tools/v4/record.sh 2>&1 | tee "$OUT/record.log"
+          kill $W || true
+      - if: (inputs.task == 'all' || inputs.task == 'record') && always()
+        uses: actions/upload-artifact@v4
+        with: { name: dmw-raw, path: /tmp/v4/raw-pack, retention-days: 30, if-no-files-found: ignore }
+      - name: Edit
+        if: inputs.task == 'all' || inputs.task == 'record' || inputs.task == 'edit'
+        run: |
+          set -o pipefail
+          [ -d /tmp/v4/raw-pack ] && cp -a /tmp/v4/raw-pack/. /tmp/v4/ || true
+          ./docs/video/tools/v4/edit.sh "$OUT" 2>&1 | tee "$OUT/edit.log"
+      - if: (inputs.task == 'all' || inputs.task == 'record' || inputs.task == 'edit') && always()
+        uses: actions/upload-artifact@v4
+        with: { name: dmw-video, path: '${{ env.OUT }}/*.mp4', retention-days: 30, if-no-files-found: ignore }
+
+      # ---------------- results ----------------
+      - name: Push the non-secret results to ci/testnet-results
+        if: always()
+        run: |
+          ./scripts/ci/mask.sh
+          # last line of defence: refuse to publish anything that looks like a private key
+          if grep -rIl 'ed25519:[1-9A-HJ-NP-Za-km-z]\{80,\}' "$OUT" 2>/dev/null; then echo "a private key reached the results; not pushing"; exit 1; fi
+          git config user.name "github-actions[bot]"; git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          mv "$OUT" /tmp/results-out
+          git fetch origin ci/testnet-results 2>/dev/null && git checkout -B ci/testnet-results origin/ci/testnet-results || git checkout --orphan ci/testnet-results
+          git rm -rq --cached . 2>/dev/null || true
+          find . -mindepth 1 -maxdepth 1 ! -name .git ! -name results -exec rm -rf {} +
+          mkdir -p results && rm -rf "results/${{ github.run_id }}" && mv /tmp/results-out "results/${{ github.run_id }}"
+          echo "${{ inputs.task }} $(date -u +%FT%TZ) ${{ github.sha }}" > "results/${{ github.run_id }}/RUN.txt"
+          git add -f results
+          git commit -qm "results: ${{ inputs.task }} run ${{ github.run_id }}" && git push -q origin ci/testnet-results

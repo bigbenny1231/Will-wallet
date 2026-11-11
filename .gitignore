@@ -6,6 +6,7 @@ dist/
 !.env.example
 *.wasm
 !contracts/release/*.wasm
+!contracts/tools/evil-dao/evil_dao.wasm
 .near-credentials/
 *.key
 keys/

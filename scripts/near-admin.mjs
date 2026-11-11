@@ -7,6 +7,7 @@
 //   node scripts/near-admin.mjs call-with-key <signerAcct> <ed25519:key> <contract> <method> '<json>' [gasTgas]
 //   node scripts/near-admin.mjs send <from> <to> <near>
 //   node scripts/near-admin.mjs keys <acct>
+//   node scripts/near-admin.mjs lock <acct>                      -> deletes the account's own full-access key (irreversible)
 import { createRequire } from 'node:module';
 import { readFileSync, writeFileSync, mkdirSync, existsSync, chmodSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -76,6 +77,16 @@ try {
     console.log(JSON.stringify(r, null, 2));
   } else if (cmd === 'send') {
     show(await account(a[0]).transfer({ receiverId: a[1], amount: toYocto(a[2]) }));
+  } else if (cmd === 'lock') {
+    // Delete the account's own full-access key (the one in keys/<acct>.json). Afterwards nobody can deploy new code to
+    // the account or call owner-only methods as it; function-call keys stay. Irreversible: a fix means a fresh account.
+    const acc = account(a[0]);
+    const pub = KeyPair.fromString(loadKey(a[0])).getPublicKey().toString();
+    show(await acc.deleteKey(pub));
+    const left = await provider.viewAccessKeyList(a[0]);
+    const full = left.keys.filter((k) => k.access_key.permission === 'FullAccess');
+    console.log(`full-access keys left on ${a[0]}: ${full.length}`);
+    if (full.length) process.exitCode = 1;
   } else if (cmd === 'keys') {
     console.log(JSON.stringify(await provider.viewAccessKeyList(a[0]), null, 2));
   } else if (cmd === 'genkey') {
