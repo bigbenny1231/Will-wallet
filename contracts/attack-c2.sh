@@ -8,6 +8,7 @@
 # vault got the bond back as well, and claim paid 1 NEAR more than the vault held, out of other vaults' NEAR.
 # Pass: after step 4 the vault balance is the step-3 balance minus the 1 NEAR bond, the claim pays only that,
 # and the attacker's three accounts end below where they started.
+# The attacker pokes and runs the steps (300 TGas each needs ~0.3 NEAR of balance); the heir only claims.
 # Keys for all three accounts must be in keys/<acct>.json (scripts/near-admin.mjs create).
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -37,12 +38,12 @@ $TX call "$ATT" "$C" set_dao "{\"token_id\":\"$TOKEN\",\"dao_id\":\"$EVIL\"}" 30
 
 echo; echo "## wait for the deadline, then poke"
 while :; do now=$(date +%s%3N); trig=$(field "v['trigger_at_ms']"); [ "$now" -gt "$((trig + 2000))" ] && break; sleep 3; done
-$TX call "$HEIR" "$C" poke "{\"token_id\":\"$TOKEN\"}" 30
+$TX call "$ATT" "$C" poke "{\"token_id\":\"$TOKEN\"}" 30
 
 declare -A B
 for i in 1 2 3 4 5; do
   echo; echo "## execute_step (step $i)"
-  $TX call "$HEIR" "$C" execute_step "{\"token_id\":\"$TOKEN\"}" 300
+  $TX call "$ATT" "$C" execute_step "{\"token_id\":\"$TOKEN\"}" 300
   sleep 2
   B[$i]=$(field "v['balance']"); echo "vault balance after step $i: $(near ${B[$i]}) NEAR, step now $(field "v['step']"), state $(field "v['state']")"
 done
