@@ -1,21 +1,50 @@
 # Demo video
 
-## v4 (tooling ready, to be recorded on the new contract)
+## v4 (current)
 
-`dmw-x8cx.testnet` still runs the code with finding C-2 and its deploy key is lost, so it cannot be fixed in place.
-v3 was filmed on it. v4 re-films the same story on the fresh contract that the `testnet` workflow deploys
-(`.github/workflows/testnet.yml`, task `all` or `record`): same stage, same scenes, same caption narration, same length
-target (about 2:50). Tools in [`tools/v4/`](tools/v4/), runnable on any machine with NEAR testnet access:
+`site/assets/demo-720p.mp4` (1280x720, 2:41, 5.6 MB) and the 1920x1080 master, plus `site/assets/demo-x-720p.mp4`
+(2:15, for X, whose standard accounts take up to 2:20). Same story, stage, captions and cards as v3, filmed on the live
+contract `dmw-979268.testnet` (`docs/LIVE_CONTRACT.md`) because v3's contract, `dmw-x8cx.testnet`, runs the code with
+finding C-2 and was replaced. Recorded by the `testnet` workflow (run 42958682328, Nov 11 2026, 04:25 to 04:30 UTC) and
+cut by its edit task (run 42972214388) from the raw footage; logs, EDL and stills are on the `ci/testnet-results` branch.
 
-- `record.sh`: `setup.sh` (the v3 vault: `make demo`, +1.5 NEAR, a phone pulse key, Base + Monad + Solana payouts, a
-  guardian), a production dashboard build on :5173, the stage on :5057 (`serve.mjs`), then `run.mjs`, which drives the
-  run with no manual steps and writes every story moment to `events.json`.
-- `edit.sh`: `autoedl.mjs` builds the cut from `events.json` (story beats at 1x, the stretches between them at 3x to 16x
-  and marked on screen, dashboard RPC-timeout banners cut), `assets.mjs` renders the cards and captions, `cut.mjs` cuts
-  and overlays. v3 needed hand-picked raw times and three patches; v4 needs neither (the act labels switch before the act
-  cards, and the keeper pane no longer turns "errors in a row" into a row).
+Nothing is mocked and nothing is patched. Idle stretches play at 3x to 16x and are marked on screen; the dashboard showed
+no RPC banner during this run, so no stretch is cut. The cut is computed from the run's own events (`autoedl.mjs`).
 
-## v3 (current)
+### The run (vault 5)
+
+Setup (`tools/v4/setup.sh`, before recording): `make demo` made vault 5 (owner `dmw-demo-owner-f0069a.testnet`, 60 s, grace
+1, heirs Sarah 60 % / Ben 40 %, CLI pulse key and agent key, the agent-demo allowed/denied pair), then a 1.5 NEAR deposit, a
+phone pulse key, Base + Monad + Solana payouts and the guardian `dmw-demo-guardian-fb6b.testnet` (max pause 600 s).
+
+| Time (UTC) | What happens | Proof |
+| --- | --- | --- |
+| setup | create_vault, pulse + agent keys, payouts | [create_vault](https://testnet.nearblocks.io/txns/9oAQ1YfN77pKjV9gTw6GrQqM61EYfT8pUXC2GR8kWUdp), [deposit](https://testnet.nearblocks.io/txns/3Weas3hRBpZNDLjrfGRNYHfJJi2frPaCfNSMsupUDtAY), [phone key](https://testnet.nearblocks.io/txns/9eM47JKpsoaa5ATPJqucgmarQaMDuqRr4coQ8yefCk2K), [payouts](https://testnet.nearblocks.io/txns/WT7Tm38tJtouvk4LHF2xeJi8y6hS8dYevJm3AqpnA2K), [guardian](https://testnet.nearblocks.io/txns/GTKUfnmvC2M6TUAu5G6J7QyiUH6iW7A4s6NZu25YrVpB) |
+| 04:25:20 to 04:27:31 | the phone beats about every 20 s (heartbeats signed in the browser with the phone key) | phone page, dashboard |
+| 04:26:17 | `make agent` (scripted brain): INV-2041, 0.12 NEAR, allowed | [tx](https://testnet.nearblocks.io/txns/AqCAoeaKxbEDpnNgWSwJsL6CVj7v5uaHicCLc8kUQKw2) |
+| 04:26:20 | INV-2042, 0.08 NEAR, allowed | [tx](https://testnet.nearblocks.io/txns/B7BuJ9Qb7JaePin6ag6oP2EyBfZLySSzgKmxKhXj2TLk) |
+| 04:26:20 | the brain obeys the injection (2.45 NEAR to `stranger.testnet`); the wallet wrapper refuses, nothing signed | agent ledger (no tx exists) |
+| 04:26:27 | run 2, wrapper checks off: the contract denies 2.25 NEAR, `receiver_not_allowlisted`, logged | [tx](https://testnet.nearblocks.io/txns/ACiMQm2ypySF76d6uGbf9MjovaeyNcz17W2TUxTQu2tM) |
+| 04:26:53 | the guardian pauses (until 04:36:52); the phone's next beat ends it | dashboard "Paused." |
+| 04:27:35 | hold to stop on the phone; last beat 04:27:31 | phone page |
+| 04:28:31 | Warning (the keeper saw it at 04:28:34) | dashboard, keeper ledger |
+| 04:29:35 | the keeper pokes: Triggered, 0.05 NEAR bounty | [poke](https://testnet.nearblocks.io/txns/FV9VXkUCNMxmYCh2Kgff6HmF83sCVy1FQcwWoj3JidbQ) |
+| 04:29:40 | step I: heirs paid on NEAR (1.26 / 0.84 NEAR) | [step 1](https://testnet.nearblocks.io/txns/2z5qMVsTmKmePkiWL8Kx4rPRzRo1homBMkb8dKMhxHzu) |
+| 04:29:44 | step II: both pulse keys and the agent key deleted | [step 2](https://testnet.nearblocks.io/txns/J2DjZKJPT92P7p21uwUaKdLtuFYmZD8kmm2Axe7TUTwa) |
+| 04:29:52 / 04:30:00 / 04:30:10 | step III: Base, Monad, Solana payouts signed by MPC; relay pending funding | [Base](https://testnet.nearblocks.io/txns/2LowT3BxTG6FwMc9XoSfdXUDfJHCGhBNrxAbPJj1p2FZ), [Monad](https://testnet.nearblocks.io/txns/Deh6BcXrce9QxvysidGMpnQDBbGXSnufQSCrqF5CQmUY), [Solana](https://testnet.nearblocks.io/txns/5742KpKeQCHCVKavo8pRnyh95HEzNx1zErbrVRjBwHfX) |
+| 04:30:14 | step IV: no estate DAO on vault 5, skipped | [step 4](https://testnet.nearblocks.io/txns/8v3opWesMmGkcKLSBbsYE7Ryut6H5Zz3LGiFdqhSQW3r) |
+| 04:30:17 | step V: Will NFT to `dmw-demo-sarah-fb6b.testnet`; Settled at 04:30:18 | [step 5](https://testnet.nearblocks.io/txns/8Cr3SCgTscu3s1ykhKe17dPs4FBZsjXDi5uwDwpJSyuk) |
+
+### How it was made
+
+`tools/v4`, run by `.github/workflows/testnet.yml` (task `record`/`finish` films, task `edit` re-cuts from the raw-footage
+artifact): `setup.sh` builds the vault, `record.sh` serves a production dashboard build and the stage, `run.mjs` drives the
+run with no manual steps and logs every story moment to `events.json`, `autoedl.mjs` builds the cut from those events
+(beats at 1x, fast stretches marked, RPC-banner stretches cut, captions held long enough to read), `assets.mjs` renders the
+cards and captions from HTML with the self-hosted fonts, and `cut.mjs` cuts and overlays in ffmpeg. The X cut is the same
+footage cut to a 132 s target.
+
+## v3 (on the replaced contract)
 
 `dmw-demo-v3.mp4` (1920x1080, 30 fps, 2:50, H.264 crf 18 + silent AAC, 51 MB) and `dmw-demo-v3-720p.mp4` (1280x720,
 13 MB, for X). The mp4s are not committed (`docs/video/*.mp4` is in `.gitignore`); the stills in

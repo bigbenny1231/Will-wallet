@@ -76,4 +76,7 @@ An earlier attempt (vault 3, run 42945032121) stopped at step I because the heir
 gas; nothing ran past the trigger and nothing was paid out. Anyone can still push that vault through its steps.
 
 
-<!-- VIDEO -->
+## The demo video, vault 5 (runs 42958682328 and 42972214388)
+
+The 2:41 demo on the site (`site/assets/demo-720p.mp4`) is one real run of vault 5 on this contract, from the phone's
+first beat to Settled, with every transaction listed in [`docs/video/README.md`](video/README.md) (v4).

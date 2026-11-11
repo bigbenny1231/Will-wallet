@@ -1,21 +1,23 @@
-// Live estate graph: vault 6 on dmw-x8cx.testnet, read with read-only JSON-RPC `query` calls (no keys, no writes).
+// Live estate graph: vault 1 on dmw-979268.testnet (the showcase vault), read with read-only JSON-RPC `query` calls (no keys, no writes).
 // Vault -> chains -> who receives what at settlement. Edges pulse on load and whenever the chain reports a new
 // heartbeat (polled every 30 s while the section is on screen). Also the live facts kept from v3: the vault count,
-// vault 6's last beat, and vault 17's five settlement steps as read now.
+// vault 1's last beat, and the demo vault's (5) five settlement steps as read now.
 import { emit, reducedMotion } from './seal.js';
 
-const CONTRACT = 'dmw-x8cx.testnet';
+const CONTRACT = 'dmw-979268.testnet';
+const SHOWCASE = '1';   // keeper/SHOWCASE.md
+const DEMO = '5';       // the recorded run (docs/video/README.md v4, docs/LIVE_CONTRACT.md)
 const RPCS = ['https://rpc.testnet.fastnear.com', 'https://rpc.testnet.near.org'];
 const NEARBLOCKS = 'https://testnet.nearblocks.io/txns/';
 const POLL_MS = 30000;
 
-// Settlement transactions of vault 17, from the recorded run (docs/video/README.md, verified in docs/AUDIT_CLAIMS.md).
+// Settlement transactions of the demo vault, from the recorded run's keeper log (docs/video/README.md, v4).
 const V17_TX = {
-  step_1: ['JDrdzwBT3geAV9LLeK87MUhQqXU94SakUkkcfMdxnwwr'],
-  step_2: ['85NiR7xyLDGyUnqvVzQgMv3Jpwr29r1S4evQ9cq3q5sZ'],
-  step_3: ['2mkJionfqdUHzCKgmxGJu5SscfG2cEfRugd8YyovkB2i', 'B28MrsJjQZSWurNYEUdohS61Jc7Vwyav6XUXVFGVgmXk', '4aKAE3y9Gp8qpeMLQXdC4oHb93DXy6CVGaRNBqyU6uJr'],
-  step_4: ['FzuDJq23u1Fyr8U1N11AJV3TE7dozvEqvtwJgKFCVjJM'],
-  step_5: ['7QKzJUBoPKJLFJ3fJmqgLrYVyhw98UiuFJ6V5EkChEhm'],
+  step_1: ['2z5qMVsTmKmePkiWL8Kx4rPRzRo1homBMkb8dKMhxHzu'],
+  step_2: ['J2DjZKJPT92P7p21uwUaKdLtuFYmZD8kmm2Axe7TUTwa'],
+  step_3: ['2LowT3BxTG6FwMc9XoSfdXUDfJHCGhBNrxAbPJj1p2FZ', 'Deh6BcXrce9QxvysidGMpnQDBbGXSnufQSCrqF5CQmUY', '5742KpKeQCHCVKavo8pRnyh95HEzNx1zErbrVRjBwHfX'],
+  step_4: ['8v3opWesMmGkcKLSBbsYE7Ryut6H5Zz3LGiFdqhSQW3r'],
+  step_5: ['8Cr3SCgTscu3s1ykhKe17dPs4FBZsjXDi5uwDwpJSyuk'],
 };
 const STEP_LABEL = {
   step_1: ['I', 'Heirs paid on NEAR'],
@@ -114,8 +116,8 @@ export async function init() {
   try {
     [supply, v6, v17] = await Promise.all([
       view('nft_total_supply', {}),
-      view('get_vault', { token_id: '6' }),
-      view('get_vault', { token_id: '17' }),
+      view('get_vault', { token_id: SHOWCASE }),
+      view('get_vault', { token_id: DEMO }),
     ]);
   } catch (e) {
     console.warn('estate graph: RPC failed', e);
@@ -134,7 +136,7 @@ export async function init() {
     const v = v6;
     if (id === 'vault') {
       return {
-        h: 'Vault 6, ' + v.state.toLowerCase(),
+        h: 'Vault ' + SHOWCASE + ', ' + v.state.toLowerCase(),
         rows: [
           ['Owner', v.owner_id, true],
           ['Holds', near(v.balance)],
@@ -203,7 +205,7 @@ export async function init() {
   {
     const sealWrap = document.createElement('span');
     sealWrap.innerHTML = miniSeal();
-    node('vault', 'node-vault', [sealWrap.firstChild, span('n-name', 'Vault 6'), span('n-sub', v6.state)], 'Vault 6, ' + v6.state + ', ' + near(v6.balance));
+    node('vault', 'node-vault', [sealWrap.firstChild, span('n-name', 'Vault ' + SHOWCASE), span('n-sub', v6.state)], 'Vault ' + SHOWCASE + ', ' + v6.state + ', ' + near(v6.balance));
     node('near', 'node-chain', [span('n-name', 'NEAR'), span('n-sub', 'step I')], 'NEAR, paid at step I');
     v6.heirs.slice(0, 2).forEach((h, i) => node('h' + i, 'node-rec', [span('n-name', cap(short(h.account_id)) + ' ' + pct(h.bps)), span('n-id', h.account_id)], 'Heir ' + h.account_id + ', ' + pct(h.bps)));
     ['base', 'monad', 'solana'].forEach((c) => {
@@ -320,7 +322,7 @@ export async function init() {
   setInterval(async () => {
     if (document.hidden || !visible) return;
     try {
-      const nv = await view('get_vault', { token_id: '6' });
+      const nv = await view('get_vault', { token_id: SHOWCASE });
       const beat = nv.last_beat_ms !== v6.last_beat_ms;
       v6 = nv;
       facts();

@@ -13,7 +13,7 @@ const links = {
   dashboard: CONFIG.DASHBOARD_URL,
   heir: CONFIG.DASHBOARD_URL + '/heir',
   try: CONFIG.DASHBOARD_URL + '/try',
-  vault6: CONFIG.DASHBOARD_URL + '/vault/6',
+  vault6: CONFIG.DASHBOARD_URL + '/vault/1',
   github: CONFIG.GITHUB_URL,
 };
 document.querySelectorAll('[data-link]').forEach((a) => {

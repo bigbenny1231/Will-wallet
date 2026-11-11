@@ -15,8 +15,8 @@ NEAR enables, and ends with links and a question.
 spam trap): `requestId`, `projectName`, `leadName`, `email`, `size`, `tracks`, `nearAddress` (lowercase mainnet
 account), `projectUrl` (the public repo), `demoUrl` (the public X post), `idea` (20 to 2000 characters, this one is
 1871), `consent` (`true` only after the human agrees to the contact notice). The repo must be public by the deadline
-(2026-11-14 23:59 UTC): on Nov 10 2026 `github.com/bigbenny1231/will-wallet` was still private (404 to an anonymous
-client). Make it public only after the fixed contract is deployed (`docs/FINAL_REVIEW.md`, step 1).
+(2026-11-14 23:59 UTC): on Nov 11 2026 `github.com/bigbenny1231/will-wallet` was still private. The fixed contract is now
+deployed (`dmw-979268.testnet`, `docs/LIVE_CONTRACT.md`), so it can be made public.
 
 ```json
 {
@@ -38,10 +38,9 @@ client). Make it public only after the fixed contract is deployed (`docs/FINAL_R
 }
 ```
 
-## 2. X demo post (pick one; attach `site/assets/demo-720p.mp4`, the corrected 2:50 cut)
+## 2. X demo post (pick one; attach `site/assets/demo-x-720p.mp4`, the 2:15 cut, or `site/assets/demo-720p.mp4`, 2:41, from a Premium account)
 
-Do not attach the older `docs/video/dmw-demo-v3-720p.mp4` master: it is not in the repo and its end card prints the old
-repository address.
+Both are the v4 cut, filmed on the live contract. Do not attach any v3 file: it was filmed on the replaced `dmw-x8cx.testnet`.
 
 Lengths use X's counting (a link is 23 characters whatever its length). Each is under 280.
 
@@ -80,8 +79,7 @@ What would you test next?
 
 Each one shows the complete action in the video: a vault that is Alive, a stopped pulse, and five settlement steps to
 Settled. Variant A is the agent story (the Security track), B the heir story (the NFT and Open tracks), C the attack.
-The video is 2:50. X accepts 2:20 on a standard account and 10 minutes on Premium, so check the posting account first
-(item 4 of the checklist).
+X accepts 2:20 on a standard account and 10 minutes on Premium: the 2:15 cut fits either; the 2:41 cut needs Premium.
 
 ## 3. Thread, days 1 to 3 (technical)
 
@@ -152,27 +150,27 @@ curl -sI $SITE/assets/og.png | grep -i 'HTTP\|content-type'   # 200, image/png
 curl -sI $DASH | head -1                             # 200
 curl -sI $DASH/vault/6 | head -1                     # 200 (SPA rewrite)
 curl -sI $DASH/pulse | head -1                       # 200
-curl -sI $SITE/assets/demo-720p.mp4 | head -1        # 200 only if the mp4 was in the deployed folder (site/README.md); it must be the v3 cut
-ffprobe -v error -show_entries format=duration -of csv=p=0 site/assets/demo-720p.mp4   # 170.458333 (v3, end card corrected Nov 9, 3.2 MB). The file is committed; do not overwrite it with the older docs/video master
+curl -sI $SITE/assets/demo-720p.mp4 | head -1        # 200 (the v4 cut, committed)
+ffprobe -v error -show_entries format=duration -of csv=p=0 site/assets/demo-720p.mp4   # 160.99 (v4, vault 5 on dmw-979268.testnet, 5.6 MB)
 
 # 4. NEP-330 link check
-curl -s https://rpc.testnet.fastnear.com -H 'content-type: application/json' -d '{"jsonrpc":"2.0","id":1,"method":"query","params":{"request_type":"call_function","finality":"final","account_id":"dmw-x8cx.testnet","method_name":"contract_source_metadata","args_base64":"e30="}}' \
+curl -s https://rpc.testnet.fastnear.com -H 'content-type: application/json' -d '{"jsonrpc":"2.0","id":1,"method":"query","params":{"request_type":"call_function","finality":"final","account_id":"dmw-979268.testnet","method_name":"contract_source_metadata","args_base64":"e30="}}' \
   | python3 -c 'import sys,json;print(bytes(json.load(sys.stdin)["result"]["result"]).decode())'
 #   -> "link" must be the repo URL. "build_info" is null: the live code comes from `cargo near build
 #      non-reproducible-wasm`, so only a same-toolchain `make build` matches it. The expected hash is in the README row
 #      "The live contract is this source" and in docs/FINAL_REVIEW.md
 curl -sI https://github.com/bigbenny1231/will-wallet | head -1            # 200 (repo is public)
 curl -sI https://github.com/bigbenny1231/will-wallet/tree/hackathon-submission | head -1           # 200
-# compare: `make build` (rustc 1.97.0, cargo-near 0.23.0) prints the code hash; `view_account dmw-x8cx.testnet` code_hash
-# must be the same. If the contract is redeployed, update the README row "The live contract is this source".
+# compare: `make build` (rustc 1.97.0, cargo-near 0.23.0) prints the code hash; `view_account dmw-979268.testnet` code_hash
+# must be the same (6s9oqxvBZfhWncW6irGH6zXTebeYUKTHh1pk1WSDxjYH). The contract has no full-access key, so it cannot change.
 
 # 5. the video
-ffprobe -v error -show_entries format=duration,size -of csv=p=0 site/assets/demo-720p.mp4   # 170.458333,3199135 (2:50, 3.2 MB)
-#   2:50 is over X's 2:20 limit for a standard account: post from a Premium account, or cut to 2:20 first
+ffprobe -v error -show_entries format=duration,size -of csv=p=0 site/assets/demo-720p.mp4 site/assets/demo-x-720p.mp4   # 160.99 / 134.72 s
+#   the 2:15 cut fits X's 2:20 limit for a standard account; the 2:41 cut needs Premium
 
 # 6. the showcase vault (nothing is relayed until its addresses hold funds)
-cd keeper && npm run derive -- --token 6             # Base 0x2cC6...28f4, Monad 0x07BF...ba5b, Solana 5iue...zvzc
-cd .. && make status TOKEN=6                         # vault 6 Alive, three payouts pending
+cd keeper && DMW_CONTRACT=dmw-979268.testnet npm run derive -- --token 1   # Base 0xe8DC...Db92, Monad 0x4103...8909, Solana Ct9Q...FPN
+cd .. && DMW_CONTRACT=dmw-979268.testnet make status TOKEN=1                 # vault 1 Alive, three payouts pending
 # fund: Base >= 0.001 ETH, Monad >= 0.05 MON (10 MON reserve: the single payout is an emptying tx), Solana >= 0.05 SOL
 # (faucets in keeper/SHOWCASE.md)
 
@@ -187,7 +185,7 @@ PY
 #   -> a length between 20 and 2000, and exactly: {{EMAIL}} {{NEAR_MAINNET_PAYOUT_ACCOUNT}} {{REQUEST_ID}} {{X_POST_URL}}
 ```
 
-Then, in order: deploy the fixed contract and merge the fix branch (`docs/FINAL_REVIEW.md`); make the repo public;
+Then, in order (the fixed contract is deployed and the fix merged, Nov 11 2026): make the repo public;
 tag and push `hackathon-submission` (steps 1 and 2 above need the public repo and the tag); post the demo with the video attached (replace `{{SITE_URL}}` with the live
 site); copy its URL into `demoUrl`; fill `requestId`, the email and `nearAddress` (a lowercase mainnet account, not
 `.testnet`); set `consent` only after the human agrees; submit; post the thread.
