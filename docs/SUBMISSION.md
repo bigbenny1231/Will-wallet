@@ -38,7 +38,7 @@ deployed (`dmw-979268.testnet`, `docs/LIVE_CONTRACT.md`), so it can be made publ
 }
 ```
 
-## 2. X demo post (pick one; attach `site/assets/demo-x-720p.mp4`, the 2:15 cut, or `site/assets/demo-720p.mp4`, 2:41, from a Premium account)
+## 2. X demo post (pick one; attach `site/assets/demo-v4-x-720p.mp4`, the 2:15 cut, or `site/assets/demo-v4-720p.mp4`, 2:41, from a Premium account)
 
 Both are the v4 cut, filmed on the live contract. Do not attach any v3 file: it was filmed on the replaced `dmw-x8cx.testnet`.
 
@@ -150,8 +150,8 @@ curl -sI $SITE/assets/og.png | grep -i 'HTTP\|content-type'   # 200, image/png
 curl -sI $DASH | head -1                             # 200
 curl -sI $DASH/vault/6 | head -1                     # 200 (SPA rewrite)
 curl -sI $DASH/pulse | head -1                       # 200
-curl -sI $SITE/assets/demo-720p.mp4 | head -1        # 200 (the v4 cut, committed)
-ffprobe -v error -show_entries format=duration -of csv=p=0 site/assets/demo-720p.mp4   # 160.99 (v4, vault 5 on dmw-979268.testnet, 5.6 MB)
+curl -sI $SITE/assets/demo-v4-720p.mp4 | head -1        # 200 (the v4 cut, committed)
+ffprobe -v error -show_entries format=duration -of csv=p=0 site/assets/demo-v4-720p.mp4   # 160.99 (v4, vault 5 on dmw-979268.testnet, 5.6 MB)
 
 # 4. NEP-330 link check
 curl -s https://rpc.testnet.fastnear.com -H 'content-type: application/json' -d '{"jsonrpc":"2.0","id":1,"method":"query","params":{"request_type":"call_function","finality":"final","account_id":"dmw-979268.testnet","method_name":"contract_source_metadata","args_base64":"e30="}}' \
@@ -165,7 +165,7 @@ curl -sI https://github.com/bigbenny1231/will-wallet/tree/hackathon-submission |
 # must be the same (6s9oqxvBZfhWncW6irGH6zXTebeYUKTHh1pk1WSDxjYH). The contract has no full-access key, so it cannot change.
 
 # 5. the video
-ffprobe -v error -show_entries format=duration,size -of csv=p=0 site/assets/demo-720p.mp4 site/assets/demo-x-720p.mp4   # 160.99 / 134.72 s
+ffprobe -v error -show_entries format=duration,size -of csv=p=0 site/assets/demo-v4-720p.mp4 site/assets/demo-v4-x-720p.mp4   # 160.99 / 134.72 s
 #   the 2:15 cut fits X's 2:20 limit for a standard account; the 2:41 cut needs Premium
 
 # 6. the showcase vault (nothing is relayed until its addresses hold funds)

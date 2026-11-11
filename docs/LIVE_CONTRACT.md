@@ -78,5 +78,5 @@ gas; nothing ran past the trigger and nothing was paid out. Anyone can still pus
 
 ## The demo video, vault 5 (runs 42958682328 and 42972214388)
 
-The 2:41 demo on the site (`site/assets/demo-720p.mp4`) is one real run of vault 5 on this contract, from the phone's
+The 2:41 demo on the site (`site/assets/demo-v4-720p.mp4`) is one real run of vault 5 on this contract, from the phone's
 first beat to Settled, with every transaction listed in [`docs/video/README.md`](video/README.md) (v4).

@@ -12,9 +12,9 @@ run this after editing anything in design/ and commit the result.
 - exports the mark (design/logo.svg): inlined between <!-- mark --> markers (nav, footer), site/assets/favicon.svg,
   favicon-32.png, apple-touch-icon.png, and dashboard/public/icons (same file names and sizes as before)
 
-The demo video is committed as site/assets/demo-720p.mp4 (the v3 cut, re-encoded to about 2.8 MB):
+The demo video is committed as site/assets/demo-v4-720p.mp4 (the v4 cut, 2:41, about 5.6 MB):
   ffmpeg -i docs/video/dmw-demo-v3-720p.mp4 -an -c:v libx264 -preset slow -crf 30 -tune stillimage \
-         -pix_fmt yuv420p -movflags +faststart -r 24 site/assets/demo-720p.mp4
+         -pix_fmt yuv420p -movflags +faststart -r 24 site/assets/demo-v4-720p.mp4
 """
 import pathlib
 import re

@@ -74,8 +74,8 @@ if (soundBtn) {
 
 // Below the fold: load each part when it comes near the viewport.
 const lazy = [
-  ['#how', () => import('./story.js')],
-  ['#live', () => import('./graph.js')],
+  ['#how', () => import('./story.js?v=9bbd7b38')],
+  ['#live', () => import('./graph.js?v=808c27e6')],
   ['#would-it-arrive', () => import('./quiz.js')],
 ];
 const start = (load) => load().then((m) => m.init()).catch((e) => console.warn('module failed', e));

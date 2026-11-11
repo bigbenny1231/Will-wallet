@@ -101,7 +101,7 @@ pass was not allowed to edit.
 | S18 | Checklist: `make test` "contract 95+, keeper 46, dashboard 67+, agent 37 (about 5 min)" | ran: 99/46/68/37 in under 2 min (dry run 4: 104 s) | OVERSTATED (stale) | Fixed |
 | S19 | Checklist #4: `build_info` names the commit | null | FALSE | Fixed |
 | S20 | Checklist #6: derive token 6 → Base `0x2cC6…28f4`, Monad `0x07BF…ba5b`, Solana `5iue…zvzc`; vault 6 Alive, three payouts pending | `npm run derive -- --token 6` and `get_vault 6` | TRUE | none |
-| S21 | Checklist #3: the site mp4 "must be the v3 cut" | `design/build_site.py` copies `docs/video/dead-mans-wallet-demo-720p.mp4` (v1, 159.4 s, vault 11) to `site/assets/demo-720p.mp4`; the site captions say 2:50 / vault 17 | FALSE (as built) | Fixed in the checklist (ffprobe check, copy v3 after building); the local gitignored mp4 was replaced with v3. *Out of scope:* change the source path in `design/build_site.py` |
+| S21 | Checklist #3: the site mp4 "must be the v3 cut" | `design/build_site.py` copies `docs/video/dead-mans-wallet-demo-v4-720p.mp4` (v1, 159.4 s, vault 11) to `site/assets/demo-v4-720p.mp4`; the site captions say 2:50 / vault 17 | FALSE (as built) | Fixed in the checklist (ffprobe check, copy v3 after building); the local gitignored mp4 was replaced with v3. *Out of scope:* change the source path in `design/build_site.py` |
 | S22 | Rules summary: post says built at NEAR Hackathon, tags @NEARProtocol and #NEARHackathon, attaches video | matches HACKATHON.md | TRUE | none |
 
 ## site/index.html

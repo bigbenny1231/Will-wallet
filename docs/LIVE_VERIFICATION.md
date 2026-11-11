@@ -19,7 +19,7 @@ Tools: Playwright (Chromium 1254, desktop 1440x900, iPhone 13 emulation, 390 px)
 | 1.1 | Site: all sections render at 1440 and 390 (`top, how, demo, heirs, security, attorneys, faq, waitlist`, footer), no horizontal scroll | PASS |
 | 1.2 | Site: in-page anchors resolve (`#main #top #how #heirs #attorneys #security #waitlist #demo #clause`) | PASS |
 | 1.3 | Site: one-pager PDF (200, application/pdf, 43,776 B), `og.png` (200), favicon.svg (200), poster.jpg (200), css/js (200) | PASS |
-| 1.4 | Site: demo video `assets/demo-720p.mp4` | PASS after fix. It returned 404 on the first deploy (the mp4 was gitignored). Commit `1b8437a` adds a `.gitignore` exception and the file (2.9 MB, not 13 MB). Now 200, `video/mp4`, Range requests return 206, `<video>` has no error. |
+| 1.4 | Site: demo video `assets/demo-v4-720p.mp4` | PASS after fix. It returned 404 on the first deploy (the mp4 was gitignored). Commit `1b8437a` adds a `.gitignore` exception and the file (2.9 MB, not 13 MB). Now 200, `video/mp4`, Range requests return 206, `<video>` has no error. |
 | 1.5 | Site: security headers (CSP, X-Content-Type-Options, Referrer-Policy, X-Frame-Options DENY, Permissions-Policy, HSTS) present | PASS |
 | 1.6 | Site: console errors/warnings and failed requests at both widths | PASS (none) |
 | 1.7 | Site: external links (GitHub repo, README anchors, releases, issues, near-auth.md) | **FAIL**. All 7 GitHub links return 404 to an anonymous client: the repo `bigbenny1231/Will-wallet` is **private**. See finding F1. |

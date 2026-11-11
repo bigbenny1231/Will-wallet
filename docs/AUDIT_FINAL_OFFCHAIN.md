@@ -190,7 +190,7 @@ What remains:
 1. The key sits in plaintext localStorage. Any same-origin script can read it, so the CSP (F-02) and `/pulse` isolation (F-05) are the controls. Recommended next step: generate the key on the phone as a non-extractable WebCrypto Ed25519 key in IndexedDB, and send only the public key back to the owner's browser for `add_pulse_key`. The secret then never travels at all.
 2. Global browser history, sync, camera apps and QR-scanner apps may keep the full URL, fragment included. Treat a pairing link as single-use: pair, then remove and re-pair if the link may have leaked. Removing a key needs the owner (`remove_key`).
 3. `dashboard/shots/v3-keys-pairing-qr.png` shows a complete pairing link and QR for `dmw-x8cx.testnet` vault 1 (`ed25519:4ByLVC…V8B`, public key `FY2XaQ9sNeWW…kfdR`). The file is gitignored (`dashboard/.gitignore: shots`), so it was never committed. An RPC query confirms `access key ed25519:FY2XaQ9sNeWWcsjRHSE7KkS45yR4teX7VKfSqyNYkfdR does not exist`, so the key is dead. Do not publish that screenshot.
-4. OpenCV decoding found no QR code in any tracked image, in `site/screenshots/`, or in any frame (sampled twice per second) of `site/assets/demo-720p.mp4` or `docs/video/*.mp4`. Text on screen was not checked by OCR. Before publishing new footage, check that no "Private key, shown once" panel or `--key ed25519:` command is visible.
+4. OpenCV decoding found no QR code in any tracked image, in `site/screenshots/`, or in any frame (sampled twice per second) of `site/assets/demo-v4-720p.mp4` or `docs/video/*.mp4`. Text on screen was not checked by OCR. Before publishing new footage, check that no "Private key, shown once" panel or `--key ed25519:` command is visible.
 
 ### F-07 Low: broadcast trusted the RPC's tx id
 

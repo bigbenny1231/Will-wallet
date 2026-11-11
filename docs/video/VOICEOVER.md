@@ -4,7 +4,7 @@ X accepts 2:20 on a standard account; the v3 demo is 2:50 and silent. This cut p
 faster (170.46 s to 138.0 s, nothing removed) and adds a spoken narration. The captions burned into the footage are
 unchanged, so the cut also works muted.
 
-The mp4 is not committed (`*.mp4` is ignored). It was built on Nov 9 2026 from `site/assets/demo-720p.mp4`, the only
+The mp4 is not committed (`*.mp4` is ignored). It was built on Nov 9 2026 from `site/assets/demo-v4-720p.mp4`, the only
 copy in the repository; rebuild it from the 13 MB master for a sharper picture (recipe below).
 
 ## The script
@@ -32,7 +32,7 @@ and not yet relayed", and the agent in the footage is the scripted one, so the n
 ## The end card
 
 The v3 end card printed an old repository address (`github.com/agarretson/deadmans-wallet`). Both this cut and the
-committed `site/assets/demo-720p.mp4` now cover that line and print `github.com/bigbenny1231/will-wallet` in the same
+committed `site/assets/demo-v4-720p.mp4` now cover that line and print `github.com/bigbenny1231/will-wallet` in the same
 place, type and colour (JetBrains Mono 14, brass), from 2:47.0 of the original timeline. The site copy was re-encoded
 once for this (libx264 crf 27, SSIM 0.998 against the previous file over the first 160 s, 3.2 MB). The 1080p and 13 MB
 masters outside the repository still carry the old line: re-render the card, or apply the same filter.

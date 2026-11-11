@@ -53,7 +53,7 @@ Testnet only. Not a will, not a custodian, not audited. MIT license.
 Live site: [will-wallet-site.vercel.app](https://will-wallet-site.vercel.app) · Live dashboard: [will-wallet.vercel.app](https://will-wallet.vercel.app) (try [/vault/1](https://will-wallet.vercel.app/vault/1), the showcase vault) ·
 Live contract: [`dmw-979268.testnet`](https://testnet.nearblocks.io/address/dmw-979268.testnet), deployed Nov 11 2026 with the C-2 fix and locked (no full-access key): [`docs/LIVE_CONTRACT.md`](docs/LIVE_CONTRACT.md). It replaces `dmw-x8cx.testnet`, where the older records below were made ·
 Live keeper run (alive → settled, both foreign payouts signed, none relayed): [`keeper/LIVE_RUN.md`](keeper/LIVE_RUN.md) ·
-Showcase vault (vault 1, read live by the site): [`keeper/SHOWCASE.md`](keeper/SHOWCASE.md) · Demo video (2:41, vault 5 on the live contract): [`site/assets/demo-720p.mp4`](site/assets/demo-720p.mp4), how it was made in [`docs/video/README.md`](docs/video/README.md) ·
+Showcase vault (vault 1, read live by the site): [`keeper/SHOWCASE.md`](keeper/SHOWCASE.md) · Demo video (2:41, vault 5 on the live contract): [`site/assets/demo-v4-720p.mp4`](site/assets/demo-v4-720p.mp4), how it was made in [`docs/video/README.md`](docs/video/README.md) ·
 Smoke run with 21 transaction links, plus the live Sputnik run: [`contracts/TESTNET_SMOKE.md`](contracts/TESTNET_SMOKE.md) ·
 Chain Signatures proof: [`docs/chainsig-notes.md`](docs/chainsig-notes.md) ·
 Security reviews and audits: [`docs/SECURITY_REVIEW.md`](docs/SECURITY_REVIEW.md) and five more audits (see [Security model](#security-model))

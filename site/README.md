@@ -46,7 +46,7 @@ re-inlines both seals, renders the phone-pulse QR code with `design/qr.js`). Com
   mid-simulation and settled with the heir "Maria"; the story at three scroll positions; the graph and a node's
   detail; the quiz card (and `v4-quiz-card.png`, the canvas itself). Add `full` as the third argument for full pages.
 - `node design/tour-v4.cjs` records `screenshots/v4-tour.mp4` (19 s scroll through the page).
-- `node design/shoot.cjs og` renders `assets/og.png` (the WebGL seal, else the SVG); `poster` renders `assets/poster.jpg`.
+- `node design/shoot.cjs og` renders `assets/og.png` (the WebGL seal, else the SVG); `poster` renders `assets/poster-v4.jpg`.
 - Lighthouse and axe were run against `serve.cjs` (production headers); see the commit message for the numbers.
 
 Fonts are the `@fontsource` builds of Instrument Serif, Inter Tight (400/500/600) and JetBrains Mono, Latin
@@ -54,8 +54,8 @@ subset, OFL (licences in `fonts/`).
 
 ## Demo video
 
-`assets/demo-720p.mp4` is the v4 cut (2:41, vault 5 on `dmw-979268.testnet`, 5.6 MB), made by `docs/video/tools/v4` in the
-`testnet` workflow (edit run 42972214388). It is committed so a git-triggered deploy serves it. `assets/poster.jpg` is its
+`assets/demo-v4-720p.mp4` is the v4 cut (2:41, vault 5 on `dmw-979268.testnet`, 5.6 MB), made by `docs/video/tools/v4` in the
+`testnet` workflow (edit run 42972214388). It is committed so a git-triggered deploy serves it. `assets/poster-v4.jpg` is its
 frame at 0:18. The v3 cut (vault 17 on the replaced `dmw-x8cx.testnet`) is in git history.
 
 ## Configure

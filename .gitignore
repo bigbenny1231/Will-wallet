@@ -37,6 +37,6 @@ shots/
 .env.*.local
 
 # the 720p demo ships with the live site (Vercel serves it from site/assets)
-!site/assets/demo-720p.mp4
-!site/assets/demo-x-720p.mp4
+!site/assets/demo-v4-720p.mp4
+!site/assets/demo-v4-x-720p.mp4
 !site/screenshots/hero-sim.mp4

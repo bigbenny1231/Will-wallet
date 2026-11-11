@@ -2,7 +2,7 @@
 
 ## v4 (current)
 
-`site/assets/demo-720p.mp4` (1280x720, 2:41, 5.6 MB) and the 1920x1080 master, plus `site/assets/demo-x-720p.mp4`
+`site/assets/demo-v4-720p.mp4` (1280x720, 2:41, 5.6 MB) and the 1920x1080 master, plus `site/assets/demo-v4-x-720p.mp4`
 (2:15, for X, whose standard accounts take up to 2:20). Same story, stage, captions and cards as v3, filmed on the live
 contract `dmw-979268.testnet` (`docs/LIVE_CONTRACT.md`) because v3's contract, `dmw-x8cx.testnet`, runs the code with
 finding C-2 and was replaced. Recorded by the `testnet` workflow (run 42958682328, Nov 11 2026, 04:25 to 04:30 UTC) and
@@ -229,7 +229,7 @@ their derived source addresses are unfunded.
 
 ## v1
 
-`dead-mans-wallet-demo.mp4` (1920x1080) and `dead-mans-wallet-demo-720p.mp4` (1280x720, for X) are not
+`dead-mans-wallet-demo.mp4` (1920x1080) and `dead-mans-wallet-demo-v4-720p.mp4` (1280x720, for X) are not
 committed because of their size (`docs/video/*.mp4` is in `.gitignore`). The stills in [`stills/`](stills/) are
 committed.
 
