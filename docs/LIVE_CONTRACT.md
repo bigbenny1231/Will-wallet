@@ -48,6 +48,32 @@ curl -s https://rpc.testnet.fastnear.com -H 'content-type: application/json' \
 | pulse and agent keys on the contract after settlement | none | both gone |
 | claim by the Will NFT's new owner | [tx](https://testnet.nearblocks.io/txns/9Mdffv8wP5tCdQJQMQopTWvjZZAsUhj95dyPb9cJZnke) | 0.1 NEAR reserve paid |
 
-<!-- ATTACK -->
+## C-2 drain attempt, vault 4 (`contracts/attack-c2.sh`, run 42958682328)
+
+The attack from [`SECURITY_REVIEW_3.md`](SECURITY_REVIEW_3.md), run live against `dmw-979268.testnet`. The attacker
+`dmw-att-fee7.testnet` deploys [`contracts/tools/evil-dao`](../contracts/tools/evil-dao) to its sub-account
+`dao.dmw-att-fee7.testnet`: its `add_proposal` keeps the 1 NEAR bond and returns a promise that fails. On the old code
+the vault got the bond back as well and `claim` paid 1 NEAR more than the vault held, out of other vaults' NEAR.
+
+| Step | Transaction | Result |
+| --- | --- | --- |
+| sub-accounts for the heir and the "DAO" | [heir](https://testnet.nearblocks.io/txns/3HKgk1jLSBX1Jtt4UtBxP6aUmmw3LxQrJSETbgS2WwDt), [dao](https://testnet.nearblocks.io/txns/7hYjeAqLvyXF7QYmKHV4cFnodHZFyQK1d1Fq2wf3q4HV) | 0.5 and 1.5 NEAR from the attacker |
+| deploy the evil DAO | [tx](https://testnet.nearblocks.io/txns/Ed1U4yZoHAUb7NWu8oPckp715G8ykRQgXL7kE9pZ1mcx) | |
+| create_vault, 10 s interval, grace 0, 1.7 NEAR, heir 100 % | [tx](https://testnet.nearblocks.io/txns/Ezx9LfNgXvrL4fDEDUpM74rQtyGff3YqoyBDwghcavWG) | vault 4, balance 1.6 NEAR |
+| set_dao to the evil DAO | [tx](https://testnet.nearblocks.io/txns/4PCp11mP1jxaEayqq55nutHtsXuySSbPZMNcbwxyvUNY) | |
+| poke | [tx](https://testnet.nearblocks.io/txns/G75S6j5LjnenBaLzmnvzyqYvELWgFtCMH2fSX18ux1ks) | Triggered, 0.01 NEAR bounty |
+| steps I to III | [I](https://testnet.nearblocks.io/txns/Dp9HZuZBwLMCCmk4pppFb6w77rZHfndQvtitHW2HWJjD), [II](https://testnet.nearblocks.io/txns/3hAHytCtMRRosELy5gCa8mLb2xKqBxGvbuPqaiasMqkE), [III](https://testnet.nearblocks.io/txns/HqfWBsYBj3qXYxZvQDAAfucEVAkZqLddTJn9EtUfamVS) | vault balance 1.5 NEAR (the reserve with a DAO) |
+| **step IV: the "DAO" keeps the bond** | [tx](https://testnet.nearblocks.io/txns/N6vuV6nXZE2bGWHXJNhiK9oD5UxZemVAQzBgXenxfsw) | `dao_proposal_failed` logged; **vault balance 0.5 NEAR**, the bond is not credited back |
+| step V | [tx](https://testnet.nearblocks.io/txns/5zNq7UbK6Ea1V1hDnUDk35nPQT3wpmMf1peEaLhzY31P) | Settled, 0.5 NEAR |
+| claim by the heir | [tx](https://testnet.nearblocks.io/txns/H7nYwBkVczBesDvBiWM2hsswgqZvQa56ibVxKstdVp6F) | **0.5 NEAR**, exactly what the vault held |
+
+Result: attacker, heir and "DAO" together **-0.104 NEAR** (storage fee and gas); the contract account went from 18.8836
+to 18.9836 NEAR (+0.1, the storage fee), so no other vault paid for anything. The same numbers as the fixed column of
+the private-copy test in `SECURITY_REVIEW_3.md` (claim 0.5 NEAR, attacker -0.104 NEAR). The script ends with
+`C-2 drain: BLOCKED`, and fails the workflow otherwise.
+
+An earlier attempt (vault 3, run 42945032121) stopped at step I because the heir account was given too little NEAR for
+gas; nothing ran past the trigger and nothing was paid out. Anyone can still push that vault through its steps.
+
 
 <!-- VIDEO -->
