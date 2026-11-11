@@ -1,0 +1,15 @@
+== setup v4: vault 5 owner dmw-demo-owner-f0069a.testnet on dmw-979268.testnet
+tx https://testnet.nearblocks.io/txns/3Weas3hRBpZNDLjrfGRNYHfJJi2frPaCfNSMsupUDtAY
+  log: EVENT_JSON:{"standard":"dmw","version":"1.0.0","event":"deposit","data":{"token_id":"5","amount":"1500000000000000000000000","from":"dmw-demo-owner-f0069a.testnet"}}
+  result: "3450000000000000000000000"
+tx https://testnet.nearblocks.io/txns/9eM47JKpsoaa5ATPJqucgmarQaMDuqRr4coQ8yefCk2K
+  log: EVENT_JSON:{"standard":"dmw","version":"1.0.0","event":"key_add_requested","data":{"token_id":"5","public_key":"ed25519:BzrbKkEWVGzizZv5AEyFDNrebTjCPVWk7omaxYTiC817","kind":"Pulse"}}
+  log: EVENT_JSON:{"standard":"dmw","version":"1.0.0","event":"key_added","data":{"token_id":"5","public_key":"ed25519:BzrbKkEWVGzizZv5AEyFDNrebTjCPVWk7omaxYTiC817","kind":"Pulse","method":"heartbeat"}}
+  result: true
+tx https://testnet.nearblocks.io/txns/WT7Tm38tJtouvk4LHF2xeJi8y6hS8dYevJm3AqpnA2K
+  log: EVENT_JSON:{"standard":"dmw","version":"1.0.0","event":"foreign_set","data":{"token_id":"5","foreign":[{"chain":"base","to":"0xcA024adC7cac111339Fe077C739F8085aE705F2F","amount":"500000000000000","from_address":"0x7FD01741Af914e2E5CB8907a65fb8B15f4891eAA","status":"pending","signed_tx":null,"tx_hash":null},{"chain":"monad","to":"0x360d02320ebff8439fe0d804e68dfc6976230e13","amount":"10000000000000000","from_address":"0x23Ac3245386A02E3c5fc99e486891B12b2741BB8","status":"pending","signed_tx":null,"tx_hash":null},{"chain":"solana","to":"CFdWXa1ean7bBoewSv2SZESrDpWSxeoN1hfLrqaqZQUr","amount":"10000000","from_address":"BzVoLozAdCfEQmJnBYydYe9mCNDMoxNnN6GVbJvTbDRx","status":"pending","signed_tx":null,"tx_hash":null}]}}
+  result: (empty)
+  base 0x7FD01741Af914e2E5CB8907a65fb8B15f4891eAA  monad 0x23Ac3245386A02E3c5fc99e486891B12b2741BB8  solana BzVoLozAdCfEQmJnBYydYe9mCNDMoxNnN6GVbJvTbDRx
+tx https://testnet.nearblocks.io/txns/GTKUfnmvC2M6TUAu5G6J7QyiUH6iW7A4s6NZu25YrVpB
+  log: EVENT_JSON:{"standard":"dmw","version":"1.0.0","event":"guardian_set","data":{"token_id":"5","guardian_id":"dmw-demo-guardian-fb6b.testnet","max_pause_s":600}}
+  result: (empty)

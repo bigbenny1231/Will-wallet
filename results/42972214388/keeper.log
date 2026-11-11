@@ -1,0 +1,16 @@
+04:24:21 keeper    watching dmw-979268.testnet via near:dmw-keeper-f542ea.testnet→dmw-979268.testnet, poll every 5s
+04:24:21 keeper    only vault 5
+04:28:34 state     vault 5: Alive → Warning
+04:29:35 poke      vault 5 → Triggered  https://testnet.nearblocks.io/txns/FV9VXkUCNMxmYCh2Kgff6HmF83sCVy1FQcwWoj3JidbQ
+04:29:36 state     vault 5: Warning → Triggered
+04:29:40 step      vault 5 step 1/5  https://testnet.nearblocks.io/txns/2z5qMVsTmKmePkiWL8Kx4rPRzRo1homBMkb8dKMhxHzu
+04:29:44 step      vault 5 step 2/5  https://testnet.nearblocks.io/txns/J2DjZKJPT92P7p21uwUaKdLtuFYmZD8kmm2Axe7TUTwa
+04:29:52 step      vault 5 step 3/5 (base #0)  https://testnet.nearblocks.io/txns/2LowT3BxTG6FwMc9XoSfdXUDfJHCGhBNrxAbPJj1p2FZ
+04:29:53 relay     vault 5 payout #0 base NOT broadcast: source 0x7FD01741Af914e2E5CB8907a65fb8B15f4891eAA is unfunded (eth_sendRawTransaction: insufficient funds for gas * price + value: have 0 want 500550000000000 (-32003)). Status stays signed; fund it and the keeper will relay. Retry in 60s
+04:30:00 step      vault 5 step 3/5 (monad #1)  https://testnet.nearblocks.io/txns/Deh6BcXrce9QxvysidGMpnQDBbGXSnufQSCrqF5CQmUY
+04:30:01 relay     vault 5 payout #1 monad NOT broadcast: source 0x23Ac3245386A02E3c5fc99e486891B12b2741BB8 is unfunded (eth_sendRawTransaction: Signer had insufficient balance (-32000)). Status stays signed; fund it and the keeper will relay. Retry in 60s
+04:30:10 step      vault 5 step 3/5 (solana #2)  https://testnet.nearblocks.io/txns/5742KpKeQCHCVKavo8pRnyh95HEzNx1zErbrVRjBwHfX
+04:30:11 relay     vault 5 payout #2 solana NOT broadcast: source BzVoLozAdCfEQmJnBYydYe9mCNDMoxNnN6GVbJvTbDRx is unfunded (sendTransaction: Transaction simulation failed: Attempt to debit an account but found no record of a prior credit. "AccountNotFound"). Status stays signed; fund it and the keeper will relay. Retry in 60s
+04:30:14 step      vault 5 step 4/5  https://testnet.nearblocks.io/txns/8v3opWesMmGkcKLSBbsYE7Ryut6H5Zz3LGiFdqhSQW3r
+04:30:17 step      vault 5 step 5/5  https://testnet.nearblocks.io/txns/8Cr3SCgTscu3s1ykhKe17dPs4FBZsjXDi5uwDwpJSyuk
+04:30:18 state     vault 5: Triggered → Settled

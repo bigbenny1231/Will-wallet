@@ -1,0 +1,333 @@
+[
+ {
+  "t": 1794371112.233,
+  "name": "kline",
+  "text": "04:24:21 keeper    watching dmw-979268.testnet via near:dmw-keeper-f542ea.testnet→dmw-979268.testnet, poll every 5s"
+ },
+ {
+  "t": 1794371112.234,
+  "name": "kline",
+  "text": "04:24:21 keeper    only vault 5"
+ },
+ {
+  "t": 1794371117.363,
+  "name": "cli_pulse_stopped"
+ },
+ {
+  "t": 1794371120.434,
+  "name": "phone_first_beat"
+ },
+ {
+  "t": 1794371124.445,
+  "name": "record_start"
+ },
+ {
+  "t": 1794371124.538,
+  "name": "raw_t0",
+  "wall": 1794371124.538
+ },
+ {
+  "t": 1794371142.539,
+  "name": "phone_beat",
+  "n": 2
+ },
+ {
+  "t": 1794371164.196,
+  "name": "phone_beat",
+  "n": 3
+ },
+ {
+  "t": 1794371164.304,
+  "name": "two_beats"
+ },
+ {
+  "t": 1794371168.307,
+  "name": "agent_start"
+ },
+ {
+  "t": 1794371170.534,
+  "name": "scroll",
+  "which": "Agent"
+ },
+ {
+  "t": 1794371173.36,
+  "name": "aline",
+  "kind": "audit"
+ },
+ {
+  "t": 1794371173.561,
+  "name": "aline",
+  "kind": "inbox"
+ },
+ {
+  "t": 1794371173.561,
+  "name": "aline",
+  "kind": "inj"
+ },
+ {
+  "t": 1794371177.183,
+  "name": "aline",
+  "kind": "payment"
+ },
+ {
+  "t": 1794371177.187,
+  "name": "aline",
+  "kind": "allowed"
+ },
+ {
+  "t": 1794371180.003,
+  "name": "aline",
+  "kind": "payment"
+ },
+ {
+  "t": 1794371180.004,
+  "name": "aline",
+  "kind": "allowed"
+ },
+ {
+  "t": 1794371180.006,
+  "name": "aline",
+  "kind": "thought"
+ },
+ {
+  "t": 1794371180.186,
+  "name": "agent_a_exit",
+  "code": 0
+ },
+ {
+  "t": 1794371180.203,
+  "name": "aline",
+  "kind": "payment"
+ },
+ {
+  "t": 1794371180.204,
+  "name": "aline",
+  "kind": "refused"
+ },
+ {
+  "t": 1794371180.205,
+  "name": "aline",
+  "kind": "result"
+ },
+ {
+  "t": 1794371184.211,
+  "name": "aline",
+  "kind": "audit"
+ },
+ {
+  "t": 1794371184.412,
+  "name": "aline",
+  "kind": "inbox"
+ },
+ {
+  "t": 1794371184.412,
+  "name": "aline",
+  "kind": "inj"
+ },
+ {
+  "t": 1794371184.414,
+  "name": "aline",
+  "kind": "thought"
+ },
+ {
+  "t": 1794371186.123,
+  "name": "phone_beat",
+  "n": 4
+ },
+ {
+  "t": 1794371187.59,
+  "name": "agent_b_exit",
+  "code": 0
+ },
+ {
+  "t": 1794371187.595,
+  "name": "agent_dash_rows"
+ },
+ {
+  "t": 1794371187.622,
+  "name": "aline",
+  "kind": "payment"
+ },
+ {
+  "t": 1794371187.623,
+  "name": "aline",
+  "kind": "denied"
+ },
+ {
+  "t": 1794371187.623,
+  "name": "aline",
+  "kind": "result"
+ },
+ {
+  "t": 1794371193.962,
+  "name": "scroll",
+  "which": "top"
+ },
+ {
+  "t": 1794371193.966,
+  "name": "guardian_scene"
+ },
+ {
+  "t": 1794371208.383,
+  "name": "phone_beat",
+  "n": 5
+ },
+ {
+  "t": 1794371210.891,
+  "name": "pause_send"
+ },
+ {
+  "t": 1794371213.511,
+  "name": "pause_done",
+  "out": "vaEmmxTn73KBZDGg\n  log: EVENT_JSON:{\"standard\":\"dmw\",\"version\":\"1.0.0\",\"event\":\"paused\",\"data\":{\"token_id\":\"5\",\"by\":\"guardian\",\"account_id\":\"dmw-demo-guardian-fb6b.testnet\",\"paused_until_ms\":1794371812656,\"trigger_at_ms\":1794371812656,\"previous_trigger_at_ms\":1794371327347}}\n  result: 1794371812656\n"
+ },
+ {
+  "t": 1794371215.327,
+  "name": "dash_paused"
+ },
+ {
+  "t": 1794371230.038,
+  "name": "phone_beat",
+  "n": 6
+ },
+ {
+  "t": 1794371230.126,
+  "name": "beat_after_pause"
+ },
+ {
+  "t": 1794371231.694,
+  "name": "dash_unpaused"
+ },
+ {
+  "t": 1794371234.703,
+  "name": "act2"
+ },
+ {
+  "t": 1794371251.964,
+  "name": "phone_beat",
+  "n": 7
+ },
+ {
+  "t": 1794371255.173,
+  "name": "hold_start",
+  "box": {
+   "x": 1493.484375,
+   "y": 659.84375,
+   "width": 134.015625,
+   "height": 134.015625
+  }
+ },
+ {
+  "t": 1794371257.64,
+  "name": "hold_end"
+ },
+ {
+  "t": 1794371257.655,
+  "name": "phone_stopped"
+ },
+ {
+  "t": 1794371257.682,
+  "name": "dash_state",
+  "state": "Alive"
+ },
+ {
+  "t": 1794371314.066,
+  "name": "kline",
+  "text": "04:28:34 state     vault 5: Alive → Warning"
+ },
+ {
+  "t": 1794371314.31,
+  "name": "dash_state",
+  "state": "Warning"
+ },
+ {
+  "t": 1794371375.752,
+  "name": "kline",
+  "text": "04:29:35 poke      vault 5 → Triggered  https://testnet.nearblocks.io/txns/FV9VXkUCNMxmYCh2Kgff6HmF83sCVy1FQcwWoj3JidbQ"
+ },
+ {
+  "t": 1794371375.972,
+  "name": "act3"
+ },
+ {
+  "t": 1794371376.256,
+  "name": "kline",
+  "text": "04:29:36 state     vault 5: Warning → Triggered"
+ },
+ {
+  "t": 1794371377.821,
+  "name": "dash_state",
+  "state": "Triggered"
+ },
+ {
+  "t": 1794371381.029,
+  "name": "kline",
+  "text": "04:29:40 step      vault 5 step 1/5  https://testnet.nearblocks.io/txns/2z5qMVsTmKmePkiWL8Kx4rPRzRo1homBMkb8dKMhxHzu"
+ },
+ {
+  "t": 1794371384.54,
+  "name": "kline",
+  "text": "04:29:44 step      vault 5 step 2/5  https://testnet.nearblocks.io/txns/J2DjZKJPT92P7p21uwUaKdLtuFYmZD8kmm2Axe7TUTwa"
+ },
+ {
+  "t": 1794371392.558,
+  "name": "kline",
+  "text": "04:29:52 step      vault 5 step 3/5 (base #0)  https://testnet.nearblocks.io/txns/2LowT3BxTG6FwMc9XoSfdXUDfJHCGhBNrxAbPJj1p2FZ"
+ },
+ {
+  "t": 1794371393.317,
+  "name": "kline",
+  "text": "04:29:53 relay     vault 5 payout #0 base NOT broadcast: source 0x7FD01741Af914e2E5CB8907a65fb8B15f4891eAA is unfunded (eth_sendRawTransaction: insufficient fun"
+ },
+ {
+  "t": 1794371401.081,
+  "name": "kline",
+  "text": "04:30:00 step      vault 5 step 3/5 (monad #1)  https://testnet.nearblocks.io/txns/Deh6BcXrce9QxvysidGMpnQDBbGXSnufQSCrqF5CQmUY"
+ },
+ {
+  "t": 1794371401.83,
+  "name": "kline",
+  "text": "04:30:01 relay     vault 5 payout #1 monad NOT broadcast: source 0x23Ac3245386A02E3c5fc99e486891B12b2741BB8 is unfunded (eth_sendRawTransaction: Signer had insu"
+ },
+ {
+  "t": 1794371410.613,
+  "name": "kline",
+  "text": "04:30:10 step      vault 5 step 3/5 (solana #2)  https://testnet.nearblocks.io/txns/5742KpKeQCHCVKavo8pRnyh95HEzNx1zErbrVRjBwHfX"
+ },
+ {
+  "t": 1794371411.37,
+  "name": "kline",
+  "text": "04:30:11 relay     vault 5 payout #2 solana NOT broadcast: source BzVoLozAdCfEQmJnBYydYe9mCNDMoxNnN6GVbJvTbDRx is unfunded (sendTransaction: Transaction simulat"
+ },
+ {
+  "t": 1794371414.88,
+  "name": "kline",
+  "text": "04:30:14 step      vault 5 step 4/5  https://testnet.nearblocks.io/txns/8v3opWesMmGkcKLSBbsYE7Ryut6H5Zz3LGiFdqhSQW3r"
+ },
+ {
+  "t": 1794371417.887,
+  "name": "kline",
+  "text": "04:30:17 step      vault 5 step 5/5  https://testnet.nearblocks.io/txns/8Cr3SCgTscu3s1ykhKe17dPs4FBZsjXDi5uwDwpJSyuk"
+ },
+ {
+  "t": 1794371418.387,
+  "name": "kline",
+  "text": "04:30:18 state     vault 5: Triggered → Settled"
+ },
+ {
+  "t": 1794371418.704,
+  "name": "dash_state",
+  "state": "Settled"
+ },
+ {
+  "t": 1794371429.009,
+  "name": "record_end"
+ },
+ {
+  "t": 1794371429.336,
+  "name": "raw_done",
+  "code": 0,
+  "written": 9142,
+  "nFrames": 4553
+ }
+]

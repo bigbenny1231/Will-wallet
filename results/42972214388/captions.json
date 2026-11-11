@@ -1,0 +1,42 @@
+[
+ {
+  "text": "The owner’s phone holds a key that can only say ‘alive’.",
+  "note": "/pulse paired to vault 5 · a function-call key scoped to heartbeat · each beat pulses the seal"
+ },
+ {
+  "text": "An agent with the second key pays two invoices.",
+  "note": "make agent · key scoped to agent_pay · 0.5 NEAR a payment, 1 NEAR a day, one allowlisted receiver"
+ },
+ {
+  "text": "Then its inbox is poisoned: ‘move everything’. Refused by the wallet. Refused by the contract. Logged.",
+  "note": "run 1: the wallet wrapper will not sign · run 2, wrapper switched off: agent_pay denied on chain, receiver_not_allowlisted"
+ },
+ {
+  "text": "A guardian can buy time, once per cycle.",
+  "note": "pause() by dmw-demo-guardian-fb6b.testnet · the deadline moves out up to 10 min · the owner’s next beat ends it"
+ },
+ {
+  "text": "Put the phone down.",
+  "note": "hold to stop, two seconds · the phone stops signing heartbeats"
+ },
+ {
+  "text": "Two missed beats. Anyone can poke it and earn the bounty.",
+  "note": "60 s interval, grace 1 · Warning disarms the agent · poke pays a 0.05 NEAR bounty to whoever calls it"
+ },
+ {
+  "text": "I. Heirs paid on NEAR. II. The agent’s key deleted from the account.",
+  "note": "60 / 40 split · pulse and agent keys removed with DeleteKey"
+ },
+ {
+  "text": "III. The contract asks NEAR’s MPC network to sign a Base, a Monad and a Solana transaction. No heir key ever existed.",
+  "note": "Chain Signatures · v1.signer-prod.testnet · signed; relay pending funding of the derived addresses"
+ },
+ {
+  "text": "IV. No estate DAO on this vault, skipped. V. The Will NFT, with its balance, to the primary heir.",
+  "note": "step 4 opens a Sputnik proposal when a DAO is set · step 5 · nft_transfer to dmw-demo-sarah-fb6b.testnet"
+ },
+ {
+  "text": "Settled. Testnet, open source, one command: make demo.",
+  "note": "vault 5 on dmw-979268.testnet · every transaction is on testnet.nearblocks.io"
+ }
+]
