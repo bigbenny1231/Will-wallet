@@ -3,8 +3,9 @@
 //! Flow per payout (`execute_step` at step 3 calls `request_foreign_signature`):
 //!
 //! ```text
-//! Base   : build EIP-1559 tx -> keccak256 -> signer.sign{Ecdsa, domain 0} -> on_foreign_signed
-//! Solana : signer.derived_public_key(sol-<id>, domain 1) -> on_foreign_sol_key
+//! EVM    : build EIP-1559 tx -> signer.derived_public_key(<path>, domain 0) -> on_foreign_evm_key
+//!          -> keccak256 -> signer.sign{Ecdsa, domain 0} -> on_foreign_signed (ecrecover == key)
+//! Solana : signer.derived_public_key(<path>, domain 1) -> on_foreign_sol_key
 //!          -> build legacy transfer message -> signer.sign{Eddsa, domain 1} -> on_foreign_signed
 //! ```
 //!
@@ -25,19 +26,24 @@
 //!   of them can ever be mined. A re-sign of a `signed`/`broadcast` payout must raise
 //!   both fee fields by >= 10% (no downgrade griefing); fees and gas are capped.
 //! - **Solana**: there is no nonce, so two signatures with two live blockhashes are two
-//!   payments. Every Solana re-sign waits `RESIGN_COOLDOWN_MS` after the last request, so
-//!   the old blockhash has expired. Anyone may then re-sign a `failed` payout; a
-//!   `signed`/`broadcast` one may be re-signed only by the contract owner or the configured
-//!   keeper, who must first check off-chain that the old signature never landed.
+//!   payments. Every re-sign waits `RESIGN_COOLDOWN_MS` after the last request, so the old
+//!   blockhash has expired.
+//! - **Who** (v2, findings C/E): only an operator (contract keeper, the vault's own keeper,
+//!   the vault owner or an heir) may re-sign any payout, and the cooldown applies to every
+//!   re-sign on every chain. Operators must check off-chain that an old signature never landed.
 //! - One re-sign per payout may be in flight at a time.
+//!
+//! Every derivation path carries a per-vault random salt (`<prefix>-<id>-<salt>`), so the
+//! source address can't be predicted before the vault exists, and an EVM signature is only
+//! stored after it recovers to the derived key the signer reports for that path.
 //!
 //! Wire format verified against live `v1.signer-prod.testnet` 3.18.0; see
 //! docs/chainsig-notes.md. The unsigned tx params are held in a raw storage slot between
-//! request and callback so `on_foreign_signed` keeps its original signature.
+//! request and callback.
 
 use near_sdk::json_types::U128;
 use near_sdk::{
-    env, near, require, Gas, GasWeight, NearToken, Promise, PromiseError, PromiseOrValue,
+    env, near, require, AccountId, Gas, GasWeight, NearToken, Promise, PromiseError, PromiseOrValue,
 };
 use serde_json::json;
 
@@ -51,9 +57,10 @@ use self::chainsig::*;
 pub const GAS_MPC_SIGN: Gas = Gas::from_tgas(50);
 /// Gas for `on_foreign_signed` / `on_foreign_resigned`.
 pub const GAS_ON_FOREIGN_SIGNED: Gas = Gas::from_tgas(30);
-/// Gas for the cross-contract `derived_public_key` view (Solana source pubkey).
+/// Gas for the cross-contract `derived_public_key` view (source key for the payout's path).
 pub const GAS_DERIVED_KEY: Gas = Gas::from_tgas(10);
-/// Minimum gas for `on_foreign_sol_key` (it schedules sign + callback); gets unused gas too.
+/// Minimum gas for `on_foreign_sol_key` / `on_foreign_evm_key` (each schedules sign +
+/// callback); gets unused gas too.
 pub const GAS_ON_SOL_KEY: Gas = Gas::from_tgas(100);
 /// Gas for the self-call that records an unbuildable payout as failed.
 const GAS_FOREIGN_FAIL: Gas = Gas::from_tgas(10);
@@ -77,13 +84,16 @@ pub const MAX_EVM_GAS_LIMIT: u128 = 100_000;
 /// wallet `receive` (~26-30k) and a fresh WETH deposit (~45k). Base bills gas used, so a
 /// transfer to an EOA still costs 21 000; Monad bills the limit (50 000 x 202 gwei ~ 0.01 MON).
 pub const EVM_GAS_LIMIT_FLOOR: u128 = 50_000;
-/// Re-signing a `signed`/`broadcast` EVM payout needs both fee fields >= 110% of the last request.
+/// Re-signing a `signed`/`broadcast` EVM payout needs both fee fields >= 110% of the last
+/// request (and still within the chain's cap).
 pub const EVM_FEE_BUMP_PCT: u128 = 110;
-/// Minimum age of the last signature request before a `signed`/`broadcast` payout may be
-/// re-signed (Solana: the old blockhash is long expired; EVM: rate limit on status flips).
+/// Minimum age of the last signature request before any payout may be re-signed (Solana: the
+/// old blockhash is long expired; EVM: rate limit on fee ratchets and status flips).
 pub const RESIGN_COOLDOWN_MS: u64 = 5 * 60 * 1000;
-/// MPC signer contract (SPEC §1).
-pub const MPC_SIGNER: &str = "v1.signer-prod.testnet";
+/// Default MPC signer contract (SPEC §1). The signer actually used is set once in `new`
+/// (`Contract::mpc_signer`, shown by `get_config`), so a sandbox or mainnet deploy can point
+/// at its own signer (finding L-8).
+pub const DEFAULT_MPC_SIGNER: &str = "v1.signer-prod.testnet";
 /// Deposit required by the MPC `sign` method.
 pub const MPC_SIGN_DEPOSIT: NearToken = NearToken::from_yoctonear(1);
 
@@ -174,7 +184,7 @@ pub fn chain_registry() -> Vec<serde_json::Value> {
         .map(|c| match c.evm() {
             Some(e) => json!({
                 "chain": c.as_str(), "kind": "evm", "chain_id": e.chain_id,
-                "path": format!("{}-<token_id>", e.path_prefix), "domain_id": DOMAIN_ECDSA,
+                "path": format!("{}-<token_id>-<salt>", e.path_prefix), "domain_id": DOMAIN_ECDSA,
                 "rpc": e.rpc, "explorer_tx": e.explorer_tx,
                 "max_fee_per_gas": U128(e.max_fee_per_gas),
                 "max_payouts": e.max_payouts,
@@ -182,7 +192,7 @@ pub fn chain_registry() -> Vec<serde_json::Value> {
             }),
             None => json!({
                 "chain": c.as_str(), "kind": "solana", "cluster": "devnet",
-                "path": "sol-<token_id>", "domain_id": DOMAIN_EDDSA,
+                "path": "sol-<token_id>-<salt>", "domain_id": DOMAIN_EDDSA,
                 "rpc": "https://api.devnet.solana.com",
                 "explorer_tx": "https://explorer.solana.com/tx/",
             }),
@@ -263,11 +273,19 @@ pub struct SolanaArgs {
     pub recent_blockhash: String,
 }
 
-/// Derivation path for a vault's foreign source address (SPEC §1).
-pub fn derivation_path(chain: ForeignChain, token_id: u64) -> String {
-    match chain.evm() {
-        Some(e) => format!("{}-{token_id}", e.path_prefix),
-        None => format!("sol-{token_id}"),
+/// Derivation path for a vault's foreign source address (SPEC §1): `<prefix>-<id>-<salt>`.
+/// The salt is 16 hex chars fixed at `create_vault` from the block's random seed, the owner
+/// and the id, so nobody can pre-compute (and pre-fund, or pre-sign for) a vault's address
+/// before it exists. An empty salt gives the legacy v1 path `<prefix>-<id>`.
+pub fn derivation_path(chain: ForeignChain, token_id: u64, salt: &str) -> String {
+    let prefix = match chain.evm() {
+        Some(e) => e.path_prefix,
+        None => "sol",
+    };
+    if salt.is_empty() {
+        format!("{prefix}-{token_id}")
+    } else {
+        format!("{prefix}-{token_id}-{salt}")
     }
 }
 
@@ -289,6 +307,11 @@ fn write_pending(token_id: u64, index: usize, p: &PendingTx) {
         &pending_key(token_id, index),
         &near_sdk::borsh::to_vec(p).unwrap(),
     );
+}
+
+pub(crate) fn read_pending(token_id: u64, index: usize) -> Option<PendingTx> {
+    let raw = env::storage_read(&pending_key(token_id, index))?;
+    near_sdk::borsh::from_slice(&raw).ok()
 }
 
 fn take_pending(token_id: u64, index: usize) -> Option<PendingTx> {
@@ -441,9 +464,15 @@ pub fn solana_transfer_for(
 
 /// Turn an MPC `sign` result + the pending unsigned tx into `(raw_signed_tx, tx_id)`.
 /// EVM: `0x` hex + keccak tx hash. Solana: base64 + base58 signature (the tx id).
+///
+/// v2: an EVM signature is only accepted when it recovers (ecrecover, low-s enforced) to
+/// `evm_key`, the vault's derived secp256k1 key as the MPC signer reported it for this path. A
+/// signature for any other key, or no key to check against, is an error: nothing unverified is
+/// ever stored as broadcastable. Solana signatures are verified against the derived ed25519 key.
 pub fn assemble_signed(
     pending: &PendingTx,
     response: &serde_json::Value,
+    evm_key: Option<&[u8; 64]>,
 ) -> Result<(String, String), String> {
     let sig: SignatureResponse = serde_json::from_value(response.clone())
         .map_err(|_| "unexpected signature response".to_string())?;
@@ -458,6 +487,15 @@ pub fn assemble_signed(
         ) => {
             let tx = evm_tx(t)?;
             let (r, s, v) = evm_rsv(&big_r.affine_point, &s.scalar, recovery_id)?;
+            let expected = evm_key.ok_or_else(|| "no derived key to verify against".to_string())?;
+            let mut rs = [0u8; 64];
+            rs[..32].copy_from_slice(&r);
+            rs[32..].copy_from_slice(&s);
+            match ecrecover64(&evm_sighash(&tx), &rs, v) {
+                Some(k) if &k == expected => {}
+                Some(_) => return Err("evm signature is not from the derived address".into()),
+                None => return Err("evm signature does not recover".into()),
+            }
             let raw = evm_assemble(&tx, &r, &s, v);
             Ok((
                 format!("0x{}", hex::encode(&raw)),
@@ -490,12 +528,16 @@ pub fn assemble_signed(
     }
 }
 
-fn mpc_signer() -> near_sdk::AccountId {
-    MPC_SIGNER.parse().unwrap()
+/// The source address a pending tx is sent from: EVM from the derived key, Solana from the tx.
+fn source_address(pending: &PendingTx, evm_key: Option<&[u8; 64]>) -> Option<String> {
+    match pending {
+        PendingTx::Evm(_) => evm_key.map(evm_address_from_key),
+        PendingTx::Solana(t) => Some(t.from.clone()),
+    }
 }
 
-fn sign_call(args: &SignArgs) -> Promise {
-    Promise::new(mpc_signer()).function_call_weight(
+fn sign_call(signer: &AccountId, args: &SignArgs) -> Promise {
+    Promise::new(signer.clone()).function_call_weight(
         "sign".to_string(),
         serde_json::to_vec(args).unwrap(),
         MPC_SIGN_DEPOSIT,
@@ -504,13 +546,13 @@ fn sign_call(args: &SignArgs) -> Promise {
     )
 }
 
-fn derived_key_call(path: &str) -> Promise {
-    Promise::new(mpc_signer()).function_call(
+fn derived_key_call(signer: &AccountId, path: &str, domain_id: u64) -> Promise {
+    Promise::new(signer.clone()).function_call(
         "derived_public_key".to_string(),
         serde_json::to_vec(&json!({
             "path": path,
             "predecessor": env::current_account_id(),
-            "domain_id": DOMAIN_EDDSA,
+            "domain_id": domain_id,
         }))
         .unwrap(),
         NearToken::from_yoctonear(0),
@@ -532,6 +574,15 @@ fn require_blockhash(a: &SolanaArgs) {
     }
 }
 
+/// A callback's single promise result, or `Err` when the callback did not get exactly one.
+fn single_result<T>(r: Result<T, PromiseError>) -> Result<T, PromiseError> {
+    if env::promise_results_count() == 1 {
+        r
+    } else {
+        Err(PromiseError::Failed)
+    }
+}
+
 impl Contract {
     /// Start signing `vault.foreign[index]`. Caller (`execute_step`) has already
     /// checked `index < foreign.len()` and set the in-flight guard.
@@ -541,10 +592,11 @@ impl Contract {
         index: usize,
         args: Option<StepArgs>,
     ) -> Promise {
-        let foreign = self.vault(token_id).foreign;
+        let v = self.vault(token_id);
+        let foreign = v.foreign.clone();
         let payout = foreign[index].clone();
         let me = env::current_account_id();
-        let path = derivation_path(payout.chain, token_id);
+        let path = v.path(token_id, payout.chain);
         let now = env::block_timestamp_ms();
         match payout.chain {
             ForeignChain::Base | ForeignChain::Monad => {
@@ -564,13 +616,15 @@ impl Contract {
                 );
                 match evm_transfer_for(&payout, &a) {
                     Err(e) => self.fail_later(token_id, index, &e),
-                    Ok((t, hash)) => {
+                    Ok((t, _)) => {
                         write_pending(token_id, index, &PendingTx::Evm(t));
-                        sign_call(&sign_args_ecdsa(&path, &hash)).then(
+                        // Ask the signer for the derived key first: the signature is verified
+                        // against it before it is stored (v2).
+                        derived_key_call(&self.mpc_signer, &path, DOMAIN_ECDSA).then(
                             Self::ext(me)
-                                .with_static_gas(GAS_ON_FOREIGN_SIGNED)
-                                .with_unused_gas_weight(0)
-                                .on_foreign_signed(token_id, index),
+                                .with_static_gas(GAS_ON_SOL_KEY)
+                                .with_unused_gas_weight(1)
+                                .on_foreign_evm_key(token_id, index, None, None, None),
                         )
                     }
                 }
@@ -596,7 +650,7 @@ impl Contract {
                         ..Default::default()
                     },
                 );
-                derived_key_call(&path).then(
+                derived_key_call(&self.mpc_signer, &path, DOMAIN_EDDSA).then(
                     Self::ext(me)
                         .with_static_gas(GAS_ON_SOL_KEY)
                         .with_unused_gas_weight(1)
@@ -611,6 +665,22 @@ impl Contract {
             .with_static_gas(GAS_FOREIGN_FAIL)
             .foreign_fail(token_id, index, detail.to_string())
     }
+
+    /// `finish_foreign` with the storage it causes charged to the vault (callback entry points).
+    fn finish_foreign_charged(
+        &mut self,
+        token_id: u64,
+        index: usize,
+        status: ForeignStatus,
+        signed_tx: Option<String>,
+        from_address: Option<String>,
+        detail: &str,
+    ) -> u8 {
+        let before = env::storage_usage();
+        let step = self.finish_foreign(token_id, index, status, signed_tx, from_address, detail);
+        self.charge_storage(token_id, before, false);
+        step
+    }
 }
 
 #[near]
@@ -618,10 +688,84 @@ impl Contract {
     /// Records a payout that can never be built (bad `to`, amount out of range) as failed.
     #[private]
     pub fn foreign_fail(&mut self, token_id: u64, index: usize, detail: String) -> u8 {
-        self.finish_foreign(token_id, index, ForeignStatus::Failed, None, &detail)
+        self.finish_foreign_charged(token_id, index, ForeignStatus::Failed, None, None, &detail)
     }
 
-    /// Solana leg: got this contract's derived ed25519 key for `sol-<token_id>`;
+    /// EVM leg: got this contract's derived secp256k1 key for the payout's path; request the
+    /// signature over the pending tx and pass the key on so the callback can verify it.
+    #[private]
+    pub fn on_foreign_evm_key(
+        &mut self,
+        token_id: u64,
+        index: usize,
+        resign: Option<bool>,
+        req_ms: Option<u64>,
+        pending: Option<PendingTx>,
+        #[callback_result] key: Result<String, PromiseError>,
+    ) -> PromiseOrValue<u8> {
+        let key = single_result(key);
+        let resign = resign.unwrap_or(false);
+        let v = self.vault(token_id);
+        if !resign && (v.step != 3 || v.foreign_index as usize != index) {
+            env::log_str("stale foreign callback ignored");
+            return PromiseOrValue::Value(v.step);
+        }
+        let pending = if resign {
+            pending
+        } else {
+            read_pending(token_id, index)
+        };
+        let built = key
+            .map_err(|_| "derived_public_key failed".to_string())
+            .and_then(|k| parse_secp256k1_key(&k).map(|_| k))
+            .and_then(|k| match &pending {
+                Some(PendingTx::Evm(t)) => Ok((k, evm_sighash(&evm_tx(t)?))),
+                _ => Err("no pending evm tx for this payout".to_string()),
+            });
+        let (key, hash) = match built {
+            Ok(x) => x,
+            Err(e) if resign => {
+                env::log_str(&format!("resign #{index} failed: {e}"));
+                clear_inflight(token_id, index, req_ms);
+                return PromiseOrValue::Value(v.step);
+            }
+            Err(e) => {
+                take_pending(token_id, index);
+                return PromiseOrValue::Value(self.finish_foreign_charged(
+                    token_id,
+                    index,
+                    ForeignStatus::Failed,
+                    None,
+                    None,
+                    &e,
+                ));
+            }
+        };
+        let path = v.path(token_id, v.foreign[index].chain);
+        let me = env::current_account_id();
+        let cb = if resign {
+            Self::ext(me)
+                .with_static_gas(GAS_ON_FOREIGN_SIGNED)
+                .with_unused_gas_weight(0)
+                .on_foreign_resigned(
+                    token_id,
+                    index,
+                    pending.unwrap_or_else(|| env::panic_str("unreachable")),
+                    req_ms,
+                    Some(key),
+                )
+        } else {
+            Self::ext(me)
+                .with_static_gas(GAS_ON_FOREIGN_SIGNED)
+                .with_unused_gas_weight(0)
+                .on_foreign_signed(token_id, index, Some(key))
+        };
+        PromiseOrValue::Promise(
+            sign_call(&self.mpc_signer, &sign_args_ecdsa(&path, &hash)).then(cb),
+        )
+    }
+
+    /// Solana leg: got this contract's derived ed25519 key for the payout's path;
     /// build the transfer message and request the signature.
     #[private]
     pub fn on_foreign_sol_key(
@@ -633,6 +777,7 @@ impl Contract {
         req_ms: Option<u64>,
         #[callback_result] key: Result<String, PromiseError>,
     ) -> PromiseOrValue<u8> {
+        let key = single_result(key);
         let resign = resign.unwrap_or(false);
         let v = self.vault(token_id);
         if !resign && (v.step != 3 || v.foreign_index as usize != index) {
@@ -652,10 +797,11 @@ impl Contract {
                 return PromiseOrValue::Value(v.step);
             }
             Err(e) => {
-                return PromiseOrValue::Value(self.finish_foreign(
+                return PromiseOrValue::Value(self.finish_foreign_charged(
                     token_id,
                     index,
                     ForeignStatus::Failed,
+                    None,
                     None,
                     &e,
                 ))
@@ -667,21 +813,23 @@ impl Contract {
                 payout.from_address, t.from
             ));
         }
-        let path = derivation_path(ForeignChain::Solana, token_id);
+        let path = v.path(token_id, ForeignChain::Solana);
         let me = env::current_account_id();
+        let before = env::storage_usage();
         let cb = if resign {
             Self::ext(me)
                 .with_static_gas(GAS_ON_FOREIGN_SIGNED)
                 .with_unused_gas_weight(0)
-                .on_foreign_resigned(token_id, index, PendingTx::Solana(t), req_ms)
+                .on_foreign_resigned(token_id, index, PendingTx::Solana(t), req_ms, None)
         } else {
             write_pending(token_id, index, &PendingTx::Solana(t));
             Self::ext(me)
                 .with_static_gas(GAS_ON_FOREIGN_SIGNED)
                 .with_unused_gas_weight(0)
-                .on_foreign_signed(token_id, index)
+                .on_foreign_signed(token_id, index, None)
         };
-        PromiseOrValue::Promise(sign_call(&sign_args_eddsa(&path, &msg)).then(cb))
+        self.charge_storage(token_id, before, false);
+        PromiseOrValue::Promise(sign_call(&self.mpc_signer, &sign_args_eddsa(&path, &msg)).then(cb))
     }
 
     /// Callback for the step-3 signature request. Returns the vault's new `step`.
@@ -690,34 +838,48 @@ impl Contract {
         &mut self,
         token_id: u64,
         index: usize,
+        evm_key: Option<String>,
         #[callback_result] result: Result<serde_json::Value, PromiseError>,
     ) -> u8 {
+        let result = single_result(result);
+        let before = env::storage_usage();
         let pending = take_pending(token_id, index);
-        let outcome = match (result, pending) {
+        let key = match evm_key.as_deref().map(parse_secp256k1_key) {
+            Some(Ok(k)) => Some(k),
+            _ => None,
+        };
+        let outcome = match (result, &pending) {
             (Err(_), _) => Err("mpc sign call failed".to_string()),
             (Ok(_), None) => Err("no pending tx for this payout".to_string()),
-            (Ok(value), Some(p)) => assemble_signed(&p, &value),
+            (Ok(value), Some(p)) => assemble_signed(p, &value, key.as_ref()),
         };
-        match outcome {
+        let step = match outcome {
             Ok((raw, txid)) => self.finish_foreign(
                 token_id,
                 index,
                 ForeignStatus::Signed,
                 Some(raw),
+                pending
+                    .as_ref()
+                    .and_then(|p| source_address(p, key.as_ref())),
                 &format!("signed {txid}"),
             ),
-            Err(e) => self.finish_foreign(token_id, index, ForeignStatus::Failed, None, &e),
-        }
+            Err(e) => self.finish_foreign(token_id, index, ForeignStatus::Failed, None, None, &e),
+        };
+        self.charge_storage(token_id, before, false);
+        step
     }
 
     /// Request a fresh signature for a payout that step 3 already handled (expired Solana
     /// blockhash, underpriced EVM tx, MPC failure). Does not change `step`/`foreign_index`.
-    /// Rules (see module docs): EVM nonce is fixed per payout and a re-sign of a
-    /// `signed`/`broadcast` payout must bump fees >= 10% (`broadcast`: also after the
-    /// cooldown); Solana always waits for the cooldown, and `signed`/`broadcast` Solana
-    /// payouts can only be re-signed by the contract owner or keeper. One re-sign per
-    /// payout in flight at a time.
+    ///
+    /// v2 rules (findings C and E): only an operator (contract keeper, vault keeper, vault owner,
+    /// heir) may re-sign; every re-sign waits `RESIGN_COOLDOWN_MS` after the last request (a fee
+    /// ratchet or status flipping can't be spammed, and an old Solana blockhash has expired); an
+    /// EVM payout that has a signature needs both fees >= 110% of the last request and within the
+    /// chain cap; the EVM nonce stays pinned per payout. One re-sign per payout in flight.
     pub fn resign_foreign(&mut self, token_id: TokenRef, index: u32, args: StepArgs) -> Promise {
+        let before = env::storage_usage();
         let id = token_id.id();
         let v = self.vault(id);
         let i = index as usize;
@@ -726,6 +888,11 @@ impl Contract {
         require!(
             v.step > 3 || (v.step == 3 && i < v.foreign_index as usize),
             "payout not processed yet"
+        );
+        let pred = env::predecessor_account_id();
+        require!(
+            self.is_operator(&v, &pred),
+            "only the keeper, the vault owner or an heir may re-sign a payout"
         );
         let payout = v.foreign[i].clone();
         require!(payout.status != ForeignStatus::Pending, "payout is pending");
@@ -739,20 +906,24 @@ impl Contract {
                         .saturating_add(crate::FOREIGN_INFLIGHT_TIMEOUT_MS)),
             "a re-sign for this payout is already in flight"
         );
+        require!(
+            now >= track.last_request_ms.saturating_add(RESIGN_COOLDOWN_MS),
+            "resign cooldown: wait 5 min after the last request"
+        );
         let has_sig = matches!(
             payout.status,
             ForeignStatus::Signed | ForeignStatus::Broadcast
         );
-        let cooled = now >= track.last_request_ms.saturating_add(RESIGN_COOLDOWN_MS);
         let me = env::current_account_id();
-        let path = derivation_path(payout.chain, id);
-        match payout.chain {
+        let path = v.path(id, payout.chain);
+        let promise = match payout.chain {
             ForeignChain::Base | ForeignChain::Monad => {
                 let a = args
                     .evm
                     .unwrap_or_else(|| env::panic_str("args.evm is required for an evm payout"));
                 let a = effective_evm_args(a, &v.foreign, i);
                 if has_sig {
+                    // Fees are capped per chain (validate_evm_args), so the u128 products are small.
                     require!(
                         a.max_fee_per_gas.0 * 100 >= track.max_fee_per_gas * EVM_FEE_BUMP_PCT
                             && a.max_priority_fee_per_gas.0 * 100
@@ -760,11 +931,7 @@ impl Contract {
                         "re-sign of a signed evm payout must raise both fees by >= 10%"
                     );
                 }
-                if payout.status == ForeignStatus::Broadcast {
-                    require!(cooled, "resign cooldown: wait 5 min after the last request");
-                }
-                let (t, hash) =
-                    evm_transfer_for(&payout, &a).unwrap_or_else(|e| env::panic_str(&e));
+                let (t, _) = evm_transfer_for(&payout, &a).unwrap_or_else(|e| env::panic_str(&e));
                 write_track(
                     id,
                     i,
@@ -775,24 +942,14 @@ impl Contract {
                         max_priority_fee_per_gas: a.max_priority_fee_per_gas.0,
                     },
                 );
-                sign_call(&sign_args_ecdsa(&path, &hash)).then(
+                derived_key_call(&self.mpc_signer, &path, DOMAIN_ECDSA).then(
                     Self::ext(me)
-                        .with_static_gas(GAS_ON_FOREIGN_SIGNED)
-                        .with_unused_gas_weight(0)
-                        .on_foreign_resigned(id, i, PendingTx::Evm(t), Some(now)),
+                        .with_static_gas(GAS_ON_SOL_KEY)
+                        .with_unused_gas_weight(1)
+                        .on_foreign_evm_key(id, i, Some(true), Some(now), Some(PendingTx::Evm(t))),
                 )
             }
             ForeignChain::Solana => {
-                // Even a `failed` payout may have a signature out there (e.g. the MPC answered
-                // but assembly failed), so always wait until the last blockhash has expired.
-                require!(cooled, "resign cooldown: wait 5 min after the last request");
-                if has_sig {
-                    let pred = env::predecessor_account_id();
-                    require!(
-                        pred == self.owner_id || Some(&pred) == self.keeper().as_ref(),
-                        "only the contract owner or keeper may re-sign a signed solana payout"
-                    );
-                }
                 let a = args.solana.unwrap_or_else(|| {
                     env::panic_str("args.solana is required for a solana payout")
                 });
@@ -812,14 +969,16 @@ impl Contract {
                         ..Default::default()
                     },
                 );
-                derived_key_call(&path).then(
+                derived_key_call(&self.mpc_signer, &path, DOMAIN_EDDSA).then(
                     Self::ext(me)
                         .with_static_gas(GAS_ON_SOL_KEY)
                         .with_unused_gas_weight(1)
                         .on_foreign_sol_key(id, i, a.recent_blockhash, Some(true), Some(now)),
                 )
             }
-        }
+        };
+        self.charge_storage(id, before, false);
+        promise
     }
 
     /// View: signing record of a payout (keeper uses it to size an EVM fee bump and to
@@ -843,8 +1002,11 @@ impl Contract {
         index: usize,
         pending: PendingTx,
         req_ms: Option<u64>,
+        evm_key: Option<String>,
         #[callback_result] result: Result<serde_json::Value, PromiseError>,
     ) -> String {
+        let result = single_result(result);
+        let before = env::storage_usage();
         let mut v = self.vault(token_id);
         let current = v.foreign[index].status;
         // Only the latest request may land (a request that timed out and was superseded is stale).
@@ -857,17 +1019,25 @@ impl Contract {
         clear_inflight(token_id, index, req_ms);
         if current == ForeignStatus::Pending {
             env::log_str("resign result ignored: payout pending");
+            self.charge_storage(token_id, before, false);
             return current.as_str().to_string();
         }
+        let key = match evm_key.as_deref().map(parse_secp256k1_key) {
+            Some(Ok(k)) => Some(k),
+            _ => None,
+        };
         let outcome = result
             .map_err(|_| "mpc sign call failed".to_string())
-            .and_then(|value| assemble_signed(&pending, &value));
+            .and_then(|value| assemble_signed(&pending, &value, key.as_ref()));
         let chain = v.foreign[index].chain;
         match outcome {
             Ok((raw, txid)) => {
                 v.foreign[index].status = ForeignStatus::Signed;
                 v.foreign[index].signed_tx = Some(raw);
                 v.foreign[index].tx_hash = None;
+                if let Some(from) = source_address(&pending, key.as_ref()) {
+                    v.foreign[index].from_address = from;
+                }
                 let data = json!({"token_id": token_id.to_string(), "index": index, "chain": chain, "status": "signed", "detail": format!("resigned {txid}")});
                 record(
                     &mut v,
@@ -890,6 +1060,7 @@ impl Contract {
         }
         let status = v.foreign[index].status.as_str().to_string();
         self.vaults.insert(&token_id, &v);
+        self.charge_storage(token_id, before, false);
         status
     }
 }
@@ -1107,6 +1278,73 @@ pub mod chainsig {
         Ok(b58.to_string())
     }
 
+    mod host {
+        #[cfg_attr(target_arch = "wasm32", link(wasm_import_module = "env"))]
+        unsafe extern "C-unwind" {
+            pub fn read_register(register_id: u64, ptr: u64);
+            pub fn register_len(register_id: u64) -> u64;
+            pub fn ecrecover(
+                hash_len: u64,
+                hash_ptr: u64,
+                sig_len: u64,
+                sig_ptr: u64,
+                v: u64,
+                malleability_flag: u64,
+                register_id: u64,
+            ) -> u64;
+        }
+    }
+
+    /// Parse a signer `derived_public_key` answer `secp256k1:<base58 x||y>` into 64 bytes.
+    pub fn parse_secp256k1_key(near_pk: &str) -> Result<[u8; 64], String> {
+        let b58 = near_pk
+            .strip_prefix("secp256k1:")
+            .ok_or("expected secp256k1: key")?;
+        let raw = near_sdk::bs58::decode(b58)
+            .into_vec()
+            .map_err(|_| "bad base58 key".to_string())?;
+        if raw.len() != 64 {
+            return Err("secp256k1 key must be 64 bytes".into());
+        }
+        let mut k = [0u8; 64];
+        k.copy_from_slice(&raw);
+        Ok(k)
+    }
+
+    /// EVM address (`0x` + 40 lowercase hex) of an uncompressed secp256k1 key `x||y`.
+    pub fn evm_address_from_key(key: &[u8; 64]) -> String {
+        format!("0x{}", hex::encode(&keccak256(key)[12..]))
+    }
+
+    /// Host `ecrecover` with malleability checks on (high-s and r/s out of range rejected).
+    /// Returns the 64-byte public key, or `None` when the signature does not recover.
+    /// Declared here because `env::ecrecover` (and `near_sdk::sys`) need the sdk's `unstable`
+    /// feature; the host function itself is stable protocol API. The declaration matches
+    /// `near-sys` 0.4 (and the sdk's native unit-test shims).
+    pub fn ecrecover64(hash: &[u8; 32], rs: &[u8; 64], v: u8) -> Option<[u8; 64]> {
+        const REG: u64 = u64::MAX - 2;
+        // SAFETY: pointers/lengths describe live local buffers; the host writes the 64-byte
+        // key into register REG only when it returns 1, and the register is then read into a
+        // 64-byte buffer.
+        unsafe {
+            let ok = host::ecrecover(
+                hash.len() as u64,
+                hash.as_ptr() as u64,
+                rs.len() as u64,
+                rs.as_ptr() as u64,
+                v as u64,
+                1,
+                REG,
+            );
+            if ok != 1 || host::register_len(REG) != 64 {
+                return None;
+            }
+            let mut out = [0u8; 64];
+            host::read_register(REG, out.as_mut_ptr() as u64);
+            Some(out)
+        }
+    }
+
     pub fn keccak256(data: &[u8]) -> [u8; 32] {
         let mut out = [0u8; 32];
         out.copy_from_slice(&near_sdk::env::keccak256(data));
@@ -1165,6 +1403,73 @@ mod chainsig_tests {
          "02f87383014a3481cc830f42408459682f0082520894000000000000000000000000000000000000dead87038d7ea4c6800080c0019f82367146ea5b58bed67086e0b74d82022ebb609a5b083d9dd782f2687b8d8aa071aaef89b5106b73172403a5f9d9cf19df46844b32fb950b4fce05e69ee52ad9"),
     ];
 
+    fn rs_of(r: &str, s: &str) -> [u8; 64] {
+        let mut rs = [0u8; 64];
+        rs[..32].copy_from_slice(&hex::decode(r).unwrap());
+        rs[32..].copy_from_slice(&hex::decode(s).unwrap());
+        rs
+    }
+
+    /// Public key of the viem test account, recovered from vector 0 and checked against its
+    /// published address.
+    pub(crate) fn viem_key() -> [u8; 64] {
+        let (_, sighash, r, s, y, _) = EVM[0];
+        let mut h = [0u8; 32];
+        h.copy_from_slice(&hex::decode(sighash).unwrap());
+        ecrecover64(&h, &rs_of(r, s), y).unwrap()
+    }
+
+    #[test]
+    fn ecrecover_matches_viem_address() {
+        let key = viem_key();
+        assert_eq!(
+            evm_address_from_key(&key),
+            "0x2c7536E3605D9C16a7a3D7b1898e529396a65c23".to_lowercase()
+        );
+        // both vectors recover to the same key
+        let (_, sighash, r, s, y, _) = EVM[1];
+        let mut h = [0u8; 32];
+        h.copy_from_slice(&hex::decode(sighash).unwrap());
+        assert_eq!(ecrecover64(&h, &rs_of(r, s), y), Some(key));
+        // parse round trip of the signer's key format
+        let wire = format!("secp256k1:{}", near_sdk::bs58::encode(key).into_string());
+        assert_eq!(parse_secp256k1_key(&wire).unwrap(), key);
+        assert!(parse_secp256k1_key("ed25519:11111111111111111111111111111111").is_err());
+        assert!(parse_secp256k1_key("secp256k1:1111").is_err());
+    }
+
+    /// v2: a well-formed signature by any key other than the vault's derived key is rejected,
+    /// and so is a signature with nothing to verify it against.
+    #[test]
+    fn evm_signature_must_recover_to_derived_key() {
+        let (nonce, _, r, s, y, _) = EVM[0];
+        let (t, _) = evm_transfer_for(&payout_base(), &evm_args(nonce)).unwrap();
+        let p = PendingTx::Evm(t);
+        let resp = mpc_secp(r, s, y);
+        assert!(assemble_signed(&p, &resp, Some(&viem_key())).is_ok());
+        let mut other = viem_key();
+        other[63] ^= 1;
+        let e = assemble_signed(&p, &resp, Some(&other)).unwrap_err();
+        assert!(e.contains("not from the derived address"), "{e}");
+        assert!(assemble_signed(&p, &resp, None).is_err());
+        // flipped recovery id recovers a different key
+        assert!(assemble_signed(&p, &mpc_secp(r, s, 1 - y), Some(&viem_key())).is_err());
+        // high-s (malleated) form of the same signature is rejected by the host check
+        let n = "fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141";
+        let hi = {
+            let (nb, sb) = (hex::decode(n).unwrap(), hex::decode(s).unwrap());
+            let mut out = [0u8; 32];
+            let mut borrow = 0i16;
+            for i in (0..32).rev() {
+                let d = nb[i] as i16 - sb[i] as i16 - borrow;
+                borrow = if d < 0 { 1 } else { 0 };
+                out[i] = (d + 256 * borrow) as u8;
+            }
+            hex::encode(out)
+        };
+        assert!(assemble_signed(&p, &mpc_secp(r, &hi, 1 - y), Some(&viem_key())).is_err());
+    }
+
     #[test]
     fn evm_payload_hash_matches_viem() {
         for (nonce, sighash, ..) in EVM {
@@ -1177,7 +1482,8 @@ mod chainsig_tests {
     fn evm_assembly_matches_viem() {
         for (nonce, _, r, s, y, raw) in EVM {
             let (t, _) = evm_transfer_for(&payout_base(), &evm_args(nonce)).unwrap();
-            let (got, txid) = assemble_signed(&PendingTx::Evm(t), &mpc_secp(r, s, y)).unwrap();
+            let (got, txid) =
+                assemble_signed(&PendingTx::Evm(t), &mpc_secp(r, s, y), Some(&viem_key())).unwrap();
             assert_eq!(got, format!("0x{raw}"));
             assert_eq!(
                 txid,
@@ -1227,7 +1533,7 @@ mod chainsig_tests {
         let (t, _) =
             solana_transfer_for(&payout_sol(1_000_000), SOL_FROM.into(), SOL_BH.into()).unwrap();
         let resp = json!({"scheme":"Ed25519","signature": hex::decode(SOL_SIG).unwrap()});
-        let (raw, txid) = assemble_signed(&PendingTx::Solana(t.clone()), &resp).unwrap();
+        let (raw, txid) = assemble_signed(&PendingTx::Solana(t.clone()), &resp, None).unwrap();
         assert_eq!(raw, SOL_RAW_B64);
         assert_eq!(
             txid,
@@ -1238,7 +1544,8 @@ mod chainsig_tests {
         bad[0] ^= 1;
         assert!(assemble_signed(
             &PendingTx::Solana(t),
-            &json!({"scheme":"Ed25519","signature":bad})
+            &json!({"scheme":"Ed25519","signature":bad}),
+            None
         )
         .is_err());
     }
@@ -1247,11 +1554,14 @@ mod chainsig_tests {
     fn rejects_mismatched_or_malformed_responses() {
         let (t, _) = evm_transfer_for(&payout_base(), &evm_args(3)).unwrap();
         let p = PendingTx::Evm(t);
-        assert!(
-            assemble_signed(&p, &json!({"scheme":"Ed25519","signature": vec![0u8; 64]})).is_err()
-        );
-        assert!(assemble_signed(&p, &json!({"stub": true})).is_err());
-        assert!(assemble_signed(&p, &mpc_secp("00", "11", 0)).is_err());
+        assert!(assemble_signed(
+            &p,
+            &json!({"scheme":"Ed25519","signature": vec![0u8; 64]}),
+            Some(&viem_key())
+        )
+        .is_err());
+        assert!(assemble_signed(&p, &json!({"stub": true}), Some(&viem_key())).is_err());
+        assert!(assemble_signed(&p, &mpc_secp("00", "11", 0), Some(&viem_key())).is_err());
     }
 
     #[test]
@@ -1271,9 +1581,17 @@ mod chainsig_tests {
 
     #[test]
     fn paths_follow_spec() {
-        assert_eq!(derivation_path(ForeignChain::Base, 12), "base-12");
-        assert_eq!(derivation_path(ForeignChain::Solana, 12), "sol-12");
-        assert_eq!(derivation_path(ForeignChain::Monad, 12), "monad-12");
+        assert_eq!(
+            derivation_path(ForeignChain::Base, 12, "0011223344556677"),
+            "base-12-0011223344556677"
+        );
+        assert_eq!(derivation_path(ForeignChain::Solana, 12, "ab"), "sol-12-ab");
+        assert_eq!(
+            derivation_path(ForeignChain::Monad, 12, "ab"),
+            "monad-12-ab"
+        );
+        // legacy (unsalted) form
+        assert_eq!(derivation_path(ForeignChain::Base, 12, ""), "base-12");
     }
 
     #[test]
@@ -1330,8 +1648,15 @@ mod chainsig_tests {
         assert_eq!(tb.chain_id, 84532);
         assert_ne!(hash, hb, "chain id is part of the signed payload");
         // signed tx assembles; RLP starts with type 2 + chain id 10143 (0x279f)
-        let (raw, txid) =
-            assemble_signed(&PendingTx::Evm(t), &mpc_secp(EVM[0].2, EVM[0].3, 1)).unwrap();
+        // the Base vector's signature over the Monad hash recovers to some other key; verify
+        // against that key so only assembly is under test here
+        let monad_key = ecrecover64(&hash, &rs_of(EVM[0].2, EVM[0].3), 1).unwrap();
+        let (raw, txid) = assemble_signed(
+            &PendingTx::Evm(t),
+            &mpc_secp(EVM[0].2, EVM[0].3, 1),
+            Some(&monad_key),
+        )
+        .unwrap();
         assert!(raw.starts_with("0x02f8"));
         assert!(raw.contains("82279f"));
         assert_eq!(expected_tx_id(ForeignChain::Monad, &raw).unwrap(), txid);

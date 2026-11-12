@@ -94,6 +94,35 @@ pub struct LogEntry {
     pub ms: u64,
     pub event: String,
     pub detail: String,
+    /// Per-vault sequence number: orders entries across the two log rings (v2, finding D).
+    #[serde(default)]
+    pub seq: u64,
+}
+
+/// One allowed `agent_pay` inside the rolling 24 h window (v2: replaces the fixed day bucket).
+#[near(serializers = [borsh, json])]
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Spend {
+    pub ms: u64,
+    pub amount: U128,
+}
+
+/// A registered pulse/agent key: the vault it serves and the gas it is estimated to have burned
+/// from its allowance (v2: `remove_key` and settlement refund the unspent part to the vault).
+#[near(serializers = [borsh])]
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct KeyRecord {
+    pub token_id: u64,
+    pub spent: u128,
+}
+
+/// Derivation paths of a vault's foreign source addresses (v2: salted, owner-bound).
+#[near(serializers = [json])]
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct DerivationPaths {
+    pub base: String,
+    pub monad: String,
+    pub solana: String,
 }
 
 #[near(serializers = [borsh])]
@@ -111,8 +140,8 @@ pub struct Vault {
     pub pulse_keys: Vec<PublicKey>,
     pub agent_keys: Vec<PublicKey>,
     pub policy: Policy,
-    pub daily_spent: u128,
-    pub daily_window_start_ms: u64,
+    /// Allowed agent spends of the last 24 h (rolling window, at most `MAX_SPENDS` entries).
+    pub spends: Vec<Spend>,
     pub dao_id: Option<AccountId>,
     pub dao_proposal_id: Option<u64>,
     /// Next settlement step (1..=5) while Triggered; 0 before, 6 after Settled.
@@ -122,7 +151,24 @@ pub struct Vault {
     /// Set while a step-3 signature request is in flight (re-entry guard).
     pub foreign_inflight_since_ms: Option<u64>,
     pub created_ms: u64,
+    /// Routine events (heartbeats, deposits, agent spends, key changes): ring of `MAX_LOG`.
     pub log: Vec<LogEntry>,
+    /// Key events (creation, configuration, trigger, steps, payouts, claims, owner changes): a
+    /// separate ring of `MAX_HISTORY` that routine traffic cannot evict (finding D).
+    pub history: Vec<LogEntry>,
+    /// Next `LogEntry::seq`.
+    pub log_seq: u64,
+    /// Per-vault salt of the foreign derivation paths (`<prefix>-<id>-<salt>`), from the block's
+    /// random seed and the creator account (v2: the paths are not predictable before creation).
+    pub salt: String,
+    /// Optional keeper chosen by the vault owner; acts like the contract keeper for this vault.
+    pub keeper_id: Option<AccountId>,
+    /// When step 3 last started or progressed (gates who may supply step-3 chain params).
+    pub step3_progress_ms: u64,
+    /// Bytes of contract storage attributed to this vault (measured, v2 L-9).
+    pub storage_bytes: u64,
+    /// yoctoNEAR held for this vault's storage (>= storage_bytes x byte cost).
+    pub storage_deposit: u128,
     /// Guardian config and pause state. NOT part of the stored `Vault` bytes (existing
     /// vaults keep their layout): kept in the raw slot `guard:<token_id>` and filled in
     /// by `Contract::load` on every read.
@@ -184,6 +230,45 @@ impl Vault {
     pub fn is_due(&self, now_ms: u64) -> bool {
         self.stored == StoredState::Live && now_ms >= self.trigger_at_ms()
     }
+    /// All log entries (both rings) in the order they were written.
+    pub fn log(&self) -> Vec<LogEntry> {
+        let mut all: Vec<LogEntry> = self
+            .history
+            .iter()
+            .chain(self.log.iter())
+            .cloned()
+            .collect();
+        all.sort_by_key(|e| e.seq);
+        all
+    }
+    /// Agent spend inside the rolling 24 h window ending at `now_ms`.
+    pub fn spent_in_window(&self, now_ms: u64) -> u128 {
+        self.spends
+            .iter()
+            .filter(|s| s.ms.saturating_add(crate::DAY_MS) > now_ms)
+            .fold(0u128, |acc, s| acc.saturating_add(s.amount.0))
+    }
+    /// Oldest spend still counted at `now_ms` (0 when none).
+    pub fn window_start_ms(&self, now_ms: u64) -> u64 {
+        self.spends
+            .iter()
+            .filter(|s| s.ms.saturating_add(crate::DAY_MS) > now_ms)
+            .map(|s| s.ms)
+            .min()
+            .unwrap_or(0)
+    }
+    /// Derivation path of this vault's source address on `chain`.
+    pub fn path(&self, id: u64, chain: crate::foreign::ForeignChain) -> String {
+        crate::foreign::derivation_path(chain, id, &self.salt)
+    }
+    pub fn paths(&self, id: u64) -> DerivationPaths {
+        use crate::foreign::ForeignChain;
+        DerivationPaths {
+            base: self.path(id, ForeignChain::Base),
+            monad: self.path(id, ForeignChain::Monad),
+            solana: self.path(id, ForeignChain::Solana),
+        }
+    }
     /// Heir with the highest bps (first one wins ties).
     pub fn primary_heir(&self) -> AccountId {
         let mut best = &self.heirs[0];
@@ -215,8 +300,12 @@ pub struct VaultView {
     pub pulse_keys: Vec<PublicKey>,
     pub agent_keys: Vec<PublicKey>,
     pub policy: Policy,
+    /// Agent spend in the rolling 24 h window ending now.
     pub daily_spent: U128,
+    /// Oldest spend still counted in the window (0 when none); it stops counting 24 h later.
     pub daily_window_start_ms: u64,
+    /// The spends still in the window.
+    pub spends: Vec<Spend>,
     pub dao_id: Option<AccountId>,
     pub dao_proposal_id: Option<u64>,
     pub step: u8,
@@ -230,6 +319,14 @@ pub struct VaultView {
     pub max_pause_s: u64,
     /// Trigger held off until this time; 0 when no pause since the last heartbeat.
     pub paused_until_ms: u64,
+    /// Foreign source derivation paths (domain 0 for base/monad, 1 for solana). Clients derive the
+    /// addresses from these; never rebuild them from the token id.
+    pub derivation_paths: DerivationPaths,
+    /// Per-vault keeper override (null when none).
+    pub keeper_id: Option<AccountId>,
+    /// Measured storage of this vault and the NEAR held for it.
+    pub storage_bytes: u64,
+    pub storage_deposit: U128,
 }
 
 /// Result of `agent_pay`. Denials are returned (and logged), never panicked.

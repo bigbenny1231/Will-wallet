@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 // Minimal NEAR testnet admin tool (no near-cli needed). Uses keeper/node_modules/near-api-js.
 //   node scripts/near-admin.mjs create <name>.testnet            -> creates via faucet, saves key to keys/<name>.json
-//   node scripts/near-admin.mjs deploy <acct> <wasm> [initJson]   -> deploys + calls new(initJson) if given
+//   node scripts/near-admin.mjs deploy <acct> <wasm> [initJson]   -> deploys, and with initJson calls new(initJson) in the
+//                                                                    SAME transaction (dmw `new` is #[private]: nobody can
+//                                                                    init the account between deploy and init)
 //   node scripts/near-admin.mjs call <signer> <contract> <method> '<json>' [gasTgas] [deposit: NEAR, or 1y = 1 yocto]
 //   node scripts/near-admin.mjs view <contract> <method> '<json>'
 //   node scripts/near-admin.mjs call-with-key <signerAcct> <ed25519:key> <contract> <method> '<json>' [gasTgas]
@@ -59,15 +61,18 @@ const show = (r) => {
   const logs = (r?.receipts_outcome || []).flatMap((o) => o.outcome.logs); for (const l of logs) console.log('  log:', l);
   try { const v = st?.SuccessValue; if (v) console.log('  result:', Buffer.from(v, 'base64').toString()); } catch {}
 };
+// DeployContract and the `new` call go out as two actions of one transaction (v2, finding G): either both land or
+// neither does, and no third party can call `new` on freshly deployed code in between.
+async function deploy(acct, wasm, initJson) {
+  const { deployContract, functionCall } = near.transactions;
+  const actions = [deployContract(readFileSync(wasm))];
+  if (initJson) actions.push(functionCall("new", JSON.parse(initJson), tgas(100), 0n));
+  show(await account(acct).signAndSendTransaction({ receiverId: acct, actions, throwOnFailure: false }));
+}
 const [cmd, ...a] = process.argv.slice(2);
 try {
   if (cmd === 'create') await create(a[0]);
-  else if (cmd === 'deploy') {
-    const acc = account(a[0]);
-    const r = await acc.deployContract(readFileSync(a[1]));
-    show(r);
-    if (a[2]) show(await acc.callFunctionRaw({ contractId: a[0], methodName: 'new', args: JSON.parse(a[2]), gas: tgas(100) }));
-  } else if (cmd === 'call') {
+  else if (cmd === 'deploy') await deploy(a[0], a[1], a[2]); else if (cmd === 'call') {
     const acc = account(a[0]);
     show(await acc.callFunctionRaw({ contractId: a[1], methodName: a[2], args: JSON.parse(a[3] || '{}'), gas: tgas(a[4] || 100), deposit: a[5] ? toDeposit(a[5]) : 0n }));
   } else if (cmd === 'call-with-key') {

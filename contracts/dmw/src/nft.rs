@@ -197,7 +197,10 @@ pub(crate) fn token_view(id: u64, v: &Vault) -> Token {
 impl Contract {
     // ----- NEP-171 core -----
 
-    /// Owner-only, while Alive/Warning; 1 yoctoNEAR. Transfers ownership of the vault.
+    /// Owner-only, only while the vault is Alive (not overdue, not paused); 1 yoctoNEAR.
+    /// Transfers ownership of the vault and resets it for the buyer (v2, finding B): the
+    /// buyer becomes the sole heir, foreign payouts / DAO / agent keys / guardian / per-vault
+    /// keeper are cleared, the bounty and policy go back to defaults and the clock restarts.
     #[payable]
     pub fn nft_transfer(
         &mut self,
@@ -246,10 +249,12 @@ impl Contract {
         approved_account_ids: Option<HashMap<AccountId, u64>>,
     ) -> bool {
         let _ = approved_account_ids;
-        let must_revert = match env::promise_result_checked(0, 16) {
-            Ok(bytes) => serde_json::from_slice::<bool>(&bytes).unwrap_or(true),
-            Err(_) => true,
-        };
+        // Exactly one result expected; anything else is treated as "revert" (v2).
+        let must_revert = env::promise_results_count() != 1
+            || match env::promise_result_checked(0, 16) {
+                Ok(bytes) => serde_json::from_slice::<bool>(&bytes).unwrap_or(true),
+                Err(_) => true,
+            };
         if !must_revert {
             return true;
         }
@@ -261,7 +266,11 @@ impl Contract {
             // Receiver already moved it on, or settlement took over: keep.
             return true;
         }
+        // The revert resets the vault again, so nothing the receiver configured while it
+        // held the token survives (the original configuration was already cleared on transfer).
+        let before = env::storage_usage();
         self.move_owner(id, &mut v, &owner_id, Some("nft_transfer_call reverted"));
+        self.charge_storage(id, before, false);
         false
     }
 
@@ -342,10 +351,16 @@ impl Contract {
         let mut v = self.vault(id);
         let sender = env::predecessor_account_id();
         require!(sender == v.owner_id, "only the will nft owner can transfer");
-        let state = v.state_at(env::block_timestamp_ms());
         require!(
-            matches!(state, VaultState::Alive | VaultState::Warning),
+            v.stored == StoredState::Live,
             "will nft is locked once triggered"
+        );
+        // v2 (finding B): a vault that is overdue (Warning) or paused can't be sold. Otherwise
+        // a seller could transfer a vault one block before it triggers (or while a pause holds
+        // it) and poke it for the bounty, or sell heirs' claims they never agreed to.
+        require!(
+            v.state_at(env::block_timestamp_ms()) == VaultState::Alive,
+            "will nft can only be transferred while the vault is alive (not overdue or paused)"
         );
         require!(receiver_id != &v.owner_id, "receiver is already the owner");
         // Owned by the contract, the vault could be kept alive by ANY pulse key on the contract
@@ -355,7 +370,9 @@ impl Contract {
             "receiver cannot be the dmw contract"
         );
         let prev = v.owner_id.clone();
+        let before = env::storage_usage();
         self.move_owner(id, &mut v, receiver_id, memo);
+        self.charge_storage(id, before, true);
         prev
     }
 }
