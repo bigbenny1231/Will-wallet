@@ -95,8 +95,8 @@ There is one message per transition per vault. A heartbeat that brings the vault
 
 ```json
 {
-  "text": "Vault 12 missed a heartbeat. Settlement becomes possible at 2026-11-09 17:00:00 UTC unless a heartbeat arrives first. https://will-wallet.vercel.app/vault/12",
-  "content": "Vault 12 missed a heartbeat. Settlement becomes possible at 2026-11-09 17:00:00 UTC unless a heartbeat arrives first. https://will-wallet.vercel.app/vault/12",
+  "text": "Vault 12 missed a heartbeat. Settlement becomes possible at 2026-11-09 17:00:00 UTC unless a heartbeat arrives first. http://localhost:5173/vault/12",
+  "content": "Vault 12 missed a heartbeat. Settlement becomes possible at 2026-11-09 17:00:00 UTC unless a heartbeat arrives first. http://localhost:5173/vault/12",
   "event": "vault_warning",
   "token_id": "12",
   "owner_id": "andrew.testnet",
@@ -106,7 +106,7 @@ There is one message per transition per vault. A heartbeat that brings the vault
 }
 ```
 
-`text` is the field Slack incoming webhooks read and `content` is the field Discord webhooks read; both hold the same line. Other receivers can use the structured fields. `DMW_DASHBOARD_URL` replaces the base of the link.
+`text` is the field Slack incoming webhooks read and `content` is the field Discord webhooks read; both hold the same line. Other receivers can use the structured fields. The link points at the dashboard (`https://will-wallet.vercel.app` by default); `DMW_DASHBOARD_URL` replaces its base, as in this example (`http://localhost:5173`).
 
 - Only transitions the running process saw are reported. A vault that is already in Warning when the keeper starts gets no warning message, so a restart never repeats one. This means notifications need the long-running keeper. A sweep is a new process each time and never sees Alive turn into Warning.
 - With `--token` or `--owner-prefix`, only matching vaults are reported.
