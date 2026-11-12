@@ -50,6 +50,9 @@ demo: $(KEEPER_DEPS) ## Testnet demo on the .env contract: new vault (60 s), key
 agent: $(AGENT_DEPS) ## Autonomous agent with the scoped wallet wrapper (TOKEN=<id>, key = DMW_AGENT_KEY in .env or .demo/agent.key.json; BRAIN=scripted|anthropic|openai|nearai; ARGS=...). Writes .demo/agent-transcript.md
 	cd agent && ./node_modules/.bin/tsx src/cli.ts --token $(TOKEN) $(if $(BRAIN),--brain $(BRAIN)) $(ARGS)
 
+evidence: $(AGENT_DEPS) ## Agent evidence on a vault of its own against the .env contract: real-model runs (ANTHROPIC_API_KEY) and the on-chain attack suite. Writes evidence/agent/
+	./scripts/ci/agent-evidence.sh "$$(sed -n 's/^DMW_CONTRACT=//p' .env)" "$$PWD/evidence/agent"
+
 attacks: $(AGENT_DEPS) ## Offline attack suite: seven scripted attacks against the simulated vault, wallet pre-checks on and off (no keys, no chain). Writes .demo/attack-suite.md
 	cd agent && npm run --silent attacks
 
@@ -66,4 +69,4 @@ status: $(KEEPER_DEPS) ## Print a vault's state (TOKEN=<id>, default: the last m
 clean: ## Remove build artifacts and node_modules
 	rm -rf contracts/dmw/target keeper/node_modules keeper/dist dashboard/node_modules dashboard/dist agent/node_modules
 
-.PHONY: help check install build build-reproducible test deploy demo agent attacks kill stop status clean
+.PHONY: help check install build build-reproducible test deploy demo agent evidence attacks kill stop status clean

@@ -242,6 +242,27 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with: { name: dmw-video, path: '${{ env.OUT }}/*.mp4', retention-days: 30, if-no-files-found: ignore }
 
+      - name: Every foreign payout of the demo vault reached its chain
+        if: ${{ !cancelled() && (inputs.task == 'all' || inputs.task == 'record' || inputs.task == 'finish') }}
+        run: |
+          set -o pipefail
+          C=$(sed -n 's/^DMW_CONTRACT=//p' .env); T=$(cat .demo/vault_id)
+          node scripts/near-admin.mjs view "$C" get_vault "{\"token_id\":\"$T\"}" | tee "$OUT/demo-vault.json" | node -e '
+            let s = ""; process.stdin.on("data", d => s += d).on("end", () => {
+              const v = JSON.parse(s.slice(s.indexOf("{"))); const f = v.foreign || [];
+              for (const p of f) console.log(`${p.chain} ${p.status} ${p.tx_hash || "-"}`);
+              const bad = f.filter(p => p.status !== "broadcast" || !p.tx_hash);
+              if (!f.length || bad.length) { console.log(`::error::${bad.length} of ${f.length} payouts did not reach their chain`); process.exit(1); }
+            });'
+      - name: Agent evidence (real model when ANTHROPIC_API_KEY is set) and the on-chain attack suite
+        if: ${{ !cancelled() && (inputs.task == 'all' || inputs.task == 'record' || inputs.task == 'finish') }}
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          set -o pipefail
+          C=$(sed -n 's/^DMW_CONTRACT=//p' .env)
+          ./scripts/ci/agent-evidence.sh "$C" "$OUT/agent-evidence" 2>&1 | tee >(eval "$SAVE" > "$OUT/agent-evidence.log")
+
       # ---------------- results ----------------
       - name: Push the non-secret results to ci/testnet-results
         if: always()

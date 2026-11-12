@@ -45,6 +45,16 @@ jobs:
           KEEPER_SEED: ${{ secrets.KEEPER_SEED }}
         run: ./scripts/ci/showcase-beat.sh
 
+      # Addresses and balances of the funder wallet that pays foreign payout sources (keys are never printed), so
+      # whoever tops it up can read what it holds in any keeper run.
+      - name: Funder wallet
+        continue-on-error: true
+        working-directory: keeper
+        env:
+          KEEPER_SEED: ${{ secrets.KEEPER_SEED }}
+        run: |
+          if [ "${#KEEPER_SEED}" -ge 32 ]; then npx tsx src/cli.ts funder; else echo "KEEPER_SEED is not set"; fi
+
       # Read-only view call. Sets outputs `work` (true/false) and `count`. No account, no key, no transaction.
       - name: Check for vaults that are past their deadline or Triggered
         id: due
@@ -69,10 +79,19 @@ jobs:
         env:
           # Secrets cannot be tested in `if:`, so the seed is passed in and checked here. An unset secret is empty.
           KEEPER_SEED: ${{ secrets.KEEPER_SEED }}
+          # This job sweeps every vault on the contract, so the funder (same seed) tops up guest vaults only, with the
+          # guest amounts of the dashboard's Try page, and at most these totals per run.
+          DMW_FUND_ONLY_GUESTS: '1'
+          FUND_RUN_CAP_ETH: '0.001'
+          FUND_RUN_CAP_SOL: '0.005'
+          # Optional phone push for Warning and Triggered notices (https://ntfy.sh); empty means off.
+          DMW_NOTIFY_NTFY_TOPIC: ${{ secrets.DMW_NTFY_TOPIC }}
         run: |
           set -euo pipefail
           . scripts/lib.sh
+          FUND=()
           if [ "${#KEEPER_SEED}" -ge 32 ]; then
+            FUND=(--fund-sources)
             name="$(node scripts/near-admin.mjs derive-keeper)"
             echo "keeper account: $name (derived from KEEPER_SEED)"
           else
@@ -89,4 +108,4 @@ jobs:
           KEEPER_PRIVATE_KEY="$(node -e 'process.stdout.write(JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")).private_key)' "keys/$name.json")"
           export KEEPER_ACCOUNT_ID="$name" KEEPER_PRIVATE_KEY
           cd keeper
-          npx tsx src/cli.ts keeper --until-idle --max-seconds 480 --poll 5
+          npx tsx src/cli.ts keeper --until-idle --max-seconds 480 --poll 5 "${FUND[@]}"

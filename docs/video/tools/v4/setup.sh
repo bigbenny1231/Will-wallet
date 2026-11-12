@@ -20,6 +20,8 @@ j() { echo "$DER" | node -e "console.log(JSON.parse(require('fs').readFileSync(0
 B=$(j base); M=$(j monad); SO=$(j solana)
 $TX call "$O" "$C" set_foreign_payouts "{\"token_id\":\"$T\",\"payouts\":[{\"chain\":\"base\",\"to\":\"0xfd151ad02f573689f235f56059ce6e2f3b64dd89\",\"amount\":\"500000000000000\",\"from_address\":\"$B\"},{\"chain\":\"monad\",\"to\":\"0xfd151ad02f573689f235f56059ce6e2f3b64dd89\",\"amount\":\"10000000000000000\",\"from_address\":\"$M\"},{\"chain\":\"solana\",\"to\":\"HpEHvLpa9pMNiDCQDnVMSomCx4bmJuXX8sKqtKGg2uWr\",\"amount\":\"10000000\",\"from_address\":\"$SO\"}]}" 50 1y | tee -a "$S/setup.out"
 echo "  base $B  monad $M  solana $SO" | tee -a "$S/setup.out"
+# the funder wallet the keeper tops these sources up from (addresses and balances only; keys are never printed)
+SEED="${KEEPER_SEED:-}"; if [ ${#SEED} -ge 32 ]; then (cd keeper && npx tsx src/cli.ts funder) 2>&1 | tee -a "$S/setup.out"; fi
 G=dmw-demo-guardian-$SFX.testnet
 FUNDER=$(ls keys/dmw-demo-funder-*.testnet.json 2>/dev/null | head -1 | xargs -r basename | sed 's/\.json$//')
 if [ ! -f "keys/$G.json" ]; then

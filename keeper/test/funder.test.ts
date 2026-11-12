@@ -264,6 +264,9 @@ describe('amounts, caps and shortfall math', () => {
   it('guest vaults are funded only within the guest amounts of dashboard/src/pages/Try.tsx', () => {
     const g = 'dmw-guest-abc123.testnet';
     expect(guestRefusal(vault([payout('base', GUEST_MAX.base), payout('solana', GUEST_MAX.solana)], g))).toBeNull();
+    expect(guestRefusal(vault([payout('base', GUEST_MAX.base)], g), true)).toBeNull();
+    expect(guestRefusal(vault([payout('base', 1n)], 'dmw-demo-owner-1.testnet'), true)).toMatch(/guest vaults only/);
+    expect(guestRefusal(vault([payout('base', 1n)], 'dmw-demo-owner-1.testnet'), false)).toBeNull();
     expect(guestRefusal(vault([payout('base', GUEST_MAX.base + 1n)], g))).toMatch(/above the guest amount 0.0001 ETH/);
     expect(guestRefusal(vault([payout('solana', 2_000_000n)], g))).toMatch(/0.001 SOL/);
     expect(guestRefusal(vault([payout('monad', 1n)], g))).toMatch(/monad payout/);

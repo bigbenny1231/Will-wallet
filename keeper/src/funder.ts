@@ -152,9 +152,13 @@ export interface FunderOpts {
   pollMs?: number;
 }
 
-/** Why a vault's sources are not funded at all (guest rules), or null. */
-export function guestRefusal(v: Pick<VaultView, 'owner_id' | 'foreign'>): string | null {
-  if (!v.owner_id.startsWith(GUEST_PREFIX)) return null;
+/**
+ * Why a vault's sources are not funded at all (guest rules), or null. With `onlyGuests` (DMW_FUND_ONLY_GUESTS=1, set
+ * by the hosted keeper, which sweeps every vault on the contract) a vault that is not a guest vault is never funded,
+ * so nobody can point the shared funder at payouts of their own choosing.
+ */
+export function guestRefusal(v: Pick<VaultView, 'owner_id' | 'foreign'>, onlyGuests = process.env.DMW_FUND_ONLY_GUESTS === '1'): string | null {
+  if (!v.owner_id.startsWith(GUEST_PREFIX)) return onlyGuests ? 'not a guest vault, and this keeper funds guest vaults only (DMW_FUND_ONLY_GUESTS=1)' : null;
   for (const [i, p] of v.foreign.entries()) {
     let amount: bigint;
     try {

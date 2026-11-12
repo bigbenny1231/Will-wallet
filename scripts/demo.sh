@@ -91,7 +91,9 @@ say "agent-demo: one allowed, one denied"
 (cd keeper && DMW_AGENT_KEY=$(jqk ../$D/agent.key.json private_key) npx tsx src/cli.ts agent-demo --token $TOKEN)
 
 # 8. keeper in the background, only for this vault
-(cd keeper; nohup ./node_modules/.bin/tsx src/cli.ts keeper --poll 5 --token $TOKEN > ../$D/keeper.log 2>&1 & echo $! > ../$D/keeper.pid)
+# with KEEPER_SEED it also tops up this vault's payout sources from the seed's funder wallet right before step III
+SEED="${KEEPER_SEED:-}"; FUND=""; [ ${#SEED} -ge 32 ] && FUND="--fund-sources"
+(cd keeper; nohup ./node_modules/.bin/tsx src/cli.ts keeper --poll 5 --token $TOKEN $FUND > ../$D/keeper.log 2>&1 & echo $! > ../$D/keeper.pid)
 say "keeper started (pid $(cat $D/keeper.pid)) -> $D/keeper.log"
 
 # 9. point the dashboard at this contract (dashboard/.env.local is gitignored)
