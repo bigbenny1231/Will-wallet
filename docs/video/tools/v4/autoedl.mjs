@@ -126,7 +126,7 @@ const caps = [
   [hold - 0.1, warn - 1, 'Put the phone down.', 'hold to stop, two seconds · the phone stops signing heartbeats'],
   [warn - 0.1, Math.max(trig, poke) + 6.8, 'Two missed beats. Anyone can poke it and earn the bounty.', '60 s interval, grace 1 · Warning disarms the agent · poke pays a 0.05 NEAR bounty to whoever calls it'],
   [step1 !== null ? step1 - 0.3 : firstStep, (step3 ?? settled) - 0.8, 'I. Heirs paid on NEAR. II. The agent’s key deleted from the account.', '60 / 40 split · pulse and agent keys removed with DeleteKey'],
-  [(step3 ?? settled) - 0.5, (step4 ?? settled) - 0.8, 'III. The contract asks NEAR’s MPC network to sign a Base, a Monad and a Solana transaction. No heir key ever existed.', 'Chain Signatures · v1.signer-prod.testnet · signed; relay pending funding of the derived addresses'],
+  [(step3 ?? settled) - 0.5, (step4 ?? settled) - 0.8, 'III. The contract asks NEAR’s MPC network to sign a Base, a Monad and a Solana transaction.', 'Signed by NEAR’s MPC network for Base, Monad and Solana · v1.signer-prod.testnet · from addresses derived from the vault'],
   [(step4 ?? settled) - 0.5, settled - 0.8, 'IV. No estate DAO on this vault, skipped. V. The Will NFT, with its balance, to the primary heir.', `step 4 opens a Sputnik proposal when a DAO is set · step 5 · nft_transfer to ${H}`],
   [settled - 0.5, settled + 7.3, 'Settled. Testnet, open source, one command: make demo.', `vault ${T} on ${C} · every transaction is on testnet.nearblocks.io`],
 ];

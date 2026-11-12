@@ -30,7 +30,7 @@ make agent TOKEN=<id> [BRAIN=...] [ARGS=...]             # from the repo root; k
 ```
 
 `DMW_AGENT_KEY=... npm run agent -- --token <id>` keeps the key out of `ps`. The transcript is printed as it happens and saved to
-`.demo/agent-transcript.md` (`--out` to change). A real testnet run, with explorer links, is in [`LIVE_TRANSCRIPT.md`](LIVE_TRANSCRIPT.md).
+`.demo/agent-transcript.md` (`--out` to change). The runs on the live contract are listed in [`LIVE_TRANSCRIPT.md`](LIVE_TRANSCRIPT.md), with explorer links.
 
 | Option | |
 |---|---|
@@ -72,7 +72,7 @@ The vault contract's `add_agent_key` runs `AddKey { FunctionCall { receiver_id: 
 - **Gas allowance, not spending money.** The allowance (1 NEAR, taken from the vault balance) is a gas budget. It is charged on prepaid gas (60 TGas per call here, about 0.006 NEAR) and cannot be withdrawn. When it runs out the key stops working; it never becomes funds.
 - **Policy still applies.** Whatever the key signs, `agent_pay` checks cap, daily cap, allowlist and vault state, and the key is deleted at settlement.
 
-`npm run probe -- --token <id>` (with `DMW_AGENT_KEY`, `DMW_CONTRACT`) signs four forbidden transactions with the real key and shows the node's rejection of each; the output of a real run is at the end of `LIVE_TRANSCRIPT.md`.
+`npm run probe -- --token <id>` (with `DMW_AGENT_KEY`, `DMW_CONTRACT`) signs four forbidden transactions with the real key and shows the node's rejection of each; the output of a real run is at the end of [`docs/history/AGENT_LIVE_TRANSCRIPT.md`](../docs/history/AGENT_LIVE_TRANSCRIPT.md).
 
 What it does not stop, by design: paying the allowlisted provider up to the caps. An agent that is fooled into overpaying the *provider* is bounded by `per_tx_max` and `daily_max`, not prevented. Choose them as the amount you can afford to lose. A leaked key can also burn its remaining gas allowance (at most 1 NEAR of the vault's balance) by spamming denied calls.
 
@@ -127,7 +127,7 @@ What the suite does not show:
 | `src/probe.ts` | forbidden-transaction probe |
 | `scenarios/` | `api-bills.json`, and seven attack scenarios: `attack-only.json`, `attack-split-payments.json`, `attack-salami-invoices.json`, `attack-lookalike-receiver.json`, `attack-malformed-request.json`, `attack-warning-state.json`, `attack-not-a-payment.json`. A scenario with an `attack` block is part of the suite. Placeholders: `{{PROVIDER}}` (first allowlist entry), `{{PROVIDER_LOOKALIKE}}` (a typosquat of it), `{{CONTRACT}}` (the vault contract) |
 | `ATTACK_SUITE.md` | recorded output of `npm run attacks -- --record`: simulated, scripted brain, deterministic |
-| `LIVE_TRANSCRIPT.md` | real testnet runs with transaction links, and the key probe |
+| `LIVE_TRANSCRIPT.md` | where the testnet runs and their transaction links are recorded |
 | `test/` | vitest suites; `attacks.test.ts` has one test per attack scenario and checks that `ATTACK_SUITE.md` equals a fresh render |
 
 `npm test` runs the vitest suite offline: every refusal reason, input refusals, fail-closed read, daily-spend tracking, the contract-denial path with layer 1 off, key audit, the scripted brain's protocol and determinism, injection detection, transcript formatting, the LLM request/response mapping, the env allow-list, and the attack suite (one test per scenario, the escape check, the recorded report). `npm run typecheck` runs `tsc`.
