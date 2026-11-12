@@ -17,5 +17,6 @@ Please give us a reasonable chance to fix it before public disclosure.
 - The contract account's full-access key (held by the deployer) can redeploy the code. That is a testnet
   trust assumption; see `docs/SECURITY_REVIEW.md` item I-1 and the security table in the README.
 - All keys in this repository and its CI are testnet-only and are rotated after demos.
-- This source is contract v2 (the Nov 12 security fixes, `docs/SECURITY_FIXES_V2.md`). The live contract
-  `dmw-979268.testnet` runs v1 and has no full-access key, so it cannot be upgraded; v2 goes to a new account.
+- This source is contract v2 (the Nov 12 security fixes, `docs/SECURITY_FIXES_V2.md`), live on `dmw-885364.testnet`
+  since Nov 12 2026 with no full-access key (`docs/LIVE_CONTRACT.md`). The v1 contract before it, `dmw-979268.testnet`,
+  also has no full-access key, so it could not be upgraded and v2 went to a new account.

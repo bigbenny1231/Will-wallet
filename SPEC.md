@@ -3,9 +3,9 @@
 This is the single source of truth for every component. Agents code against this file.
 If you must deviate, update this file in the same change and say why in the commit.
 
-> **Contract v2 (Nov 12 2026, this source; not deployed yet).** The security fixes in
+> **Contract v2 (Nov 12 2026, this source; live as `dmw-885364.testnet`).** The security fixes in
 > [`docs/SECURITY_FIXES_V2.md`](docs/SECURITY_FIXES_V2.md) change the interface; §2.9 lists the changes and the
-> sections below are updated where a rule changed. The live contract `dmw-979268.testnet` still runs v1.
+> sections below are updated where a rule changed. The v1 contract before it is `dmw-979268.testnet`.
 
 ## 0. One-paragraph summary
 
@@ -205,7 +205,7 @@ red `#e74c3c` Triggered, grey `#7f8c8d` Settled), vault id, state word, "next be
 
 ### 2.7 Implementation notes (contracts agent, 2026-11-07)
 
-These are the places where the shipped contract (`contracts/dmw`, deployed at `dmw-979268.testnet` since Nov 11 2026, `docs/LIVE_CONTRACT.md`; before that `dmw-x8cx.testnet`) differs from or adds to §2.1–2.5:
+These are the places where the shipped contract (`contracts/dmw`, deployed at `dmw-885364.testnet` since Nov 12 2026, `docs/LIVE_CONTRACT.md`; before that `dmw-979268.testnet` (v1, Nov 11) and `dmw-x8cx.testnet`) differs from or adds to §2.1–2.5:
 
 - **`token_id` input** is accepted as a JSON number (`1`) or a string (`"1"`). Views always return a string.
 - **Key gas allowance is 1 NEAR, not 0.25.** Gas burned by function-call keys comes out of the contract account, which pools every vault's NEAR. So `add_*_key` takes the allowance from the vault's own `balance` (the vault needs ≥ 1 NEAR) and gives it back if AddKey fails. A heartbeat sent with 10 TGas burns about 0.0003 NEAR (measured on testnet, Nov 10 2026). About 0.011 NEAR of allowance is held for the prepaid gas when the call is sent and the unused part comes back to the key's allowance, so one 1 NEAR key covers a few thousand beats, not ~90 as this note first said. Keep the keeper at **≤ 10 TGas** for `heartbeat`: the prepaid amount must still fit in the remaining allowance when the call is sent.

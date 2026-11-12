@@ -3,10 +3,10 @@
 These fixes cover the Nov 12 security pass on `claude/pre-public-hardening` (commit 10eb479). This is the source of
 contract v2.
 
-**Status.** v2 is **not deployed**. The live contract `dmw-979268.testnet` still runs v1
-(`contracts/release/dmw.wasm`). Its full-access key was deleted, so it cannot be upgraded. v2 also changes the
-storage layout. Going live therefore means a new account: `NEW=1 make deploy`. `deploy.sh` refuses to put v2 code on
-a v1 account.
+**Status.** v2 is **live** on `dmw-885364.testnet` since Nov 12 2026 (reproducible build of commit `6c58110`,
+[`LIVE_CONTRACT.md`](LIVE_CONTRACT.md)). The v1 contract `dmw-979268.testnet` had its full-access key deleted, so it
+could not be upgraded, and v2 also changes the storage layout, so v2 went to a new account (`NEW=1 make deploy`).
+`deploy.sh` refuses to put v2 code on a v1 account.
 
 **Tests.** Every row below has at least one regression test. After the first pass `cargo test` ran 134 contract tests:
 the 105 from v1 plus 29 new ones. The second review (below) brings it to 148: the reviewer's 4 tests in `audit_v2.rs`

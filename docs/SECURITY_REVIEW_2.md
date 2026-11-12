@@ -1,7 +1,7 @@
 # Security review 2: `contracts/dmw` (guardian pause, chain registry)
 
-> **Update, contract v2 (Nov 12 2026, not deployed yet).** Several statements here describe v1 and changed in v2:
-> a pulse-key heartbeat can no longer end a running guardian pause (only the owner's, which now needs 1 yoctoNEAR); the owner can `unpause`, which does not re-arm the guardian; the Will NFT moves only while Alive. See [`SECURITY_FIXES_V2.md`](SECURITY_FIXES_V2.md). The live contract `dmw-979268.testnet` still runs v1.
+> **Update, contract v2 (Nov 12 2026, live as `dmw-885364.testnet`).** Several statements here describe v1 and changed in v2:
+> a pulse-key heartbeat can no longer end a running guardian pause (only the owner's, which now needs 1 yoctoNEAR); the owner can `unpause`, which does not re-arm the guardian; the Will NFT moves only while Alive. See [`SECURITY_FIXES_V2.md`](SECURITY_FIXES_V2.md). The live contract is now `dmw-885364.testnet` (v2); `dmw-979268.testnet` runs v1.
 
 This is the second independent review of the Dead Man's Wallet vault contract, done 2026-11-07. It
 covers what changed after round 1 (docs/SECURITY_REVIEW.md, commit `7a12c23`):

@@ -125,7 +125,7 @@ It runs every 10 minutes and on manual dispatch, one run at a time:
 3. With `work=true` it picks a keeper account. If the repository secrets `KEEPER_ACCOUNT_ID` and `KEEPER_PRIVATE_KEY` are both set it uses them. Otherwise it creates a one-off account `dmw-sweep-<random>.testnet` from the testnet faucet with `node scripts/near-admin.mjs create`, masks the new key in the log, and passes it to the keeper through the environment. The keeper earns the poke bounty, so the account pays for its own gas.
 4. Sweep: `npx tsx src/cli.ts keeper --until-idle --max-seconds 240 --owner-prefix dmw-guest- --poll 5`.
 
-The contract and RPC come from the repository variables `DMW_CONTRACT` (default `dmw-979268.testnet`; `dmw-x8cx.testnet` before Nov 11 2026) and `NEAR_RPC` (default `https://rpc.testnet.fastnear.com`). The workflow passes them as environment variables; there is no `.env` on the runner.
+The contract and RPC come from the repository variables `DMW_CONTRACT` (default `dmw-885364.testnet`; `dmw-979268.testnet` on Nov 11 and 12 2026, `dmw-x8cx.testnet` before that) and `NEAR_RPC` (default `https://rpc.testnet.fastnear.com`). The workflow passes them as environment variables; there is no `.env` on the runner.
 
 Setup: none is required. One optional step: add the repository secrets `KEEPER_ACCOUNT_ID` and `KEEPER_PRIVATE_KEY` (Settings, Secrets and variables, Actions) for a funded testnet account. Then the sweep does not depend on the faucet, and that account can be registered with `set_keeper` so it may re-sign stale Solana payouts. Use a testnet account that holds nothing else.
 

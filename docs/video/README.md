@@ -3,9 +3,9 @@
 ## v4 (current)
 
 `site/assets/demo-v4-720p.mp4` (1280x720, 2:41, 5.6 MB) and the 1920x1080 master, plus `site/assets/demo-v4-x-720p.mp4`
-(2:15, for X, whose standard accounts take up to 2:20). Same story, stage, captions and cards as v3, filmed on the live
-contract `dmw-979268.testnet` (`docs/LIVE_CONTRACT.md`) because v3's contract, `dmw-x8cx.testnet`, runs the code with
-finding C-2 and was replaced. Recorded by the `testnet` workflow (run 42958682328, Nov 11 2026, 04:25 to 04:30 UTC) and
+(2:15, for X, whose standard accounts take up to 2:20). Same story, stage, captions and cards as v3, filmed on
+`dmw-979268.testnet`, the live contract on Nov 11 2026 (v1; replaced on Nov 12 by `dmw-885364.testnet`, see
+`docs/LIVE_CONTRACT.md`), because v3's contract, `dmw-x8cx.testnet`, runs the code with finding C-2 and was replaced. Recorded by the `testnet` workflow (run 42958682328, Nov 11 2026, 04:25 to 04:30 UTC) and
 cut by its edit task (run 42972214388) from the raw footage; logs, EDL and stills are on the `ci/testnet-results` branch.
 
 Nothing is mocked and nothing is patched. Idle stretches play at 3x to 16x and are marked on screen; the dashboard showed

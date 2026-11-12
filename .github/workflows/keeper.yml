@@ -24,7 +24,7 @@ jobs:
     env:
       # keeper/src/config.ts reads the process environment first; there is no .env file on the runner.
       NEAR_NETWORK: testnet
-      DMW_CONTRACT: ${{ vars.DMW_CONTRACT || 'dmw-979268.testnet' }}
+      DMW_CONTRACT: ${{ vars.DMW_CONTRACT || 'dmw-885364.testnet' }}
       NEAR_RPC: ${{ vars.NEAR_RPC || 'https://rpc.testnet.fastnear.com' }}
       DMW_MOCK: '0'
     steps:

@@ -51,9 +51,9 @@ Built at NEAR Hackathon, Nov 1–14 2026. Tracks: `security` (06 AI Security & D
 Testnet only. Not a will, not a custodian, not audited. MIT license.
 
 Live site: [will-wallet-site.vercel.app](https://will-wallet-site.vercel.app) · Live dashboard: [will-wallet.vercel.app](https://will-wallet.vercel.app) (try [/vault/1](https://will-wallet.vercel.app/vault/1), the showcase vault) ·
-Live contract: [`dmw-979268.testnet`](https://testnet.nearblocks.io/address/dmw-979268.testnet), deployed Nov 11 2026 with the C-2 fix and locked (no full-access key): [`docs/LIVE_CONTRACT.md`](docs/LIVE_CONTRACT.md). It replaces `dmw-x8cx.testnet`, where the older records below were made ·
+Live contract: [`dmw-885364.testnet`](https://testnet.nearblocks.io/address/dmw-885364.testnet), contract v2, deployed Nov 12 2026 from a reproducible build and locked (no full-access key): [`docs/LIVE_CONTRACT.md`](docs/LIVE_CONTRACT.md). It replaces `dmw-979268.testnet` (v1, Nov 11 2026), which replaced `dmw-x8cx.testnet`, where the older records below were made ·
 Live keeper run (alive → settled, both foreign payouts signed, none relayed): [`keeper/LIVE_RUN.md`](keeper/LIVE_RUN.md) ·
-Showcase vault (vault 1, read live by the site): [`keeper/SHOWCASE.md`](keeper/SHOWCASE.md) · Demo video (2:41, vault 5 on the live contract): [`site/assets/demo-v4-720p.mp4`](site/assets/demo-v4-720p.mp4), how it was made in [`docs/video/README.md`](docs/video/README.md) ·
+Showcase vault (vault 1, read live by the site): [`keeper/SHOWCASE.md`](keeper/SHOWCASE.md) · Demo video (2:41, vault 5 on the v1 contract `dmw-979268.testnet`): [`site/assets/demo-v4-720p.mp4`](site/assets/demo-v4-720p.mp4), how it was made in [`docs/video/README.md`](docs/video/README.md) ·
 Smoke run with 21 transaction links, plus the live Sputnik run: [`contracts/TESTNET_SMOKE.md`](contracts/TESTNET_SMOKE.md) ·
 Chain Signatures proof: [`docs/chainsig-notes.md`](docs/chainsig-notes.md) ·
 Security reviews and audits: [`docs/SECURITY_REVIEW.md`](docs/SECURITY_REVIEW.md) and five more audits (see [Security model](#security-model))
@@ -190,7 +190,7 @@ source addresses; the faucets need a human login), and step 4 is skipped because
 Open the dashboard's [`/try`](https://will-wallet.vercel.app/try) page and press Begin, or run it locally:
 
 ```bash
-cd dashboard && npm ci && npm run dev     # http://localhost:5173/try  (uses dmw-979268.testnet unless .env.local says otherwise)
+cd dashboard && npm ci && npm run dev     # http://localhost:5173/try  (uses dmw-885364.testnet unless .env.local says otherwise)
 ```
 
 | Do | See |
@@ -204,7 +204,7 @@ cd dashboard && npm ci && npm run dev     # http://localhost:5173/try  (uses dmw
 | **Poke and settle** (about a minute later) | poke, steps I to V, each with a tx link; the two foreign payouts turn `signed` |
 | **Claim the remaining 0.1 NEAR as Sarah** | the heir's own key signs `claim`; "See it as Sarah" opens the heir page |
 
-A complete run on the live contract, Nov 9 2026: [vault 20](https://will-wallet.vercel.app/vault/20), from
+A complete run on the contract live at the time (`dmw-x8cx.testnet`), Nov 9 2026: [vault 20](https://will-wallet.vercel.app/vault/20), from
 [`create_vault`](https://testnet.nearblocks.io/txns/GGJ9d2FsdrKST1T5sgjLS6xkq7fhpiQcCnfEZXXEjVF) through the
 [denied payment](https://testnet.nearblocks.io/txns/Hd55LJTpCe7Whb5qMg3C4QQ2Q8JUHK37AmKeUFtGPhTE) and the
 [poke](https://testnet.nearblocks.io/txns/FYhnGAtLt8s6KhbYbqgFa3jeeMChGK9qXVRPGWopiVMH) to the heir's
@@ -220,15 +220,15 @@ until someone pokes it; the `guest-sweep` workflow does that every ten minutes f
 
 | Claim | Where to look |
 | --- | --- |
-| The pulse key can only call `heartbeat`, the agent key only `agent_pay` | your own `make demo` contract: `node scripts/near-admin.mjs keys <contract>` shows `FunctionCall` keys with `method_names` `["heartbeat"]` / `["agent_pay"]`. On `dmw-979268.testnet` the smoke run added both kinds for vault 2 ([pulse](https://testnet.nearblocks.io/txns/FyLHs8L4riHq75H3oxYriqSbTKwQ3FehAJUEvPTGRLhA), [agent](https://testnet.nearblocks.io/txns/8tT8UDhGGYhjgLMyXxDzdSmvcJih2N84dXnyFFTB56Zf)); the pulse key's call to `agent_pay` was rejected by NEAR before execution, and step II deleted both ([`docs/LIVE_CONTRACT.md`](docs/LIVE_CONTRACT.md)). The account has no FullAccess key: `view_access_key_list` lists only the function-call keys of vaults that are running |
+| The pulse key can only call `heartbeat`, the agent key only `agent_pay` | your own `make demo` contract: `node scripts/near-admin.mjs keys <contract>` shows `FunctionCall` keys with `method_names` `["heartbeat"]` / `["agent_pay"]`. On `dmw-885364.testnet` the smoke run added both kinds for vault 2 ([pulse](https://testnet.nearblocks.io/txns/4sUmigjx4dYz7gXLzhedY7RFFpzcgNe4sP5o59CG5ReC), [agent](https://testnet.nearblocks.io/txns/75jCa4tsuvHjhHpa1LQbHdMhGWoni65Zv14M9soLKG8T)); the pulse key's call to `agent_pay` was rejected by NEAR before execution, and step II deleted both ([`docs/LIVE_CONTRACT.md`](docs/LIVE_CONTRACT.md)). The account has no FullAccess key: `view_access_key_list` lists only the function-call keys of vaults that are running |
 | An autonomous agent is refused when a prompt injection tells it to drain the vault | [`agent/LIVE_TRANSCRIPT.md`](agent/LIVE_TRANSCRIPT.md): three real runs against vault 13 on the replaced contract `dmw-x8cx.testnet` (same agent code) with the scripted brain (wrapper refuses; contract denies when the wrapper's checks are off; the vigilant scripted brain refuses on its own), with the setup transactions |
 | A guardian can pause once and the deadline moves | [TESTNET_SMOKE.md](contracts/TESTNET_SMOKE.md) vault 14: [`set_guardian`](https://testnet.nearblocks.io/txns/HqomRLAzzUd6KYTuz2bsNU1qYEsuC9RyBQUtuToFShcG), [`pause`](https://testnet.nearblocks.io/txns/FNZntghrMV7pj2S5qLvqqu4zrpLKJZ933mNQSyMm163o) (deadline +153 s, state Warning), a second [`pause`](https://testnet.nearblocks.io/txns/Chnrufz6tF2Z6qrSijL9xPgRuoukz8oNDfKMxqddY7Ub) rejected `already_paused`, an early [`poke`](https://testnet.nearblocks.io/txns/31xYgVNdcpY2sqaT369SVVFDf5oohmry8ifjzN23qEDn) rejected `not_due` |
 | The contract signs a Monad transaction | TESTNET_SMOKE.md vault 14, [step 3](https://testnet.nearblocks.io/txns/DFmmyrRWNTUdsn3KLXuoHfjuaAcMoY7c71i2EUN3p976): `v1.signer-prod.testnet` signs path `monad-14`; the stored tx decodes to chain id 10143 from the derived address `0x360D0232…0e13`. Relay is pending funding (the RPC answers `insufficient balance`) |
 | Denied agent payments are logged, not reverted | `agent_pay` returns `{allowed:false, reason}`; the tx succeeds; see TESTNET_SMOKE.md item 5 |
 | Settlement deletes the keys | TESTNET_SMOKE.md item 8, key list before/after |
-| The contract itself requests MPC signatures | `docs/chainsig-notes.md`: NEAR txs where `dmw` calls `v1.signer-prod.testnet.sign`. The probe contract `ecrecover`s the Base signature on-chain to the derived address; for the live `dmw` (v1) the signed Base tx recovers off-chain (viem) to the derived address. Contract v2 does the check on-chain before it stores a signature |
+| The contract itself requests MPC signatures | `docs/chainsig-notes.md`: NEAR txs where `dmw` calls `v1.signer-prod.testnet.sign`. The probe contract `ecrecover`s the Base signature on-chain to the derived address; for `dmw` v1 (the contracts these records come from) the signed Base tx recovers off-chain (viem) to the derived address. Contract v2, the live one, does the check on-chain before it stores a signature |
 | Step 4 files and ratifies a Sputnik proposal | TESTNET_SMOKE.md, last section: vault 10 on the replaced contract `dmw-x8cx.testnet` (same step-4 code apart from the C-2 callback fix), [`add_proposal` from the contract](https://testnet.nearblocks.io/txns/FAzezve68HDjUDsNzsb8qV7KnE6SNE8kVap6S5Hmkd6e), proposal 0 on `estate-82bd1f.sputnik-v2.testnet`, [approved and executed](https://testnet.nearblocks.io/txns/5y9hspPGwhmzfU2ivNggFQhPrTaHtznqpaB5dNcfBgeB) |
-| The live contract is the v1 source | `view_account dmw-979268.testnet` → code hash **`6s9oqxvBZfhWncW6irGH6zXTebeYUKTHh1pk1WSDxjYH`**, the build of `contracts/release/dmw.wasm` (the v1 tree, commit 10eb479, with the C-2 fix; this branch's source is contract v2, not deployed yet, see [`docs/SECURITY_FIXES_V2.md`](docs/SECURITY_FIXES_V2.md)), deployed Nov 11 2026 ([deploy](https://testnet.nearblocks.io/txns/BVz6Aq7ggJv9yG4gPzaawJktkAzH8XaHHQHTnfctneWC)). The hash comes from rustc 1.97.0 and cargo-near 0.23.0 with `cargo near build non-reproducible-wasm`: two separate clones of this tree gave it (`docs/FINAL_REVIEW.md`), and `make build` prints it; another toolchain gives a different one. It is **not** a reproducible build: `contract_source_metadata` returns `link` but `build_info: null`. The contract's only full-access key was [deleted](https://testnet.nearblocks.io/txns/Ft71mPBybxUGtPnuzjHxPbBpHMywvdvf3ZhkbLen4Yiq) right after setup, so this code cannot change. The old `dmw-x8cx.testnet` still runs the pre-fix build `HAxzQkJd…`; its key is lost, so it was replaced, not upgraded |
+| The live contract is this source, and anyone can rebuild it | `view_account dmw-885364.testnet` → code hash **`8geWkWLte1vsnVStUZtoNkNoL2b6sgLh5wPuSH9n4tna`**, the reproducible build of commit [`6c58110`](https://github.com/bigbenny1231/Will-wallet/tree/6c581107017ad53414a2970a1b85497c35d4c57d) (contract v2, 497,329 bytes) made with `cargo near build reproducible-wasm` (cargo-near 0.23.0) in `sourcescan/cargo-near:0.23.0-rust-1.99.1`, pinned by digest in `contracts/dmw/Cargo.toml`. `contracts/release/dmw.wasm` is that build (commit 219c7aa, by the CI bot). `contract_source_metadata` returns NEP-330 `build_info` with the image digest and a link to that commit, so check out `6c58110` and run `make build-reproducible` (Docker) to get the same hash; the commit id is part of the embedded metadata, so a later commit gives another one. Deployed and initialised in one transaction on Nov 12 2026 ([deploy](https://testnet.nearblocks.io/txns/B4h939RafZ3c7z24aJ9U6FyG7JwCypwGjjKQX4VsRTr2)); the contract's only full-access key was [deleted](https://testnet.nearblocks.io/txns/GAQEFX9eiRxtqkJjdKFyvEUzJBFkkN1qe3gZSWCmncm4) right after setup, so this code cannot change. The v1 contract before it, `dmw-979268.testnet`, runs `6s9oqxvB…` (a same-toolchain build, not reproducible) and the older `dmw-x8cx.testnet` the pre-fix build `HAxzQkJd…`; both were replaced, not upgraded |
 | The Will NFT holds funds and redraws itself | `nft_token {"token_id":"4"}` → `media` is an on-chain SVG data URI (grey, Settled) |
 
 ## How NEAR fits
@@ -290,13 +290,13 @@ Three review rounds by AI agents that did not write the code (not a third-party 
 redeployed; the other Medium/Low items are documented with their mitigations. Round 3 (Nov 10, the whole repository)
 found 1 Critical, 3 Medium, 14 Low: a vault's "DAO" could keep the step-4 bond and still have it credited back, paid
 out of other vaults' NEAR (C-2). It was reproduced on a private testnet copy and is fixed in the source and in
-`contracts/release/dmw.wasm`, with the three Mediums and 11 of the Lows. That build is the live contract,
-`dmw-979268.testnet` (row "The live contract is the v1 source" above). A fourth pass (Nov 12) found 2 Medium and
+`contracts/release/dmw.wasm`, with the three Mediums and 11 of the Lows. That build went live on Nov 11 as
+`dmw-979268.testnet` (v1). A fourth pass (Nov 12) found 2 Medium and
 several Low items (an overdue Will NFT could be sold and then poked by the seller, the keeper could not be rotated on
 the locked contract, log flooding, unauthenticated `mark_broadcast`, a silent owner heartbeat, a non-private `new`,
 predictable derivation paths and more). All are fixed in this source as contract v2, each with a regression test
-([`docs/SECURITY_FIXES_V2.md`](docs/SECURITY_FIXES_V2.md)). v2 is not deployed yet: the live v1 contract cannot be
-upgraded, so v2 needs a new account. Full findings:
+([`docs/SECURITY_FIXES_V2.md`](docs/SECURITY_FIXES_V2.md)). The locked v1 contract could not be upgraded, so v2 went to a
+new account: `dmw-885364.testnet`, live since Nov 12 (row "The live contract is this source" above). Full findings:
 [`docs/SECURITY_REVIEW.md`](docs/SECURITY_REVIEW.md), [`docs/SECURITY_REVIEW_2.md`](docs/SECURITY_REVIEW_2.md),
 [`docs/SECURITY_REVIEW_3.md`](docs/SECURITY_REVIEW_3.md). The live tests of the same day, with their transactions, are in
 [`docs/FINAL_REVIEW.md`](docs/FINAL_REVIEW.md).
@@ -378,11 +378,15 @@ The author leads no other hackathon project.
 
 - Testnet only; three foreign chains (Base, Monad, Solana). Foreign payouts are signed by the MPC network, but none has been relayed yet:
   relaying needs the derived source addresses funded, and the faucets require a human login.
-- Not a reproducible build: the live code hash matches `make build` only with the same toolchain (see the table above).
-- This source is contract v2 (the Nov 12 security fixes, [`docs/SECURITY_FIXES_V2.md`](docs/SECURITY_FIXES_V2.md)); the live
-  contract is v1 until v2 is deployed to a new account. v2 is a 612 KB unoptimised wasm here (no `wasm-opt` on the
-  build machine); `wee_alloc` was deliberately not added.
-- The live contract has no FullAccess key, so nobody can upgrade it, and nobody can fix it in place either: a bug fix means a new account and moving to it, as on Nov 11 2026. (The replaced `dmw-x8cx.testnet` kept its deployer key, which could have upgraded it and moved any vault's funds.)
+- The live code is a reproducible build of commit `6c58110`, but checking it needs Docker (`make build-reproducible`); a plain `make build` with another toolchain gives a different hash (see the table above).
+- This source is contract v2 (the Nov 12 security fixes, [`docs/SECURITY_FIXES_V2.md`](docs/SECURITY_FIXES_V2.md)), live on
+  `dmw-885364.testnet`. The reproducible build runs `wasm-opt` (497,329 bytes); a local build without `wasm-opt` is
+  larger. `wee_alloc` was deliberately not added.
+- The live contract's global keeper, `dmw-keeper-2f6dcb.testnet`, can never act again: its key existed only on the CI
+  runner, and on a locked contract only the current keeper can hand the role over. Vaults do not depend on it: an owner
+  can name a per-vault keeper (`set_vault_keeper`), heirs can run the steps, and anyone can run step III after its
+  1-hour operator window ([`docs/LIVE_CONTRACT.md`](docs/LIVE_CONTRACT.md)).
+- The live contract has no FullAccess key, so nobody can upgrade it, and nobody can fix it in place either: a bug fix means a new account and moving to it, as on Nov 11 and again on Nov 12 2026. (The replaced `dmw-x8cx.testnet` kept its deployer key, which could have upgraded it and moved any vault's funds.)
 - Not a legal instrument. The product configures alongside a will or trust; see the FAQ on the site.
 - Once a vault is poked it cannot be stopped; there is no cancel window between the poke and step I.
 - Foreign payouts are native coins only (ETH, MON, SOL), and NEAR payouts are NEAR only: no stablecoins, no Bitcoin.

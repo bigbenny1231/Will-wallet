@@ -1,12 +1,14 @@
-// Live estate graph: vault 1 on dmw-979268.testnet (the showcase vault), read with read-only JSON-RPC `query` calls (no keys, no writes).
+// Live estate graph: vault 1 on dmw-885364.testnet (the showcase vault), read with read-only JSON-RPC `query` calls (no keys, no writes).
 // Vault -> chains -> who receives what at settlement. Edges pulse on load and whenever the chain reports a new
 // heartbeat (polled every 30 s while the section is on screen). Also the live facts kept from v3: the vault count,
-// vault 1's last beat, and the demo vault's (5) five settlement steps as read now.
+// vault 1's last beat, and the demo vault's (5) five settlement steps as read now. The demo vault is the recorded v4 run on
+// the v1 contract dmw-979268.testnet, so it is read there; switch DEMO_CONTRACT and DEMO when a run on the live contract lands.
 import { emit, reducedMotion } from './seal.js';
 
-const CONTRACT = 'dmw-979268.testnet';
+const CONTRACT = 'dmw-885364.testnet';
 const SHOWCASE = '1';   // keeper/SHOWCASE.md
 const DEMO = '5';       // the recorded run (docs/video/README.md v4, docs/LIVE_CONTRACT.md)
+const DEMO_CONTRACT = 'dmw-979268.testnet';   // where that run happened (v1, replaced by CONTRACT)
 const RPCS = ['https://rpc.testnet.fastnear.com', 'https://rpc.testnet.near.org'];
 const NEARBLOCKS = 'https://testnet.nearblocks.io/txns/';
 const POLL_MS = 30000;
@@ -35,10 +37,10 @@ const CHAIN = {
   solana: { name: 'Solana', net: 'Solana devnet', unit: 'SOL', dec: 9 },
 };
 
-async function view(method, args) {
+async function view(method, args, account = CONTRACT) {
   const body = JSON.stringify({
     jsonrpc: '2.0', id: 'dmw-site', method: 'query',
-    params: { request_type: 'call_function', finality: 'final', account_id: CONTRACT, method_name: method, args_base64: btoa(JSON.stringify(args)) },
+    params: { request_type: 'call_function', finality: 'final', account_id: account, method_name: method, args_base64: btoa(JSON.stringify(args)) },
   });
   let last;
   for (const url of RPCS) {
@@ -117,7 +119,7 @@ export async function init() {
     [supply, v6, v17] = await Promise.all([
       view('nft_total_supply', {}),
       view('get_vault', { token_id: SHOWCASE }),
-      view('get_vault', { token_id: DEMO }),
+      view('get_vault', { token_id: DEMO }, DEMO_CONTRACT),
     ]);
   } catch (e) {
     console.warn('estate graph: RPC failed', e);

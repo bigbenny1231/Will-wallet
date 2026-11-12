@@ -15,8 +15,8 @@ NEAR enables, and ends with links and a question.
 spam trap): `requestId`, `projectName`, `leadName`, `email`, `size`, `tracks`, `nearAddress` (lowercase mainnet
 account), `projectUrl` (the public repo), `demoUrl` (the public X post), `idea` (20 to 2000 characters, this one is
 1871), `consent` (`true` only after the human agrees to the contact notice). The repo must be public by the deadline
-(2026-11-14 23:59 UTC): on Nov 11 2026 `github.com/bigbenny1231/will-wallet` was still private. The fixed contract is now
-deployed (`dmw-979268.testnet`, `docs/LIVE_CONTRACT.md`), so it can be made public.
+(2026-11-14 23:59 UTC): on Nov 11 2026 `github.com/bigbenny1231/will-wallet` was still private. The hardened contract v2 is now
+deployed and locked (`dmw-885364.testnet`, `docs/LIVE_CONTRACT.md`), so it can be made public.
 
 ```json
 {
@@ -40,7 +40,7 @@ deployed (`dmw-979268.testnet`, `docs/LIVE_CONTRACT.md`), so it can be made publ
 
 ## 2. X demo post (pick one; attach `site/assets/demo-v4-x-720p.mp4`, the 2:15 cut, or `site/assets/demo-v4-720p.mp4`, 2:41, from a Premium account)
 
-Both are the v4 cut, filmed on the live contract. Do not attach any v3 file: it was filmed on the replaced `dmw-x8cx.testnet`.
+Both are the v4 cut, filmed on `dmw-979268.testnet` (v1, the live contract on Nov 11; replaced by `dmw-885364.testnet` on Nov 12). Do not attach any v3 file: it was filmed on the replaced `dmw-x8cx.testnet`.
 
 Lengths use X's counting (a link is 23 characters whatever its length). Each is under 280.
 
@@ -108,16 +108,17 @@ tweet 2 (use `docs/diagrams/settlement-sequence.png`) and tweet 5 (a crop of `do
 ```
 
 ```text
-6/6 Reproduce it: git clone, make check, make build, make test, make deploy, make demo. make build matches the live code hash with the same toolchain (rustc 1.97, cargo-near 0.23). Foreign payouts are signed; relay waits for funded addresses. github.com/bigbenny1231/will-wallet
+6/6 Reproduce it: git clone, make check, make build, make test, make deploy, make demo. The live code is a reproducible build of the commit named on chain (cargo-near 0.23, Docker). Foreign payouts are signed; relay waits for funded addresses. github.com/bigbenny1231/will-wallet
 ```
 
-Lengths: 250, 263, 258, 266, 260, 266.
+Lengths: 250, 263, 258, 266, 260, 267.
 
 What keeps the thread honest (see `docs/AUDIT_CLAIMS.md`). Chain Signatures here use two curves (secp256k1 for Base
 and Monad, ed25519 for Solana) on three chains, so tweet 4 says that and not "three curves". The foreign payouts are
 signed on chain but not yet relayed, so tweet 6 and the form description say so. The recorded agent runs use the
-scripted brain, written to obey the injection, so post C and tweet 5 say "scripted". The live contract is not a
-reproducible build (`build_info` is null), so tweet 6 claims only a same-toolchain hash match. Heirs need a NEAR account
+scripted brain, written to obey the injection, so post C and tweet 5 say "scripted". The live contract is a
+reproducible build (NEP-330 `build_info` names the pinned image and the source commit), so tweet 6 says so; checking
+it needs Docker and that commit, not a plain `make build`. Heirs need a NEAR account
 named in the plan; they sign nothing to receive NEAR, which is what post B and the description claim, not "no seed
 phrase". The video's end card still shows the line "No seed phrase for your heirs." (burned in; see
 `docs/video/VOICEOVER.md`): heirs do need a NEAR account named in the plan.
@@ -151,26 +152,27 @@ curl -sI $DASH | head -1                             # 200
 curl -sI $DASH/vault/6 | head -1                     # 200 (SPA rewrite)
 curl -sI $DASH/pulse | head -1                       # 200
 curl -sI $SITE/assets/demo-v4-720p.mp4 | head -1        # 200 (the v4 cut, committed)
-ffprobe -v error -show_entries format=duration -of csv=p=0 site/assets/demo-v4-720p.mp4   # 160.99 (v4, vault 5 on dmw-979268.testnet, 5.6 MB)
+ffprobe -v error -show_entries format=duration -of csv=p=0 site/assets/demo-v4-720p.mp4   # 160.99 (v4, vault 5 on dmw-979268.testnet (v1), 5.6 MB)
 
 # 4. NEP-330 link check
-curl -s https://rpc.testnet.fastnear.com -H 'content-type: application/json' -d '{"jsonrpc":"2.0","id":1,"method":"query","params":{"request_type":"call_function","finality":"final","account_id":"dmw-979268.testnet","method_name":"contract_source_metadata","args_base64":"e30="}}' \
+curl -s https://rpc.testnet.fastnear.com -H 'content-type: application/json' -d '{"jsonrpc":"2.0","id":1,"method":"query","params":{"request_type":"call_function","finality":"final","account_id":"dmw-885364.testnet","method_name":"contract_source_metadata","args_base64":"e30="}}' \
   | python3 -c 'import sys,json;print(bytes(json.load(sys.stdin)["result"]["result"]).decode())'
-#   -> "link" must be the repo URL. "build_info" is null: the live code comes from `cargo near build
-#      non-reproducible-wasm`, so only a same-toolchain `make build` matches it. The expected hash is in the README row
-#      "The live contract is this source" and in docs/FINAL_REVIEW.md
+#   -> "link" must point to the repo at commit 6c581107017ad53414a2970a1b85497c35d4c57d, and "build_info" must name
+#      sourcescan/cargo-near:0.23.0-rust-1.99.1@sha256:8013f039... (the reproducible build). The expected hash is in the
+#      README row "The live contract is this source" and in docs/LIVE_CONTRACT.md
 curl -sI https://github.com/bigbenny1231/will-wallet | head -1            # 200 (repo is public)
 curl -sI https://github.com/bigbenny1231/will-wallet/tree/hackathon-submission | head -1           # 200
-# compare: `make build` (rustc 1.97.0, cargo-near 0.23.0) prints the code hash; `view_account dmw-979268.testnet` code_hash
-# must be the same (6s9oqxvBZfhWncW6irGH6zXTebeYUKTHh1pk1WSDxjYH). The contract has no full-access key, so it cannot change.
+# compare: at commit 6c58110, `make build-reproducible` (Docker, cargo-near 0.23.0) prints the code hash; `view_account
+# dmw-885364.testnet` code_hash must be the same (8geWkWLte1vsnVStUZtoNkNoL2b6sgLh5wPuSH9n4tna). The contract has no
+# full-access key, so it cannot change.
 
 # 5. the video
 ffprobe -v error -show_entries format=duration,size -of csv=p=0 site/assets/demo-v4-720p.mp4 site/assets/demo-v4-x-720p.mp4   # 160.99 / 134.72 s
 #   the 2:15 cut fits X's 2:20 limit for a standard account; the 2:41 cut needs Premium
 
 # 6. the showcase vault (nothing is relayed until its addresses hold funds)
-cd keeper && DMW_CONTRACT=dmw-979268.testnet npm run derive -- --token 1   # Base 0xe8DC...Db92, Monad 0x4103...8909, Solana Ct9Q...FPN
-cd .. && DMW_CONTRACT=dmw-979268.testnet make status TOKEN=1                 # vault 1 Alive, three payouts pending
+cd keeper && DMW_CONTRACT=dmw-885364.testnet npm run derive -- --token 1   # Base 0x7F98...3f3b, Monad 0xa8fd...4b91, Solana CPRM...hZdc
+cd .. && DMW_CONTRACT=dmw-885364.testnet make status TOKEN=1                 # vault 1 Alive, three payouts pending
 # fund: Base >= 0.001 ETH, Monad >= 0.05 MON (10 MON reserve: the single payout is an emptying tx), Solana >= 0.05 SOL
 # (faucets in keeper/SHOWCASE.md)
 
@@ -185,7 +187,7 @@ PY
 #   -> a length between 20 and 2000, and exactly: {{EMAIL}} {{NEAR_MAINNET_PAYOUT_ACCOUNT}} {{REQUEST_ID}} {{X_POST_URL}}
 ```
 
-Then, in order (the fixed contract is deployed and the fix merged, Nov 11 2026): make the repo public;
+Then, in order (the hardened contract v2 is deployed and locked, Nov 12 2026): make the repo public;
 tag and push `hackathon-submission` (steps 1 and 2 above need the public repo and the tag); post the demo with the video attached (replace `{{SITE_URL}}` with the live
 site); copy its URL into `demoUrl`; fill `requestId`, the email and `nearAddress` (a lowercase mainnet account, not
 `.testnet`); set `consent` only after the human agrees; submit; post the thread.

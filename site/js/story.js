@@ -1,4 +1,4 @@
-// Scrolling is time: the run of vault 5 (dmw-979268.testnet) as one vertical ECG line, drawn as the reader descends.
+// Scrolling is time: the run of vault 5 (dmw-979268.testnet, the v1 contract before dmw-885364.testnet) as one vertical ECG line, drawn as the reader descends.
 // Every event is a real moment of vault 5's recorded run (keeper log, agent transcript, docs/video/README.md); events are spaced by the
 // time between them, the heartbeats ARE the beats on the trace, and the clock shows the time at the pen.
 import { setSeal, reducedMotion, emit } from './seal.js';

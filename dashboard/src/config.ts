@@ -4,7 +4,7 @@
 
 export const MOCK = import.meta.env.VITE_DMW_MOCK === "1" || import.meta.env.VITE_DMW_MOCK === "true";
 export const NETWORK: "testnet" | "mainnet" = import.meta.env.VITE_NEAR_NETWORK === "mainnet" ? "mainnet" : "testnet";
-export const CONTRACT: string = import.meta.env.VITE_DMW_CONTRACT || "dmw-979268.testnet";
+export const CONTRACT: string = import.meta.env.VITE_DMW_CONTRACT || "dmw-885364.testnet";
 export const RPC: string =
   import.meta.env.VITE_NEAR_RPC || (NETWORK === "mainnet" ? "https://rpc.mainnet.near.org" : "https://rpc.testnet.fastnear.com");
 export const SIGNER_CONTRACT = NETWORK === "mainnet" ? "v1.signer" : "v1.signer-prod.testnet";
@@ -13,7 +13,7 @@ export const SPUTNIK_UI: string = import.meta.env.VITE_SPUTNIK_UI || "";
 export const NEARBLOCKS = NETWORK === "mainnet" ? "https://nearblocks.io" : "https://testnet.nearblocks.io";
 export const POLL_MS = 3000;
 /** The vault the project keeps alive as a living example (labelled as such on its page). Empty: none. */
-export const SHOWCASE_VAULT: string = import.meta.env.VITE_SHOWCASE_VAULT ?? (CONTRACT === "dmw-979268.testnet" ? "1" : "");
+export const SHOWCASE_VAULT: string = import.meta.env.VITE_SHOWCASE_VAULT ?? (CONTRACT === "dmw-885364.testnet" ? "1" : "");
 
 export const links = {
   nearAddress: (account: string) => `${NEARBLOCKS}/address/${account}`,
