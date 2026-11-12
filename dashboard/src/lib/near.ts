@@ -1,6 +1,6 @@
 import { providers } from "near-api-js";
 import { CONTRACT, MOCK, RPC } from "../config";
-import type { NftToken, VaultView } from "../types";
+import type { ContractConfig, NftToken, VaultView } from "../types";
 import { mockApi } from "./mock";
 
 const provider = new providers.JsonRpcProvider({ url: RPC });
@@ -14,6 +14,30 @@ const PAGE = 50;
 /** NEAR implicit accounts (ed25519: 64 hex; eth-implicit: 0x + 40 hex) exist as soon as something is sent to them. */
 export const isImplicitAccount = (a: string) => /^[0-9a-f]{64}$/.test(a) || /^0x[0-9a-f]{40}$/.test(a);
 const MAX_VAULTS = 1000;
+/** get_vaults_for_owner page size: the contract's maximum (v3, L-5: default 50, at most 100). */
+export const OWNER_PAGE = 100;
+
+/**
+ * Every vault of an owner from the paged get_vaults_for_owner (v3). Pages until a short page. A pre-v3 contract
+ * ignores from_index/limit and returns the whole list every time, so a page that brings no new token id (or is
+ * longer than asked) ends the loop too, and duplicates are dropped.
+ */
+export async function pageOwnerVaults<T extends { token_id: string }>(fetchPage: (fromIndex: number, limit: number) => Promise<T[] | null>, max = MAX_VAULTS): Promise<T[]> {
+  const out: T[] = [];
+  const seen = new Set<string>();
+  for (let from = 0; from < max; from += OWNER_PAGE) {
+    const page = (await fetchPage(from, OWNER_PAGE)) ?? [];
+    let added = 0;
+    for (const v of page) {
+      if (seen.has(v.token_id)) continue;
+      seen.add(v.token_id);
+      out.push(v);
+      added++;
+    }
+    if (page.length < OWNER_PAGE || page.length > OWNER_PAGE || added === 0) break;
+  }
+  return out;
+}
 
 export const api = {
   async getVault(id: string): Promise<VaultView | null> {
@@ -26,9 +50,19 @@ export const api = {
     const t = await view<NftToken | null>("nft_token", { token_id: id });
     return t ?? null;
   },
+  /** All of the owner's vaults: get_vaults_for_owner is paged on v3 (default 50, at most 100 a call). */
   async getVaultsForOwner(account: string): Promise<VaultView[]> {
     if (MOCK) return mockApi.getVaultsForOwner(account);
-    return (await view<VaultView[]>("get_vaults_for_owner", { account_id: account })) ?? [];
+    return pageOwnerVaults((from_index, limit) => view<VaultView[]>("get_vaults_for_owner", { account_id: account, from_index, limit }));
+  },
+  /** get_config, or null when it cannot be read. */
+  async getConfig(): Promise<ContractConfig | null> {
+    if (MOCK) return null;
+    try {
+      return await view<ContractConfig>("get_config");
+    } catch {
+      return null;
+    }
   },
   /** Pages through get_vaults until a short page comes back. */
   async getAllVaults(): Promise<VaultView[]> {

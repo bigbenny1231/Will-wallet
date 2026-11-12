@@ -1,6 +1,8 @@
 // What the page says about a vault's foreign payouts, read from each payout's own status and tx_hash, never assumed.
 // pending: not signed yet. signed: NEAR's MPC network signed it; a keeper has not recorded a broadcast. broadcast: a
-// keeper relayed it and recorded the hash with mark_broadcast. failed: the signature request timed out (re-signable).
+// keeper relayed it and recorded the hash with mark_broadcast. failed: the signature request timed out, or (contract v3,
+// M-1) a Solana payout was skipped because no operator signed it within the hour (log detail "skipped: ..."); an
+// operator may re-sign either.
 import { chainMeta } from "./chainmeta";
 import type { ForeignPayout } from "../types";
 

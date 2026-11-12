@@ -10,6 +10,7 @@ import PendingCreate from "./components/PendingCreate";
 import Pulse from "./pages/Pulse";
 import Try from "./pages/Try";
 import { guestAvailable } from "./lib/guest";
+import ContractNotice from "./components/ContractNotice";
 
 function Mark() {
   // The mark (design/logo.svg): brass ring, one heartbeat in life green, the flat line in the text colour.
@@ -81,6 +82,7 @@ function Footer() {
       <div className="wrap flex flex-wrap items-baseline justify-between gap-4 py-8 text-[13px] text-text-2">
         <p>Not a will. Not a custodian. Configure it with your estate attorney.</p>
         <a className="xl" href={links.nearAddress(CONTRACT)} target="_blank" rel="noreferrer">{CONTRACT}</a>
+        <ContractNotice />
       </div>
     </footer>
   );

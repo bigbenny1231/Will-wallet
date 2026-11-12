@@ -1,6 +1,7 @@
 // Call builders for every write method of the dmw contract (contracts/dmw/src/lib.rs).
 // Each builder returns the exact method, JSON args, gas and attached deposit. calls.test.ts pins them.
 import type { CallArgs, ForeignChain, ForeignPayout, Heir, Policy, StepArgs } from "../types";
+import { assertValidPayouts } from "./payouts";
 
 export interface ForeignDraft {
   chain: ForeignChain;
@@ -31,6 +32,11 @@ export const GAS = {
   addKey: tgas(50),
   executeStep: tgas(300),
   create: tgas(100),
+  /** Contract v3 (SECURITY_FIXES_V3 M-2): poke pays the bounty and claim the reserve, each a transfer with a 10 TGas
+   *  callback; 29.7 TGas of host gas on a maximal vault, so callers attach at least 50. Same 60 as the keeper's poke. */
+  poke: tgas(60),
+  claim: tgas(60),
+  /** Owner setters, deposit, mark_broadcast, nft_transfer: one vault read and write, no transfer. */
   other: tgas(30),
   /** kept for older call sites */
   set: tgas(30),
@@ -109,12 +115,11 @@ export const setPolicyCall = (tokenId: string, policy: Policy): CallArgs => ({
   deposit: ONE_YOCTO,
 });
 
-export const setForeignPayoutsCall = (tokenId: string, payouts: ForeignPayout[]): CallArgs => ({
-  method: "set_foreign_payouts",
-  args: { token_id: tokenId, payouts },
-  gas: GAS.other,
-  deposit: ONE_YOCTO,
-});
+/** Throws (with every reason) when contract v3 would refuse the payouts: see lib/payouts.ts. */
+export function setForeignPayoutsCall(tokenId: string, payouts: ForeignPayout[]): CallArgs {
+  assertValidPayouts(payouts);
+  return { method: "set_foreign_payouts", args: { token_id: tokenId, payouts }, gas: GAS.other, deposit: ONE_YOCTO };
+}
 
 /** dao_id null clears the DAO. */
 export const setDaoCall = (tokenId: string, daoId: string | null): CallArgs => ({
@@ -166,7 +171,7 @@ export const agentPayCall = (tokenId: string, receiverId: string, amountYocto: s
   gas: GAS.agentPay,
 });
 
-export const pokeCall = (tokenId: string): CallArgs => ({ method: "poke", args: { token_id: tokenId }, gas: GAS.other });
+export const pokeCall = (tokenId: string): CallArgs => ({ method: "poke", args: { token_id: tokenId }, gas: GAS.poke });
 
 /** `args` is only needed in step 3 (chain environment fields); it is omitted otherwise. */
 export const executeStepCall = (tokenId: string, args?: StepArgs): CallArgs => ({
@@ -182,7 +187,7 @@ export const markBroadcastCall = (tokenId: string, index: number, txHash: string
   gas: GAS.other,
 });
 
-export const claimCall = (tokenId: string): CallArgs => ({ method: "claim", args: { token_id: tokenId }, gas: GAS.other });
+export const claimCall = (tokenId: string): CallArgs => ({ method: "claim", args: { token_id: tokenId }, gas: GAS.claim });
 
 /** NEP-171 transfer of the Will NFT (= the vault). Needs exactly 1 yoctoNEAR; owner only, and (v2, finding B) only
  *  while the vault is Alive: not overdue, not paused. The buyer gets a reset vault (no heirs, keys, payouts or DAO). */

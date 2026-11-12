@@ -58,6 +58,13 @@ describe("gas table", () => {
     expect(C.GAS.executeStep).toBe(gas(300));
     expect(C.GAS.create).toBe(gas(100));
     expect(C.GAS.other).toBe(gas(30));
+    expect(C.GAS.poke).toBe(gas(60));
+    expect(C.GAS.claim).toBe(gas(60));
+  });
+  it("contract v3 (M-2): poke and claim attach at least 50 TGas (29.7 TGas of host gas on a maximal vault)", () => {
+    for (const c of [C.pokeCall("4"), C.claimCall("4")]) expect(BigInt(c.gas!)).toBeGreaterThanOrEqual(50n * TGAS);
+    // the transfer callback the extra gas pays for
+    expect(LIB).toMatch(/GAS_ON_TRANSFER: Gas = Gas::from_tgas\(10\)/);
   });
 });
 
@@ -108,10 +115,10 @@ describe("simple calls", () => {
     ["set_foreign_payouts", C.setForeignPayoutsCall("4", [payout]), { args: { token_id: "4", payouts: [payout] }, gas: gas(30), deposit: "1" }],
     ["set_dao", C.setDaoCall("4", "estate-4.sputnik-v2.testnet"), { args: { token_id: "4", dao_id: "estate-4.sputnik-v2.testnet" }, gas: gas(30), deposit: "1" }],
     ["set_timing", C.setTimingCall("4", 20, 1), { args: { token_id: "4", heartbeat_interval_s: 20, grace_missed: 1 }, gas: gas(30), deposit: "1" }],
-    ["poke", C.pokeCall("4"), { args: { token_id: "4" }, gas: gas(30) }],
+    ["poke", C.pokeCall("4"), { args: { token_id: "4" }, gas: gas(60) }],
     ["execute_step", C.executeStepCall("4"), { args: { token_id: "4" }, gas: gas(300) }],
     ["mark_broadcast", C.markBroadcastCall("4", 0, "0xabc"), { args: { token_id: "4", index: 0, tx_hash: "0xabc" }, gas: gas(30) }],
-    ["claim", C.claimCall("4"), { args: { token_id: "4" }, gas: gas(30) }],
+    ["claim", C.claimCall("4"), { args: { token_id: "4" }, gas: gas(60) }],
   ];
   for (const [name, call, want] of cases) {
     it(`${name}: exact args, gas and deposit, and the arg names exist in lib.rs`, () => {
@@ -128,8 +135,13 @@ describe("simple calls", () => {
     expect(LIB).toMatch(/fn require_owner_mutable\(&self, v: &Vault\) \{\s+assert_one_yocto\(\);/);
     expect(LIB).toMatch(/pub fn pause\(&mut self, token_id: TokenRef\) -> u64 \{\s+(\/\/.*\s+)*assert_one_yocto\(\);/);
     for (const m of ["poke", "execute_step", "mark_broadcast", "claim"]) expect(LIB).not.toMatch(new RegExp(`#\\[payable\\]\\s+pub fn ${m}\\(`));
-    // second review: the contract keeper hand-over takes 1 yocto too (scripts/lib.sh register_keeper attaches it)
+    // v3 (H-1(4)): the contract keeper hand-over is two steps, both exactly 1 yocto. set_keeper (owner or keeper) only
+    // proposes (pending_keeper); the named account takes the role with accept_keeper, signed with its own full-access key.
     expect(LIB).toMatch(/#\[payable\]\s+pub fn set_keeper\([\s\S]{0,80}assert_one_yocto\(\)/);
+    expect(LIB).toMatch(/#\[payable\]\s+pub fn accept_keeper\(&mut self\) \{\s+assert_one_yocto\(\);/);
+    expect(LIB).toMatch(/self\.pending_keeper\.as_ref\(\) == Some\(&pred\),\s+"only the pending keeper may accept"/);
+    expect(sig(LIB, "accept_keeper").all).toEqual([]);
+    expect(sig(LIB, "set_keeper").all).toEqual(["account_id"]);
     expect(C.setGuardianCall("4", null).deposit).toBe("1");
   });
   it("v2 (finding F): the owner's heartbeat attaches 1 yocto, a pulse key's does not", () => {
@@ -203,6 +215,19 @@ describe("create follow-ups", () => {
       tx_hash: null,
     });
   });
+  it("set_foreign_payouts refuses what contract v3 refuses, before any wallet prompt", () => {
+    const sol: ForeignPayout = { chain: "solana", to: "9xQeWvG816bUx9EPjHmaT23yvVM2ZWbrrpZb9PusVFin", amount: "50000000", status: "pending" };
+    expect(() => C.setForeignPayoutsCall("4", [sol, payout])).not.toThrow();
+    expect(() => C.setForeignPayoutsCall("4", [sol, { ...sol }])).toThrow(/Only one Solana payout per vault/);
+    expect(() => C.setForeignPayoutsCall("4", [{ ...sol, to: "9xQeWvG816bUx9EPjHmaT23yvVM2ZWbrrpZb9Pus" }])).toThrow(/32 bytes/);
+    expect(() => C.setForeignPayoutsCall("4", [{ ...sol, amount: "18446744073709551616" }])).toThrow(/64 bits/);
+    expect(() => C.setForeignPayoutsCall("4", [{ ...payout, to: "0x7a3f" }])).toThrow(/0x followed by 40 hex/);
+    expect(() => C.followUpCalls("7", [sol, sol], null)).toThrow();
+    // the same rules in lib.rs
+    expect(LIB).toContain('"solana `to` must be a base58 32-byte public key"');
+    expect(LIB).toContain('"solana amount must fit in u64 lamports"');
+    expect(LIB).toContain('"evm `to` must be 0x + 40 hex"');
+  });
   it("followUpCalls: set_foreign_payouts then set_dao, 30 TGas and 1 yocto each, nothing when empty", () => {
     const calls = C.followUpCalls("7", [payout], "estate-7.sputnik-v2.testnet");
     expect(calls.map((c) => c.method)).toEqual(["set_foreign_payouts", "set_dao"]);
@@ -254,6 +279,14 @@ describe("step 3 current payout", () => {
     expect(currentForeign(base)?.chain).toBe("solana");
     expect(currentForeign({ ...base, step: 2 })).toBeNull();
     expect(currentForeign({ ...base, foreign_index: 2 })).toBeNull();
+  });
+});
+
+describe("get_vaults_for_owner (v3, paged)", () => {
+  it("takes account_id with optional from_index and limit; default 50, at most 100", () => {
+    expect(sig(LIB, "get_vaults_for_owner")).toEqual({ all: ["account_id", "from_index", "limit"], required: ["account_id"] });
+    expect(LIB).toMatch(/OWNER_PAGE_DEFAULT: u64 = 50;/);
+    expect(LIB).toMatch(/OWNER_PAGE_MAX: u64 = 100;/);
   });
 });
 

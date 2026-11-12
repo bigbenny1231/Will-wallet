@@ -109,3 +109,51 @@ export interface CallArgs {
   /** gas as string of raw gas units */
   gas?: string;
 }
+
+/** One entry of `get_config().chains` (contracts/dmw/src/foreign.rs chain_registry). */
+export interface ChainConfig {
+  chain: ForeignChain;
+  kind: "evm" | "solana";
+  chain_id?: number;
+  path?: string;
+  rpc?: string;
+  explorer_tx?: string;
+  /** EVM: cap on any caller's max_fee_per_gas (wei). */
+  max_fee_per_gas?: string;
+  /** EVM: a non-keeper's fees are clamped to this (wei). */
+  non_keeper_max_fee_per_gas?: string;
+  min_gas_limit?: string;
+  /** Most payouts of this chain per vault (v3 adds it for Solana: 1). */
+  max_payouts?: number;
+  /** v3, Solana: keeper re-signs of a signed payout per keeper epoch (3). */
+  max_keeper_resigns?: number;
+}
+
+/** v3: the keeper admin's pending, timelocked proposal. Anyone may execute it once `eta_ms` has passed. */
+export interface AdminProposal {
+  action: "keeper" | "mpc_signer" | "keeper_admin";
+  account_id: string | null;
+  proposed_ms: number;
+  eta_ms: number;
+}
+
+/** `get_config()`: the fields the dashboard reads. Every v3 field is optional (absent on a v2 contract). */
+export interface ContractConfig {
+  owner_id: string;
+  next_id: number | string;
+  keeper?: string | null;
+  mpc_signer?: string;
+  step3_open_after_ms?: number;
+  resign_cooldown_ms?: number;
+  chains: ChainConfig[];
+  /** v3: named by set_keeper, not a keeper until it calls accept_keeper. */
+  pending_keeper?: string | null;
+  /** v3: may only propose a new keeper, MPC signer or admin, behind a 48 h timelock. */
+  keeper_admin?: string | null;
+  admin_timelock_ms?: number;
+  admin_proposal?: AdminProposal | null;
+  keeper_epoch?: number;
+  max_keeper_solana_resigns?: number;
+  sale_min_interval_s?: number;
+  sale_min_grace?: number;
+}

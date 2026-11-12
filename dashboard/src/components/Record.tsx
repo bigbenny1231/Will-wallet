@@ -47,6 +47,9 @@ export function describe(e: LogEntry, alias: (id: string) => string | null = () 
     case "foreign_resign_failed": {
       const m = d.match(/^#(\d+) (.*)$/);
       const ok = e.event === "foreign_signed";
+      // Contract v3 (M-1): after the operator hour a stranger's step 3 leaves a Solana payout failed, unsigned.
+      if (!ok && m && /^skipped:/.test(m[2]))
+        return { tone: "warn", title: `Step III: payout ${Number(m[1]) + 1} skipped`, detail: "Nobody who may sign it (the keeper, the owner or an heir) did so within the hour, so settlement moved on without a signature. Any of them may re-sign it now." };
       return { tone: ok ? "brass" : "dead", title: `Step III: payout ${m ? Number(m[1]) + 1 : ""} ${ok ? "signed by NEAR’s MPC network" : "failed"}`.replace("  ", " "), detail: m ? shortHash(m[2].replace(/^signed /, "tx ")) : d };
     }
     case "dao_proposal":

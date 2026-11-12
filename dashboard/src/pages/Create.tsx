@@ -7,6 +7,7 @@ import { useWallet } from "../lib/wallet";
 import { missingHeirsNote, useContractRecipients, useMissingAccounts } from "../lib/accounts";
 import { contractRecipientsNote } from "../lib/chains";
 import { MAX_BOUNTY_YOCTO, createVaultCall, type CreateDraft, type ForeignDraft } from "../lib/calls";
+import { payoutProblems } from "../lib/payouts";
 import { PENDING_KEY, type Pending } from "../components/PendingCreate";
 import { bpsToPct, fmtInterval, nearToYocto, toSmallest, unitsFor } from "../lib/format";
 import { CONTRACT, MOCK } from "../config";
@@ -72,11 +73,8 @@ export default function Create() {
       if (!(bpsRows[i] > 0)) p[1].push(`Heir ${i + 1}: share must be above 0.`);
     });
     try { nearToYocto(perTx); nearToYocto(daily); } catch { p[2].push("Caps must be NEAR amounts."); }
-    foreign.forEach((f, i) => {
-      if (chainMeta(f.chain).evm && !/^0x[0-9a-fA-F]{40}$/.test(f.to.trim())) p[3].push(`Payout ${i + 1}: ${chainMeta(f.chain).short} address must be 0x plus 40 hex characters.`);
-      if (f.chain === "solana" && !/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(f.to.trim())) p[3].push(`Payout ${i + 1}: enter a Solana base58 address.`);
-      try { if (BigInt(toSmallest(f.chain, f.amount)) <= 0n) throw new Error(); } catch { p[3].push(`Payout ${i + 1}: enter an amount.`); }
-    });
+    // Contract v3 rules (lib/payouts.ts): EVM 0x + 40 hex; Solana a 32-byte base58 key, amount within u64, one per vault.
+    p[3].push(...payoutProblems(foreign.map((f) => ({ chain: f.chain, to: f.to, amount: safeSmallest(f, "") }))));
     if (dao.trim() && !/^[a-z0-9._-]+\.[a-z0-9._-]+$/.test(dao.trim())) p[4].push("DAO id should look like estate.sputnik-v2.testnet.");
     try {
       if (BigInt(nearToYocto(deposit)) < BigInt(nearToYocto("0.1"))) p[5].push("Deposit must be at least 0.1 NEAR (storage).");
@@ -268,6 +266,7 @@ export default function Create() {
               );
             })}
             <button className="tl" onClick={() => setForeign([...foreign, { chain: "base", to: "", amount: "" }])}>Add foreign payout</button>
+            <p className="text-[14px] text-text-2">At most four payouts, and one each on Monad and Solana: every payout of a chain is sent from the same derived address.</p>
             {contractNote && <p className="border-l border-warn pl-4 text-[15px] text-warn">{contractNote}</p>}
             <p className="max-w-[62ch] text-[14px] text-text-2">
               The source address depends on the vault id and a random salt the contract draws when it creates the vault, so nobody can know it, fund it or sign for it before the vault exists. It is shown on the vault page after creation. Fund it then, while you are alive; nobody holds its key.
@@ -325,8 +324,8 @@ export default function Create() {
   );
 }
 
-function safeSmallest(f: ForeignRow): string {
-  try { return toSmallest(f.chain, f.amount); } catch { return "0"; }
+function safeSmallest(f: ForeignRow, fallback = "0"): string {
+  try { return toSmallest(f.chain, f.amount); } catch { return fallback; }
 }
 
 function Review({ rows }: { rows: [string, string][] }) {
