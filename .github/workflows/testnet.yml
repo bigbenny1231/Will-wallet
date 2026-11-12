@@ -95,6 +95,12 @@ jobs:
             echo "KEEPER_ADMIN_SEED is set (${#KEEPER_ADMIN_SEED} characters)"
           fi
 
+      - name: The funder wallet can pay the demo's Base, Monad and Solana payouts
+        if: inputs.task == 'all' || inputs.task == 'record' || inputs.task == 'finish'
+        env:
+          KEEPER_SEED: ${{ secrets.KEEPER_SEED }}
+        run: ./scripts/ci/funder-check.sh 2>&1 | tee >(eval "$SAVE" > "$OUT/funder.log")
+
       # ---------------- release build ----------------
       - name: Reproducible release build, committed to this branch
         if: inputs.task == 'release' || inputs.task == 'all'
