@@ -1,0 +1,18 @@
+19:30:28 keeper    watching dmw-885364.testnet via near:dmw-keeper-bc6af4.testnet→dmw-885364.testnet, poll every 5s
+19:30:28 keeper    only vault 4
+19:34:15 state     vault 4: Alive → Warning
+19:42:38 poke      vault 4 → Triggered  https://testnet.nearblocks.io/txns/4aobfntQWvsB4FUhSaQtvxNFvNMKNCcuCod9n8mPXHAE
+19:42:38 state     vault 4: Warning → Triggered
+19:42:42 step      vault 4 step 1/5  https://testnet.nearblocks.io/txns/GfRYEWBSYKTgWwqjPFEXykxFvPvPzBb9dAXH6fe7KTiw
+19:42:46 step      vault 4 step 2/5  https://testnet.nearblocks.io/txns/2pUzmF1psUBL1FZAdkvqMaSAZkwuYHhfNcQLynTE1Qfi
+19:42:55 step      vault 4 step 3/5 (base #0)  https://testnet.nearblocks.io/txns/2C5g8gQDjYkfvjHy9S9dtM6YnQneSNXBTHyDwS3vf2nh
+19:42:56 relay     vault 4 payout #0 base NOT broadcast: source 0xe2DA1a2b7CF1EdB54b9234E270B0F24B26905c06 is unfunded (eth_sendRawTransaction: insufficient funds for gas * price + value: have 0 want 500550000000000 (-32003)). Status stays signed; fund it and the keeper will relay. Retry in 60s
+19:43:05 step      vault 4 step 3/5 (monad #1)  https://testnet.nearblocks.io/txns/3VrfD3FMJiRvFC6JUyh7JvkXERDxY1yJxH339z2RBCW8
+19:43:05 relay     vault 4 payout #1 monad NOT broadcast: source 0x708301D9e44e23ea9B11BE8558E4B4F638B4E457 is unfunded (eth_sendRawTransaction: Signer had insufficient balance (-32000)). Status stays signed; fund it and the keeper will relay. Retry in 60s
+19:43:14 step      vault 4 step 3/5 (solana #2)  https://testnet.nearblocks.io/txns/FRz14Qnf78CCUXKaqXRRuZittY6JinV5FxDS8Eo6ULzA
+19:43:15 relay     vault 4 payout #2 solana NOT broadcast: source 7PCGhe8EusakbHbdSREM7RAkDfRJLUvpqC8548qhUQg7 is unfunded (sendTransaction: Transaction simulation failed: Attempt to debit an account but found no record of a prior credit. "AccountNotFound"). Status stays signed; fund it and the keeper will relay. Retry in 60s
+19:43:18 step      vault 4 step 4/5  https://testnet.nearblocks.io/txns/8YjhLkVxGmXy1wfHDeu9hT31fDAZp246c1eyDPivtsGi
+19:43:19 step      vault 4 execute_step 5: Transaction has expired
+19:43:19 keeper    errors in a row: 1, next poll in 10s
+19:43:33 step      vault 4 step 5/5  https://testnet.nearblocks.io/txns/4KtyRoV1yMQMkEBQFPWUVjaFaf3BiQHUken68jAFWLJ7
+19:43:33 state     vault 4: Triggered → Settled

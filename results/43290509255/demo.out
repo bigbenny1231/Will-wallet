@@ -1,0 +1,51 @@
+./scripts/demo.sh
+== keeper account dmw-keeper-bc6af4.testnet (testnet faucet)
+created dmw-keeper-bc6af4.testnet  key saved to keys/dmw-keeper-bc6af4.testnet.json
+  (cannot set the keeper from here: the current keeper dmw-keeper-2f6dcb.testnet or a separate contract owner must call set_keeper {"account_id":"dmw-keeper-bc6af4.testnet"})
+== accounts
+created dmw-demo-funder-2667.testnet  key saved to keys/dmw-demo-funder-2667.testnet.json
+tx https://testnet.nearblocks.io/txns/5mdE7gTFCWnf6MB91AxYG1rk6h9CCrRomUVR61kjFJBQ
+  result: true
+created dmw-demo-sarah-2667.testnet (0.5 NEAR from dmw-demo-funder-2667.testnet)  key saved to keys/dmw-demo-sarah-2667.testnet.json
+tx https://testnet.nearblocks.io/txns/FvNBfXLFG8w68RSCjrws1DHp8PcYNkfVf2f7y5WPX6vi
+  result: true
+created dmw-demo-ben-2667.testnet (0.5 NEAR from dmw-demo-funder-2667.testnet)  key saved to keys/dmw-demo-ben-2667.testnet.json
+tx https://testnet.nearblocks.io/txns/2ipYaadoseqETfJ1N55WUYHcuWjgSoMNP6wHptAcKQzE
+  result: true
+created dmw-demo-api-2667.testnet (0.5 NEAR from dmw-demo-funder-2667.testnet)  key saved to keys/dmw-demo-api-2667.testnet.json
+created dmw-demo-owner-0d86db.testnet  key saved to keys/dmw-demo-owner-0d86db.testnet.json
+== create vault (4 NEAR, 60 s interval, grace 1)
+tx https://testnet.nearblocks.io/txns/BKgEmaqNg4b2QVVCpSF2C7ZemJbZsUzAPfYJhyqaTEMu
+  result: "4"
+== vault keeper dmw-keeper-bc6af4.testnet (contract keeper is dmw-keeper-2f6dcb.testnet)
+tx https://testnet.nearblocks.io/txns/2AKYGnZBwr1tvWJJ8KwHxRVDVzDthyVLeFAGHcoRZsmU
+  result: (empty)
+== keys
+tx https://testnet.nearblocks.io/txns/4SsAFHFWrRPe3i9jSzGfFoe9tQpRmZ2FTLGoqRtX17sg
+  result: true
+tx https://testnet.nearblocks.io/txns/GVaT54JAQ7FXRbUcK95DNYUZkfEznyGWS8c5vAxEvHAy
+  result: true
+== pulse started (pid 7852, beats every 20 s) -> .demo/pulse.log
+== foreign payouts (Base 0.0005 ETH, Solana 0.01 SOL)
+tx https://testnet.nearblocks.io/txns/2SDNtH9zD7GhmbPAfVsSruvKEkwMzXgzFkBwCojDSKaJ
+  result: (empty)
+  base source   0xe2DA1a2b7CF1EdB54b9234E270B0F24B26905c06
+  solana source 7PCGhe8EusakbHbdSREM7RAkDfRJLUvpqC8548qhUQg7
+== agent-demo: one allowed, one denied
+policy: per_tx_max 0.5000 NEAR · daily_max 1.0000 NEAR · allowlist [dmw-demo-api-2667.testnet]
+
+agent_pay ALLOWED  (small, allowlisted)  0.0500 NEAR → dmw-demo-api-2667.testnet
+  result {"allowed":true,"reason":null,"receiver_id":"dmw-demo-api-2667.testnet","amount":"50000000000000000000000","daily_spent":"50000000000000000000000","balance":"1950000000000000000000000"}  https://testnet.nearblocks.io/txns/9zuCxuiz1akKL2aaj6XASCxw2jkWdqa4oSidEW8orRk5
+  event agent_pay_allowed  to dmw-demo-api-2667.testnet · 0.0500 NEAR
+
+agent_pay DENIED   (unknown receiver, over per_tx_max)  1.0000 NEAR → stranger-15c55ed3.testnet
+  result {"allowed":false,"reason":"receiver_not_allowlisted","receiver_id":"stranger-15c55ed3.testnet","amount":"1000000000000000000000000","daily_spent":"50000000000000000000000","balance":"1950000000000000000000000"}  https://testnet.nearblocks.io/txns/C2hsbdtzBLx6VWmk66J5XQRrnsCthBMf7ZfgQsXZkZTg
+  event agent_pay_denied  to stranger-15c55ed3.testnet · 1.0000 NEAR · reason=receiver_not_allowlisted
+== keeper started (pid 9362) -> .demo/keeper.log
+
+  vault id      4   (owner dmw-demo-owner-0d86db.testnet, heirs dmw-demo-sarah-2667.testnet / dmw-demo-ben-2667.testnet)
+  dashboard     http://localhost:5173/vault/4   (cd dashboard && npm ci && npm run dev; dashboard/.env.local points it at dmw-885364.testnet)
+  explorer      https://testnet.nearblocks.io/address/dmw-885364.testnet
+  watch         tail -f .demo/pulse.log   |   tail -f .demo/keeper.log   |   make status
+
+  Vault is alive and beating. When you are ready:   make kill    (afterwards: make stop)

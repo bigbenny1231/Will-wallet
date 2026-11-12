@@ -1,0 +1,169 @@
+./scripts/demo.sh
+== keeper account dmw-keeper-bc6af4.testnet (testnet faucet)
+created dmw-keeper-bc6af4.testnet  key saved to keys/dmw-keeper-bc6af4.testnet.json
+  (cannot set the keeper from here: the current keeper dmw-keeper-2f6dcb.testnet or a separate contract owner must call set_keeper {"account_id":"dmw-keeper-bc6af4.testnet"})
+== accounts
+created dmw-demo-funder-2667.testnet  key saved to keys/dmw-demo-funder-2667.testnet.json
+tx https://testnet.nearblocks.io/txns/5mdE7gTFCWnf6MB91AxYG1rk6h9CCrRomUVR61kjFJBQ
+  result: true
+created dmw-demo-sarah-2667.testnet (0.5 NEAR from dmw-demo-funder-2667.testnet)  key saved to keys/dmw-demo-sarah-2667.testnet.json
+tx https://testnet.nearblocks.io/txns/FvNBfXLFG8w68RSCjrws1DHp8PcYNkfVf2f7y5WPX6vi
+  result: true
+created dmw-demo-ben-2667.testnet (0.5 NEAR from dmw-demo-funder-2667.testnet)  key saved to keys/dmw-demo-ben-2667.testnet.json
+tx https://testnet.nearblocks.io/txns/2ipYaadoseqETfJ1N55WUYHcuWjgSoMNP6wHptAcKQzE
+  result: true
+created dmw-demo-api-2667.testnet (0.5 NEAR from dmw-demo-funder-2667.testnet)  key saved to keys/dmw-demo-api-2667.testnet.json
+created dmw-demo-owner-0d86db.testnet  key saved to keys/dmw-demo-owner-0d86db.testnet.json
+== create vault (4 NEAR, 60 s interval, grace 1)
+tx https://testnet.nearblocks.io/txns/BKgEmaqNg4b2QVVCpSF2C7ZemJbZsUzAPfYJhyqaTEMu
+  result: "4"
+== vault keeper dmw-keeper-bc6af4.testnet (contract keeper is dmw-keeper-2f6dcb.testnet)
+tx https://testnet.nearblocks.io/txns/2AKYGnZBwr1tvWJJ8KwHxRVDVzDthyVLeFAGHcoRZsmU
+  result: (empty)
+== keys
+tx https://testnet.nearblocks.io/txns/4SsAFHFWrRPe3i9jSzGfFoe9tQpRmZ2FTLGoqRtX17sg
+  result: true
+tx https://testnet.nearblocks.io/txns/GVaT54JAQ7FXRbUcK95DNYUZkfEznyGWS8c5vAxEvHAy
+  result: true
+== pulse started (pid 7852, beats every 20 s) -> .demo/pulse.log
+== foreign payouts (Base 0.0005 ETH, Solana 0.01 SOL)
+tx https://testnet.nearblocks.io/txns/2SDNtH9zD7GhmbPAfVsSruvKEkwMzXgzFkBwCojDSKaJ
+  result: (empty)
+  base source   0xe2DA1a2b7CF1EdB54b9234E270B0F24B26905c06
+  solana source 7PCGhe8EusakbHbdSREM7RAkDfRJLUvpqC8548qhUQg7
+== agent-demo: one allowed, one denied
+policy: per_tx_max 0.5000 NEAR · daily_max 1.0000 NEAR · allowlist [dmw-demo-api-2667.testnet]
+
+agent_pay ALLOWED  (small, allowlisted)  0.0500 NEAR → dmw-demo-api-2667.testnet
+  result {"allowed":true,"reason":null,"receiver_id":"dmw-demo-api-2667.testnet","amount":"50000000000000000000000","daily_spent":"50000000000000000000000","balance":"1950000000000000000000000"}  https://testnet.nearblocks.io/txns/9zuCxuiz1akKL2aaj6XASCxw2jkWdqa4oSidEW8orRk5
+  event agent_pay_allowed  to dmw-demo-api-2667.testnet · 0.0500 NEAR
+
+agent_pay DENIED   (unknown receiver, over per_tx_max)  1.0000 NEAR → stranger-15c55ed3.testnet
+  result {"allowed":false,"reason":"receiver_not_allowlisted","receiver_id":"stranger-15c55ed3.testnet","amount":"1000000000000000000000000","daily_spent":"50000000000000000000000","balance":"1950000000000000000000000"}  https://testnet.nearblocks.io/txns/C2hsbdtzBLx6VWmk66J5XQRrnsCthBMf7ZfgQsXZkZTg
+  event agent_pay_denied  to stranger-15c55ed3.testnet · 1.0000 NEAR · reason=receiver_not_allowlisted
+== keeper started (pid 9362) -> .demo/keeper.log
+
+  vault id      4   (owner dmw-demo-owner-0d86db.testnet, heirs dmw-demo-sarah-2667.testnet / dmw-demo-ben-2667.testnet)
+  dashboard     http://localhost:5173/vault/4   (cd dashboard && npm ci && npm run dev; dashboard/.env.local points it at dmw-885364.testnet)
+  explorer      https://testnet.nearblocks.io/address/dmw-885364.testnet
+  watch         tail -f .demo/pulse.log   |   tail -f .demo/keeper.log   |   make status
+
+  Vault is alive and beating. When you are ready:   make kill    (afterwards: make stop)
+== setup v4: vault 4 owner dmw-demo-owner-0d86db.testnet on dmw-885364.testnet
+tx https://testnet.nearblocks.io/txns/567LbmF1VceBGK1nD8dYyZ4N1pdu7LaL7J9oaExYqY17
+  log: EVENT_JSON:{"standard":"dmw","version":"1.0.0","event":"deposit","data":{"token_id":"4","amount":"1500000000000000000000000","from":"dmw-demo-owner-0d86db.testnet"}}
+  result: "3450000000000000000000000"
+tx https://testnet.nearblocks.io/txns/GCAueShuBtGYELg2zUXKLuh8j2kQxa1u33N2nD9Nh58V
+  log: EVENT_JSON:{"standard":"dmw","version":"1.0.0","event":"key_add_requested","data":{"token_id":"4","public_key":"ed25519:7cKXHkYc3NnSr5miztzn9xfbKBM8MRjAEpkkQfoHi4LE","kind":"Pulse"}}
+  log: EVENT_JSON:{"standard":"dmw","version":"1.0.0","event":"key_added","data":{"token_id":"4","public_key":"ed25519:7cKXHkYc3NnSr5miztzn9xfbKBM8MRjAEpkkQfoHi4LE","kind":"Pulse","method":"heartbeat"}}
+  result: true
+tx https://testnet.nearblocks.io/txns/E1csn16ctFAaLnMdfGpbjH6fa1hmbgF3Gmf34a6bqmY4
+  log: EVENT_JSON:{"standard":"dmw","version":"1.0.0","event":"foreign_set","data":{"token_id":"4","foreign":[{"chain":"base","to":"0xcA024adC7cac111339Fe077C739F8085aE705F2F","amount":"500000000000000","from_address":"0xe2DA1a2b7CF1EdB54b9234E270B0F24B26905c06","status":"pending","signed_tx":null,"tx_hash":null},{"chain":"monad","to":"0x360d02320ebff8439fe0d804e68dfc6976230e13","amount":"10000000000000000","from_address":"0x708301D9e44e23ea9B11BE8558E4B4F638B4E457","status":"pending","signed_tx":null,"tx_hash":null},{"chain":"solana","to":"CFdWXa1ean7bBoewSv2SZESrDpWSxeoN1hfLrqaqZQUr","amount":"10000000","from_address":"7PCGhe8EusakbHbdSREM7RAkDfRJLUvpqC8548qhUQg7","status":"pending","signed_tx":null,"tx_hash":null}]}}
+  result: (empty)
+  base 0xe2DA1a2b7CF1EdB54b9234E270B0F24B26905c06  monad 0x708301D9e44e23ea9B11BE8558E4B4F638B4E457  solana 7PCGhe8EusakbHbdSREM7RAkDfRJLUvpqC8548qhUQg7
+tx https://testnet.nearblocks.io/txns/FvCB4P8oYoLVmi5q5K65aKGr7eP5LYFJURWZwn4tCEAJ
+  result: true
+created dmw-demo-guardian-2667.testnet (0.3 NEAR from dmw-demo-funder-2667.testnet)  key saved to keys/dmw-demo-guardian-2667.testnet.json
+tx https://testnet.nearblocks.io/txns/7yacvH79n9JwWT27gk1hNriHTPooGbaqBA7waYbYmiHf
+  log: EVENT_JSON:{"standard":"dmw","version":"1.0.0","event":"guardian_set","data":{"token_id":"4","guardian_id":"dmw-demo-guardian-2667.testnet","max_pause_s":600}}
+  result: (empty)
+== ready: vault 4
+[plugin rolldown:vite-resolve] Module "crypto" has been externalized for browser compatibility, imported by "/home/runner/work/Will-wallet/Will-wallet/dashboard/node_modules/chainsig.js/browser/index.browser.js". See https://vite.dev/guide/troubleshooting.html#module-externalized-for-browser-compatibility for more details.
+[plugin rolldown:vite-resolve] Module "util" has been externalized for browser compatibility, imported by "/home/runner/work/Will-wallet/Will-wallet/dashboard/node_modules/generate-function/index.js". See https://vite.dev/guide/troubleshooting.html#module-externalized-for-browser-compatibility for more details.
+[plugin builtin:vite-reporter] 
+(!) Some chunks are larger than 2500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+[33m[EVAL] [0mUse of direct `eval` function is strongly discouraged as it poses security risks and may cause issues with minification.
+    [38;5;246m╭[0m[38;5;246m─[0m[38;5;246m[[0m node_modules/js-sha256/src/sha256.js:83:18 [38;5;246m][0m
+    [38;5;246m│[0m
+ [38;5;246m83 │[0m [38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249mv[0m[38;5;249ma[0m[38;5;249mr[0m[38;5;249m [0m[38;5;249mc[0m[38;5;249mr[0m[38;5;249my[0m[38;5;249mp[0m[38;5;249mt[0m[38;5;249mo[0m[38;5;249m [0m[38;5;249m=[0m[38;5;249m [0meval[38;5;249m([0m[38;5;249m"[0m[38;5;249mr[0m[38;5;249me[0m[38;5;249mq[0m[38;5;249mu[0m[38;5;249mi[0m[38;5;249mr[0m[38;5;249me[0m[38;5;249m([0m[38;5;249m'[0m[38;5;249mc[0m[38;5;249mr[0m[38;5;249my[0m[38;5;249mp[0m[38;5;249mt[0m[38;5;249mo[0m[38;5;249m'[0m[38;5;249m)[0m[38;5;249m"[0m[38;5;249m)[0m[38;5;249m;[0m
+ [38;5;240m   │[0m                  ──┬─  
+ [38;5;240m   │[0m                    ╰─── Use of direct `eval` here.
+ [38;5;240m   │[0m 
+ [38;5;240m   │[0m [38;5;115mHelp[0m: Consider using indirect eval. For more information, check the documentation: https://rolldown.rs/guide/troubleshooting#avoiding-direct-eval
+[38;5;246m────╯[0m
+
+[33m[EVAL] [0mUse of direct `eval` function is strongly discouraged as it poses security risks and may cause issues with minification.
+    [38;5;246m╭[0m[38;5;246m─[0m[38;5;246m[[0m node_modules/js-sha256/src/sha256.js:84:18 [38;5;246m][0m
+    [38;5;246m│[0m
+ [38;5;246m84 │[0m [38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249mv[0m[38;5;249ma[0m[38;5;249mr[0m[38;5;249m [0m[38;5;249mB[0m[38;5;249mu[0m[38;5;249mf[0m[38;5;249mf[0m[38;5;249me[0m[38;5;249mr[0m[38;5;249m [0m[38;5;249m=[0m[38;5;249m [0meval[38;5;249m([0m[38;5;249m"[0m[38;5;249mr[0m[38;5;249me[0m[38;5;249mq[0m[38;5;249mu[0m[38;5;249mi[0m[38;5;249mr[0m[38;5;249me[0m[38;5;249m([0m[38;5;249m'[0m[38;5;249mb[0m[38;5;249mu[0m[38;5;249mf[0m[38;5;249mf[0m[38;5;249me[0m[38;5;249mr[0m[38;5;249m'[0m[38;5;249m)[0m[38;5;249m.[0m[38;5;249mB[0m[38;5;249mu[0m[38;5;249mf[0m[38;5;249mf[0m[38;5;249me[0m[38;5;249mr[0m[38;5;249m"[0m[38;5;249m)[0m[38;5;249m;[0m
+ [38;5;240m   │[0m                  ──┬─  
+ [38;5;240m   │[0m                    ╰─── Use of direct `eval` here.
+ [38;5;240m   │[0m 
+ [38;5;240m   │[0m [38;5;115mHelp[0m: Consider using indirect eval. For more information, check the documentation: https://rolldown.rs/guide/troubleshooting#avoiding-direct-eval
+[38;5;246m────╯[0m
+
+[33m[INEFFECTIVE_DYNAMIC_IMPORT] [0msrc/lib/derive.ts is dynamically imported by src/pages/Try.tsx but also statically imported by src/components/PendingCreate.tsx, src/components/PulseStrip.tsx, src/lib/chains.ts, src/pages/Vault.tsx, dynamic import will not move module into another chunk.
+
+19:30:52 kline {"text":"19:30:28 keeper    watching dmw-885364.testnet via near:dmw-keeper-bc6af4.testnet→dmw-885364.testnet, poll ever
+19:30:52 kline {"text":"19:30:28 keeper    only vault 4"}
+19:30:57 cli_pulse_stopped {}
+19:31:00 phone_first_beat {}
+19:31:04 record_start {}
+19:31:04 raw_t0 {"wall":1794511864.671}
+19:31:22 phone_beat {"n":2}
+19:31:44 two_beats {}
+19:31:44 phone_beat {"n":3}
+19:31:48 agent_start {}
+19:31:50 scroll {"which":"Agent"}
+19:31:54 aline {"kind":"audit"}
+19:31:54 aline {"kind":"inbox"}
+19:31:54 aline {"kind":"inj"}
+19:31:57 aline {"kind":"payment"}
+19:31:57 aline {"kind":"allowed"}
+19:32:00 aline {"kind":"payment"}
+19:32:00 aline {"kind":"allowed"}
+19:32:00 aline {"kind":"thought"}
+19:32:00 agent_a_exit {"code":0}
+19:32:00 aline {"kind":"payment"}
+19:32:00 aline {"kind":"refused"}
+19:32:00 aline {"kind":"result"}
+19:32:05 aline {"kind":"audit"}
+19:32:05 aline {"kind":"inbox"}
+19:32:05 aline {"kind":"inj"}
+19:32:05 aline {"kind":"thought"}
+19:32:06 phone_beat {"n":4}
+19:32:08 agent_b_exit {"code":0}
+19:32:08 agent_dash_rows {}
+19:32:08 aline {"kind":"payment"}
+19:32:08 aline {"kind":"denied"}
+19:32:08 aline {"kind":"result"}
+19:32:14 scroll {"which":"top"}
+19:32:14 guardian_scene {}
+19:32:27 phone_beat {"n":5}
+19:32:30 pause_send {}
+19:32:34 pause_done {"out":"opqLveYCPghswdqe\n  log: EVENT_JSON:{\"standard\":\"dmw\",\"version\":\"1.0.0\",\"event\":\"paused\",\"data\":{\"token_id\":\"4\",\"by\":\"guardian\",\"account_id\":\"dmw-demo-guardian-2667.testnet\",\"paused_until_ms\":1794512553117,\"trigger_at_ms\":1794512553117,\"previous_trigger_at_ms\":1794512067043}}\n  result: 1794512553117\n"}
+19:32:37 dash_paused {}
+19:32:50 beat_after_pause {}
+19:32:50 phone_beat {"n":6}
+19:33:00 dash_unpaused {}
+19:33:03 act2 {}
+19:33:12 phone_beat {"n":7}
+19:33:15 hold_start {"box":{"x":1493.484375,"y":659.84375,"width":134.015625,"height":134.015625}}
+19:33:18 hold_end {}
+19:33:18 phone_stopped {}
+19:33:18 dash_state {"state":"Warning"}
+19:34:15 kline {"text":"19:34:15 state     vault 4: Alive → Warning"}
+19:42:37 dash_state {"state":"Triggered"}
+19:42:37 act3 {}
+19:42:38 kline {"text":"19:42:38 poke      vault 4 → Triggered  https://testnet.nearblocks.io/txns/4aobfntQWvsB4FUhSaQtvxNFvNMKNCcuCod9
+19:42:38 kline {"text":"19:42:38 state     vault 4: Warning → Triggered"}
+19:42:42 kline {"text":"19:42:42 step      vault 4 step 1/5  https://testnet.nearblocks.io/txns/GfRYEWBSYKTgWwqjPFEXykxFvPvPzBb9dAXH6fe
+19:42:46 kline {"text":"19:42:46 step      vault 4 step 2/5  https://testnet.nearblocks.io/txns/2pUzmF1psUBL1FZAdkvqMaSAZkwuYHhfNcQLynT
+19:42:55 kline {"text":"19:42:55 step      vault 4 step 3/5 (base #0)  https://testnet.nearblocks.io/txns/2C5g8gQDjYkfvjHy9S9dtM6YnQneS
+19:42:56 kline {"text":"19:42:56 relay     vault 4 payout #0 base NOT broadcast: source 0xe2DA1a2b7CF1EdB54b9234E270B0F24B26905c06 is u
+19:43:05 kline {"text":"19:43:05 step      vault 4 step 3/5 (monad #1)  https://testnet.nearblocks.io/txns/3VrfD3FMJiRvFC6JUyh7JvkXERDx
+19:43:05 kline {"text":"19:43:05 relay     vault 4 payout #1 monad NOT broadcast: source 0x708301D9e44e23ea9B11BE8558E4B4F638B4E457 is 
+19:43:14 kline {"text":"19:43:14 step      vault 4 step 3/5 (solana #2)  https://testnet.nearblocks.io/txns/FRz14Qnf78CCUXKaqXRRuZittY6
+19:43:15 kline {"text":"19:43:15 relay     vault 4 payout #2 solana NOT broadcast: source 7PCGhe8EusakbHbdSREM7RAkDfRJLUvpqC8548qhUQg7 
+19:43:18 kline {"text":"19:43:18 step      vault 4 step 4/5  https://testnet.nearblocks.io/txns/8YjhLkVxGmXy1wfHDeu9hT31fDAZp246c1eyDPi
+19:43:19 kline {"text":"19:43:19 step      vault 4 execute_step 5: Transaction has expired"}
+19:43:19 kline {"text":"19:43:19 keeper    errors in a row: 1, next poll in 10s"}
+19:43:33 kline {"text":"19:43:33 step      vault 4 step 5/5  https://testnet.nearblocks.io/txns/4KtyRoV1yMQMkEBQFPWUVjaFaf3BiQHUken68jA
+19:43:33 kline {"text":"19:43:33 state     vault 4: Triggered → Settled"}
+19:43:35 dash_state {"state":"Settled"}
+19:43:45 record_end {}
+19:43:46 raw_done {"code":0,"written":22841,"nFrames":8887}
+DONE written 22841 frames from the browser 8887 secs 774

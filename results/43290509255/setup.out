@@ -1,0 +1,15 @@
+== setup v4: vault 4 owner dmw-demo-owner-0d86db.testnet on dmw-885364.testnet
+tx https://testnet.nearblocks.io/txns/567LbmF1VceBGK1nD8dYyZ4N1pdu7LaL7J9oaExYqY17
+  log: EVENT_JSON:{"standard":"dmw","version":"1.0.0","event":"deposit","data":{"token_id":"4","amount":"1500000000000000000000000","from":"dmw-demo-owner-0d86db.testnet"}}
+  result: "3450000000000000000000000"
+tx https://testnet.nearblocks.io/txns/GCAueShuBtGYELg2zUXKLuh8j2kQxa1u33N2nD9Nh58V
+  log: EVENT_JSON:{"standard":"dmw","version":"1.0.0","event":"key_add_requested","data":{"token_id":"4","public_key":"ed25519:7cKXHkYc3NnSr5miztzn9xfbKBM8MRjAEpkkQfoHi4LE","kind":"Pulse"}}
+  log: EVENT_JSON:{"standard":"dmw","version":"1.0.0","event":"key_added","data":{"token_id":"4","public_key":"ed25519:7cKXHkYc3NnSr5miztzn9xfbKBM8MRjAEpkkQfoHi4LE","kind":"Pulse","method":"heartbeat"}}
+  result: true
+tx https://testnet.nearblocks.io/txns/E1csn16ctFAaLnMdfGpbjH6fa1hmbgF3Gmf34a6bqmY4
+  log: EVENT_JSON:{"standard":"dmw","version":"1.0.0","event":"foreign_set","data":{"token_id":"4","foreign":[{"chain":"base","to":"0xcA024adC7cac111339Fe077C739F8085aE705F2F","amount":"500000000000000","from_address":"0xe2DA1a2b7CF1EdB54b9234E270B0F24B26905c06","status":"pending","signed_tx":null,"tx_hash":null},{"chain":"monad","to":"0x360d02320ebff8439fe0d804e68dfc6976230e13","amount":"10000000000000000","from_address":"0x708301D9e44e23ea9B11BE8558E4B4F638B4E457","status":"pending","signed_tx":null,"tx_hash":null},{"chain":"solana","to":"CFdWXa1ean7bBoewSv2SZESrDpWSxeoN1hfLrqaqZQUr","amount":"10000000","from_address":"7PCGhe8EusakbHbdSREM7RAkDfRJLUvpqC8548qhUQg7","status":"pending","signed_tx":null,"tx_hash":null}]}}
+  result: (empty)
+  base 0xe2DA1a2b7CF1EdB54b9234E270B0F24B26905c06  monad 0x708301D9e44e23ea9B11BE8558E4B4F638B4E457  solana 7PCGhe8EusakbHbdSREM7RAkDfRJLUvpqC8548qhUQg7
+tx https://testnet.nearblocks.io/txns/7yacvH79n9JwWT27gk1hNriHTPooGbaqBA7waYbYmiHf
+  log: EVENT_JSON:{"standard":"dmw","version":"1.0.0","event":"guardian_set","data":{"token_id":"4","guardian_id":"dmw-demo-guardian-2667.testnet","max_pause_s":600}}
+  result: (empty)

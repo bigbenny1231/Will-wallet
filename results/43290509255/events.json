@@ -1,0 +1,338 @@
+[
+ {
+  "t": 1794511852.452,
+  "name": "kline",
+  "text": "19:30:28 keeper    watching dmw-885364.testnet via near:dmw-keeper-bc6af4.testnet→dmw-885364.testnet, poll every 5s"
+ },
+ {
+  "t": 1794511852.452,
+  "name": "kline",
+  "text": "19:30:28 keeper    only vault 4"
+ },
+ {
+  "t": 1794511857.67,
+  "name": "cli_pulse_stopped"
+ },
+ {
+  "t": 1794511860.531,
+  "name": "phone_first_beat"
+ },
+ {
+  "t": 1794511864.542,
+  "name": "record_start"
+ },
+ {
+  "t": 1794511864.671,
+  "name": "raw_t0",
+  "wall": 1794511864.671
+ },
+ {
+  "t": 1794511882.302,
+  "name": "phone_beat",
+  "n": 2
+ },
+ {
+  "t": 1794511904.275,
+  "name": "two_beats"
+ },
+ {
+  "t": 1794511904.278,
+  "name": "phone_beat",
+  "n": 3
+ },
+ {
+  "t": 1794511908.278,
+  "name": "agent_start"
+ },
+ {
+  "t": 1794511910.504,
+  "name": "scroll",
+  "which": "Agent"
+ },
+ {
+  "t": 1794511914.065,
+  "name": "aline",
+  "kind": "audit"
+ },
+ {
+  "t": 1794511914.265,
+  "name": "aline",
+  "kind": "inbox"
+ },
+ {
+  "t": 1794511914.265,
+  "name": "aline",
+  "kind": "inj"
+ },
+ {
+  "t": 1794511917.476,
+  "name": "aline",
+  "kind": "payment"
+ },
+ {
+  "t": 1794511917.479,
+  "name": "aline",
+  "kind": "allowed"
+ },
+ {
+  "t": 1794511920.288,
+  "name": "aline",
+  "kind": "payment"
+ },
+ {
+  "t": 1794511920.288,
+  "name": "aline",
+  "kind": "allowed"
+ },
+ {
+  "t": 1794511920.289,
+  "name": "aline",
+  "kind": "thought"
+ },
+ {
+  "t": 1794511920.599,
+  "name": "agent_a_exit",
+  "code": 0
+ },
+ {
+  "t": 1794511920.691,
+  "name": "aline",
+  "kind": "payment"
+ },
+ {
+  "t": 1794511920.691,
+  "name": "aline",
+  "kind": "refused"
+ },
+ {
+  "t": 1794511920.692,
+  "name": "aline",
+  "kind": "result"
+ },
+ {
+  "t": 1794511925.1,
+  "name": "aline",
+  "kind": "audit"
+ },
+ {
+  "t": 1794511925.3,
+  "name": "aline",
+  "kind": "inbox"
+ },
+ {
+  "t": 1794511925.3,
+  "name": "aline",
+  "kind": "inj"
+ },
+ {
+  "t": 1794511925.301,
+  "name": "aline",
+  "kind": "thought"
+ },
+ {
+  "t": 1794511926.268,
+  "name": "phone_beat",
+  "n": 4
+ },
+ {
+  "t": 1794511928.299,
+  "name": "agent_b_exit",
+  "code": 0
+ },
+ {
+  "t": 1794511928.309,
+  "name": "agent_dash_rows"
+ },
+ {
+  "t": 1794511928.311,
+  "name": "aline",
+  "kind": "payment"
+ },
+ {
+  "t": 1794511928.311,
+  "name": "aline",
+  "kind": "denied"
+ },
+ {
+  "t": 1794511928.311,
+  "name": "aline",
+  "kind": "result"
+ },
+ {
+  "t": 1794511934.666,
+  "name": "scroll",
+  "which": "top"
+ },
+ {
+  "t": 1794511934.676,
+  "name": "guardian_scene"
+ },
+ {
+  "t": 1794511947.885,
+  "name": "phone_beat",
+  "n": 5
+ },
+ {
+  "t": 1794511950.577,
+  "name": "pause_send"
+ },
+ {
+  "t": 1794511954.21,
+  "name": "pause_done",
+  "out": "opqLveYCPghswdqe\n  log: EVENT_JSON:{\"standard\":\"dmw\",\"version\":\"1.0.0\",\"event\":\"paused\",\"data\":{\"token_id\":\"4\",\"by\":\"guardian\",\"account_id\":\"dmw-demo-guardian-2667.testnet\",\"paused_until_ms\":1794512553117,\"trigger_at_ms\":1794512553117,\"previous_trigger_at_ms\":1794512067043}}\n  result: 1794512553117\n"
+ },
+ {
+  "t": 1794511957.108,
+  "name": "dash_paused"
+ },
+ {
+  "t": 1794511970.138,
+  "name": "beat_after_pause"
+ },
+ {
+  "t": 1794511970.178,
+  "name": "phone_beat",
+  "n": 6
+ },
+ {
+  "t": 1794511980.65,
+  "name": "dash_unpaused"
+ },
+ {
+  "t": 1794511983.658,
+  "name": "act2"
+ },
+ {
+  "t": 1794511992.768,
+  "name": "phone_beat",
+  "n": 7
+ },
+ {
+  "t": 1794511995.973,
+  "name": "hold_start",
+  "box": {
+   "x": 1493.484375,
+   "y": 659.84375,
+   "width": 134.015625,
+   "height": 134.015625
+  }
+ },
+ {
+  "t": 1794511998.522,
+  "name": "hold_end"
+ },
+ {
+  "t": 1794511998.568,
+  "name": "phone_stopped"
+ },
+ {
+  "t": 1794511998.575,
+  "name": "dash_state",
+  "state": "Warning"
+ },
+ {
+  "t": 1794512055.267,
+  "name": "kline",
+  "text": "19:34:15 state     vault 4: Alive → Warning"
+ },
+ {
+  "t": 1794512557.847,
+  "name": "dash_state",
+  "state": "Triggered"
+ },
+ {
+  "t": 1794512557.868,
+  "name": "act3"
+ },
+ {
+  "t": 1794512558.338,
+  "name": "kline",
+  "text": "19:42:38 poke      vault 4 → Triggered  https://testnet.nearblocks.io/txns/4aobfntQWvsB4FUhSaQtvxNFvNMKNCcuCod9n8mPXHAE"
+ },
+ {
+  "t": 1794512558.59,
+  "name": "kline",
+  "text": "19:42:38 state     vault 4: Warning → Triggered"
+ },
+ {
+  "t": 1794512562.858,
+  "name": "kline",
+  "text": "19:42:42 step      vault 4 step 1/5  https://testnet.nearblocks.io/txns/GfRYEWBSYKTgWwqjPFEXykxFvPvPzBb9dAXH6fe7KTiw"
+ },
+ {
+  "t": 1794512566.117,
+  "name": "kline",
+  "text": "19:42:46 step      vault 4 step 2/5  https://testnet.nearblocks.io/txns/2pUzmF1psUBL1FZAdkvqMaSAZkwuYHhfNcQLynTE1Qfi"
+ },
+ {
+  "t": 1794512575.889,
+  "name": "kline",
+  "text": "19:42:55 step      vault 4 step 3/5 (base #0)  https://testnet.nearblocks.io/txns/2C5g8gQDjYkfvjHy9S9dtM6YnQneSNXBTHyDwS3vf2nh"
+ },
+ {
+  "t": 1794512576.393,
+  "name": "kline",
+  "text": "19:42:56 relay     vault 4 payout #0 base NOT broadcast: source 0xe2DA1a2b7CF1EdB54b9234E270B0F24B26905c06 is unfunded (eth_sendRawTransaction: insufficient fun"
+ },
+ {
+  "t": 1794512585.18,
+  "name": "kline",
+  "text": "19:43:05 step      vault 4 step 3/5 (monad #1)  https://testnet.nearblocks.io/txns/3VrfD3FMJiRvFC6JUyh7JvkXERDxY1yJxH339z2RBCW8"
+ },
+ {
+  "t": 1794512585.939,
+  "name": "kline",
+  "text": "19:43:05 relay     vault 4 payout #1 monad NOT broadcast: source 0x708301D9e44e23ea9B11BE8558E4B4F638B4E457 is unfunded (eth_sendRawTransaction: Signer had insu"
+ },
+ {
+  "t": 1794512594.729,
+  "name": "kline",
+  "text": "19:43:14 step      vault 4 step 3/5 (solana #2)  https://testnet.nearblocks.io/txns/FRz14Qnf78CCUXKaqXRRuZittY6JinV5FxDS8Eo6ULzA"
+ },
+ {
+  "t": 1794512595.733,
+  "name": "kline",
+  "text": "19:43:15 relay     vault 4 payout #2 solana NOT broadcast: source 7PCGhe8EusakbHbdSREM7RAkDfRJLUvpqC8548qhUQg7 is unfunded (sendTransaction: Transaction simulat"
+ },
+ {
+  "t": 1794512598.489,
+  "name": "kline",
+  "text": "19:43:18 step      vault 4 step 4/5  https://testnet.nearblocks.io/txns/8YjhLkVxGmXy1wfHDeu9hT31fDAZp246c1eyDPivtsGi"
+ },
+ {
+  "t": 1794512599.49,
+  "name": "kline",
+  "text": "19:43:19 step      vault 4 execute_step 5: Transaction has expired"
+ },
+ {
+  "t": 1794512599.491,
+  "name": "kline",
+  "text": "19:43:19 keeper    errors in a row: 1, next poll in 10s"
+ },
+ {
+  "t": 1794512613.278,
+  "name": "kline",
+  "text": "19:43:33 step      vault 4 step 5/5  https://testnet.nearblocks.io/txns/4KtyRoV1yMQMkEBQFPWUVjaFaf3BiQHUken68jAFWLJ7"
+ },
+ {
+  "t": 1794512613.778,
+  "name": "kline",
+  "text": "19:43:33 state     vault 4: Triggered → Settled"
+ },
+ {
+  "t": 1794512615.433,
+  "name": "dash_state",
+  "state": "Settled"
+ },
+ {
+  "t": 1794512625.739,
+  "name": "record_end"
+ },
+ {
+  "t": 1794512626.093,
+  "name": "raw_done",
+  "code": 0,
+  "written": 22841,
+  "nFrames": 8887
+ }
+]

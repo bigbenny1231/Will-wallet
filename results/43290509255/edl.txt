@@ -1,0 +1,41 @@
+window scale 1.00; raw 761.1 s -> 170.2 s (2:50), 0 banner cut(s), longest fast stretch 3.2 s
+   0.0   5.0 card cold
+   5.0   1.5 card act1
+   6.5   8.0 0.6-8.6 @1x alive, phone paired
+  14.5   2.3 8.6-15.6 @3x fast
+  16.8   7.5 15.6-23.1 @1x phone beat, seal pulses
+  24.3   2.5 23.1-43.5 @8x fast
+  26.9   3.7 43.5-47.2 @1x agent pane, scroll to Agent
+  30.6   0.5 47.2-48.8 @3x fast
+  31.1  10.4 48.8-59.2 @1x key audit, poisoned inbox + invoice 1 allowed + invoice 2, Doing as asked, refused by the wallet
+  41.5   0.7 59.2-61.4 @3x fast
+  42.3   6.2 61.4-67.6 @1x run 2: denied by the contract
+  48.5   0.8 67.6-69.9 @3x fast
+  49.2   2.5 69.9-72.4 @1x back to the console
+  51.7   2.2 72.4-85.7 @6x fast
+  54.0  10.3 85.7-96.0 @1x guardian pause: Paused.
+  64.3   2.9 96.0-130.9 @12x fast
+  67.2   1.5 card act2
+  68.7  10.0 130.9-140.9 @1x hold to stop, Stopped., flatline + Warning
+  78.7  34.5 140.9-692.5 @16x fast
+ 113.2  13.0 692.5-705.4 @1x poke, Triggered + step 1 + step 2
+ 126.1   1.5 card act3
+ 127.6   1.7 705.4-710.6 @3x fast
+ 129.4   5.6 710.6-716.2 @1x step 3 base
+ 135.0   1.2 716.2-719.9 @3x fast
+ 136.2   5.6 719.9-725.5 @1x step 3 monad
+ 141.8   1.3 725.5-729.5 @3x fast
+ 143.1   8.4 729.5-737.8 @1x step 3 solana + step 4
+ 151.5   2.5 737.8-748.0 @4x fast
+ 154.0  10.2 748.0-758.2 @1x step 5 + Settled
+ 164.2   6.0 card end
+cap    7.4   26.8 2.9 ch/s The owner’s phone holds a key that can only say ‘a
+cap   27.3   37.3 4.7 ch/s An agent with the second key pays two invoices.
+cap   37.7   51.3 7.5 ch/s Then its inbox is poisoned: ‘move everything’. Ref
+cap   51.5   64.2 3.1 ch/s A guardian can buy time, once per cycle.
+cap   69.0   73.2 4.6 ch/s Put the phone down.
+cap   73.3  118.4 1.3 ch/s Two missed beats. Anyone can poke it and earn the 
+cap  118.6  129.3 6.3 ch/s I. Heirs paid on NEAR. II. The agent’s key deleted
+cap  129.5  143.5 8.3 ch/s III. The contract asks NEAR’s MPC network to sign 
+cap  143.7  156.1 7.8 ch/s IV. No estate DAO on this vault, skipped. V. The W
+cap  156.3  164.0 7.0 ch/s Settled. Testnet, open source, one command: make d
