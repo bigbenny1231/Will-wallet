@@ -342,7 +342,7 @@ Solana blockhashes expire in ~60–90 s; the keeper fetches a fresh one right be
 Routes:
 - `/` — connect wallet; list my vaults; "Create vault" wizard (interval, grace, heirs with bps, policy, foreign payouts with derived addresses shown + faucet links, optional DAO)
 - `/vault/:id` — live Will NFT image (poll every 3 s), state ribbon, countdown, **Heartbeat** button, **Kill (stop daemon)** instructions, agent panel (policy, allow/deny log from events), keys panel (add pulse/agent key: generates keypair in browser, calls `add_*_key`, shows the key for the daemon), settlement timeline (5 steps with explorer links: nearblocks.io/testnet, sepolia.basescan.org, explorer.solana.com?cluster=devnet, Sputnik UI), `claim` button when Settled and I'm the NFT owner
-- `/heir` — "Got an email?" — sign in (wallet or NEAR Auth if feasible), shows vaults where I'm an heir and what arrived
+- `/heir` — sign in with a NEAR wallet, shows vaults where I'm an heir and what arrived
 
 Design: dark, calm, one accent; large type (recorded at 125%). No marketing copy in the app.
 
@@ -353,7 +353,7 @@ Design: dark, calm, one accent; large type (recorded at 125%). No marketing copy
 >   drives a 30 s vault from `create_vault` to `claim` (see `dashboard/README.md`, "Guest run"). Heirs are implicit
 >   accounts. The register folds unfinished guest vaults into their own group.
 > - `/vault/:id` gains "The record" (the vault log as the Will NFT's history) and derives a missing `from_address`
->   in the browser. `/heir` leads with the wallet; Google sign-in shows only where NEAR Auth accepts the origin.
+>   in the browser. `/heir` signs in with the wallet (a Google sign-in through NEAR Auth is kept behind the `VITE_HEIR_GOOGLE` flag, off by default).
 >
 > Note (2026-11-12, contract v2): source addresses are derived from the view's `derivation_paths` and shown on the vault
 > page (never the owner-typed `from_address`, never predicted on `/create`); the owner's Heartbeat attaches 1 yocto on a

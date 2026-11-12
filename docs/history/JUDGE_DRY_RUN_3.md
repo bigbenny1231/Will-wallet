@@ -35,6 +35,6 @@ kill 244 s). Nothing needed fixing and no manual step was needed between the com
 
 - `make demo` creates one Base and one Solana payout. The Monad path in the keeper loop is covered by unit tests
   (mock vault with a `monad` payout: `evmParams(from, 'monad')`, `broadcastEvm(raw, 'monad')`, 1000 gwei cap,
-  explorer link) and by the live contract run in [`contracts/TESTNET_SMOKE.md`](../contracts/TESTNET_SMOKE.md) (vault 14, step 3
+  explorer link) and by the live contract run in [`contracts/TESTNET_SMOKE.md`](TESTNET_SMOKE.md) (vault 14, step 3
   signed on `monad-14`). A live keeper relay of a Monad payout needs the derived address funded, and was not done.
 - Docker reproducible build, dashboard dev server and the phone PWA were not part of this sequence.

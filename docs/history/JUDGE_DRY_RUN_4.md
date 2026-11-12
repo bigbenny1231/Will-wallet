@@ -14,7 +14,7 @@ Accounts created by this run: contract `dmw-82e1da.testnet`, keeper `dmw-keeper-
 | --- | --- | --- | --- | --- |
 | 1 | `git clone` | ok | 1 s | PASS |
 | 2 | `make check` | "All good." | 2 s | PASS |
-| 3 | `make build` | 460,419 B, code hash `13ug5kLS5oCUSHBjJ7P5sEJ7gANxaATHtHtfdDUZfsqU`, the same as the `dmw-x8cx.testnet` redeploy in [TESTNET_SMOKE.md](../contracts/TESTNET_SMOKE.md) | 53 s | PASS |
+| 3 | `make build` | 460,419 B, code hash `13ug5kLS5oCUSHBjJ7P5sEJ7gANxaATHtHtfdDUZfsqU`, the same as the `dmw-x8cx.testnet` redeploy in [TESTNET_SMOKE.md](TESTNET_SMOKE.md) | 53 s | PASS |
 | 4 | `make test` | contract **99 passed**, keeper **46**, dashboard **68**, agent **37** (typechecks clean) | 104 s | PASS |
 | 5 | `make deploy` | `deployed dmw-82e1da.testnet`, `.env` written | 55 s | PASS |
 | 6 | `make demo` | `add_pulse_key`, `add_agent_key` and `set_foreign_payouts` with 1 yocto succeed; **ALLOWED 0.0500 NEAR**, **DENIED `receiver_not_allowlisted`**; pulse and keeper started | 95 s | PASS |

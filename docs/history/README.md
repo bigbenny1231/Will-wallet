@@ -9,6 +9,7 @@ for the security record, [`docs/SECURITY_FIXES_V2.md`](../SECURITY_FIXES_V2.md) 
 
 | File | What it was |
 | --- | --- |
+| [`CONTRACT_V1.md`](CONTRACT_V1.md) | `dmw-979268.testnet`, contract v1: deploy, lock, its C-2 attack run and the earlier demo cut |
 | [`TESTNET_SMOKE.md`](TESTNET_SMOKE.md) | smoke runs on `dmw-x8cx.testnet`, including the Sputnik DAO proposal filed and ratified by step 4 |
 | [`KEEPER_LIVE_RUN.md`](KEEPER_LIVE_RUN.md) | the first end-to-end keeper runs, on `dmw-x8cx.testnet` |
 | [`AGENT_LIVE_TRANSCRIPT.md`](AGENT_LIVE_TRANSCRIPT.md) | the first agent transcripts against a live vault, on `dmw-x8cx.testnet` |

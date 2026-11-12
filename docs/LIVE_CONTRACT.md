@@ -2,9 +2,8 @@
 
 `dmw-885364.testnet` runs contract v2 and replaces `dmw-979268.testnet`. The contract was hardened after a fourth
 review pass ([`SECURITY_FIXES_V2.md`](SECURITY_FIXES_V2.md)); `dmw-979268.testnet` runs v1, has no full-access key and
-could not be upgraded, and v2 changes the storage layout, so v2 went to a new account. Older records stay as history:
-the `dmw-979268.testnet` runs are summarised [at the end of this file](#before-this-dmw-979268testnet-v1), and the
-records of `dmw-x8cx.testnet`, the contract before that, are in [`docs/history/`](history/README.md).
+could not be upgraded, and v2 changes the storage layout, so v2 went to a new account. The records of earlier
+contracts are in [`docs/history/`](history/README.md).
 
 Everything below was done by the repository's own `testnet` workflow ([`.github/workflows/testnet.yml`](../.github/workflows/testnet.yml)),
 run by the author from the Actions tab. Every account is a throwaway testnet faucet account whose key existed only on the
@@ -143,13 +142,3 @@ transaction from its derived source address (Base `0xe2DA1a2b7CF1EdB54b9234E270B
 `0x708301D9e44e23ea9B11BE8558E4B4F638B4E457`, Solana `7PCGhe8EusakbHbdSREM7RAkDfRJLUvpqC8548qhUQg7`) once the address
 holds the value and the fee, and records the hash on the vault with `mark_broadcast`; the vault page then links each
 payout to its explorer.
-
-## Before this: `dmw-979268.testnet` (v1)
-
-`dmw-979268.testnet` was the live contract from Nov 11 to Nov 12 2026: contract v1 with the C-2 fix, code hash
-`6s9oqxvBZfhWncW6irGH6zXTebeYUKTHh1pk1WSDxjYH` (not a reproducible build), deployed by run 42943063178 and locked
-([delete key](https://testnet.nearblocks.io/txns/Ft71mPBybxUGtPnuzjHxPbBpHMywvdvf3ZhkbLen4Yiq)). Its C-2 drain attempt
-(vault 4, run 42958682328) ended `C-2 drain: BLOCKED`, and the earlier 2:41 cut of the demo video (vault 5, runs
-42958682328 and 42972214388; now in git history) was filmed on it. The
-full tables are in this file's git history (commit `fe57cc9`) and the logs on `ci/testnet-results`. Its vaults stay
-readable there; it cannot be changed.
