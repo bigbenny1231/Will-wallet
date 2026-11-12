@@ -163,7 +163,14 @@ export async function init() {
     const f = v.foreign.find((p) => p.chain === chain);
     const c = CHAIN[chain];
     if (!f) return { h: c.name, rows: [], note: '' };
-    const rows = [['Network', c.net], ['Amount', units(f.amount, c.dec) + ' ' + c.unit], ['From', f.from_address ? f.from_address : 'Not recorded yet', !!f.from_address], ['To', f.to, true], ['Status', statusWord(f.status)]];
+    // Contract v2 salts each vault's derivation path and publishes it as derivation_paths; until a payout is signed its
+    // from_address is only what the owner typed, and at signing the contract writes the derived address into it.
+    const paths = v.derivation_paths;
+    const ownerTyped = !!paths && f.status === 'pending';
+    const from = ownerTyped ? 'Written by the contract at signing' : f.from_address ? f.from_address : 'Not recorded yet';
+    const rows = [['Network', c.net], ['Amount', units(f.amount, c.dec) + ' ' + c.unit], ['From', from, !ownerTyped && !!f.from_address]];
+    if (paths) rows.push(['Derivation path', chain === 'solana' ? paths.solana : paths[chain], true]);
+    rows.push(['To', f.to, true], ['Status', statusWord(f.status)]);
     return {
       h: id.startsWith('r') ? 'Recipient on ' + c.net : c.name + ', step III',
       rows,

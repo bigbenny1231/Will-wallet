@@ -2,6 +2,8 @@
 # Real testnet smoke test for the dmw contract (SPEC §2.6 / item 7).
 #   contracts/smoke.sh <contract> <owner> <heir1> <heir2>
 # Keys for owner/heir1 must be in keys/<acct>.json (scripts/near-admin.mjs create).
+# Contract v2: the owner's own heartbeat attaches 1 yocto; pulse-key heartbeats attach nothing. heir1 runs the steps,
+# so it is an operator for step 3 and mark_broadcast (findings C/E).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 C=$1 OWNER=$2 H1=$3 H2=$4
@@ -36,6 +38,10 @@ for k in json.load(sys.stdin)['keys']:
 echo; echo "## heartbeat signed by the pulse key (signer = contract account)"
 echo "\$ $TX call-with-key $C <pulse-private-key> $C heartbeat '{\"token_id\":\"$TOKEN\"}' 10"
 $TX call-with-key "$C" "$PULSE_SK" "$C" heartbeat "{\"token_id\":\"$TOKEN\"}" 10
+
+echo; echo "## owner heartbeat: contract v2 requires exactly 1 yoctoNEAR on the owner's path (finding F)"
+$TX call "$OWNER" "$C" heartbeat "{\"token_id\":\"$TOKEN\"}" 10 || echo "(rejected without the yocto, as expected)"
+run $TX call "$OWNER" "$C" heartbeat "{\"token_id\":\"$TOKEN\"}" 10 1y
 
 echo; echo "## pulse key cannot call agent_pay (access-key scope, rejected before execution)"
 echo "\$ $TX call-with-key $C <pulse-private-key> $C agent_pay '{...}' 30"

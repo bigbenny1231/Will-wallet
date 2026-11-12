@@ -51,9 +51,21 @@ ensure_keeper() {
   KEEPER_CREATED=1
 }
 
-# set_keeper on the contract (only the contract owner may call it; here owner = contract account).
+# Make KEEPER_ACCOUNT_ID the contract keeper. Contract v2 takes the keeper in `new` (deploy.sh passes it), so this is
+# only needed when the keeper changes later. Who may call set_keeper (v2, finding C): the contract owner when that is a
+# separate account, or the current keeper (a hand-over). An owner that is the contract account itself cannot: that is
+# the locked design, where only the keeper can pass the role on.
 register_keeper() {
-  local c=$1
-  [ -f "keys/$c.json" ] || { echo "  (no keys/$c.json: ask the contract owner to call set_keeper {\"account_id\":\"$KEEPER_ACCOUNT_ID\"})"; return 0; }
-  node scripts/near-admin.mjs call "$c" "$c" set_keeper "{\"account_id\":\"$KEEPER_ACCOUNT_ID\"}" 30 | grep -E '^tx ' || true
+  local c=$1 cur owner
+  cur=$(node scripts/near-admin.mjs view "$c" get_config '{}' 2>/dev/null | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{const j=JSON.parse(s);console.log((j.keeper||"")+" "+(j.owner_id||j.owner||""))}catch{console.log(" ")}})')
+  owner=${cur#* }; cur=${cur%% *}
+  if [ "$cur" = "$KEEPER_ACCOUNT_ID" ]; then echo "  keeper is already $KEEPER_ACCOUNT_ID"; return 0; fi
+  if [ -n "$owner" ] && [ "$owner" != "$c" ] && [ -f "keys/$owner.json" ]; then
+    node scripts/near-admin.mjs call "$owner" "$c" set_keeper "{\"account_id\":\"$KEEPER_ACCOUNT_ID\"}" 30 | grep -E '^tx ' || true
+  elif [ -n "$cur" ] && [ -f "keys/$cur.json" ]; then
+    # hand-over by the current keeper
+    node scripts/near-admin.mjs call "$cur" "$c" set_keeper "{\"account_id\":\"$KEEPER_ACCOUNT_ID\"}" 30 | grep -E '^tx ' || true
+  else
+    echo "  (cannot set the keeper from here: the current keeper ${cur:-<none>} or a separate contract owner must call set_keeper {\"account_id\":\"$KEEPER_ACCOUNT_ID\"})"
+  fi
 }

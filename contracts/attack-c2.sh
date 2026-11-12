@@ -6,8 +6,10 @@
 # The attacker deploys contracts/tools/evil-dao (keeps the 1 NEAR step-4 bond, returns a promise that fails),
 # opens a vault with that "DAO", lets it trigger, runs the five steps and claims as the heir. On the old code the
 # vault got the bond back as well, and claim paid 1 NEAR more than the vault held, out of other vaults' NEAR.
-# Pass: after step 4 the vault balance is the step-3 balance minus the 1 NEAR bond, the claim pays only that,
-# and the attacker's three accounts end below where they started.
+# Pass: after step 4 the vault balance is the step-3 balance minus the 1 NEAR bond, the claim pays no more than the
+# vault's own balance after step 5, and the attacker's three accounts end below where they started. Contract v2
+# (finding L-9) releases the vault's unused storage deposit into its balance at step 5, so the step-5 balance may be
+# above the step-4 balance by at most the 0.1 NEAR storage fee taken at create_vault.
 # The attacker pokes and runs the steps (300 TGas each needs ~0.3 NEAR of balance); the heir only claims.
 # Keys for all three accounts must be in keys/<acct>.json (scripts/near-admin.mjs create).
 set -euo pipefail
@@ -62,15 +64,16 @@ A1=$(bal "$ATT"); H1=$(bal "$HEIR"); E1=$(bal "$EVIL"); C1=$(bal "$C")
 NET=$(python3 -c "print(($A1+$H1+$E1)-($A0+$H0+$E0))")
 echo
 echo "## result"
-echo "vault balance after step 3: $(near ${B[3]})  after step 4: $(near ${B[4]})  (bond 1 NEAR)"
+echo "vault balance after step 3: $(near ${B[3]})  after step 4: $(near ${B[4]})  (bond 1 NEAR)  after step 5: $(near ${B[5]})  (storage released)"
 echo "claim paid: $(near ${PAID:-0}) NEAR"
 echo "attacker + heir + dao, net: $(near $NET) NEAR"
 echo "contract account: $(near $C0) -> $(near $C1) NEAR"
-python3 - "${B[3]}" "${B[4]}" "${PAID:-0}" "$NET" <<'PY'
+python3 - "${B[3]}" "${B[4]}" "${B[5]}" "${PAID:-0}" "$NET" <<'PY'
 import sys
-b3, b4, paid, net = (int(x) for x in sys.argv[1:])
+b3, b4, b5, paid, net = (int(x) for x in sys.argv[1:])
 ONE = 10**24
-ok = (b3 - b4 == ONE) and (paid <= b4) and (net < 0)
+STORAGE_FEE = ONE // 10
+ok = (b3 - b4 == ONE) and (0 <= b5 - b4 <= STORAGE_FEE) and (paid <= b5) and (net < 0)
 print("C-2 drain: BLOCKED (bond not credited back, attacker lost money)" if ok else "C-2 drain: NOT BLOCKED or unexpected numbers")
 sys.exit(0 if ok else 1)
 PY

@@ -9,14 +9,18 @@
 # Target account: the argument, else DMW_CONTRACT from .env, else a new dmw-<rand>.testnet.
 # Accounts that do not exist yet are created through the testnet faucet (scripts/near-admin.mjs;
 # the key is saved to keys/<acct>.json, which is gitignored). A keeper account dmw-keeper-<rand>.testnet
-# is created too if .env has none, and registered on the contract with set_keeper.
+# is created too if .env has none and passed to `new` as keeper_id (contract v2). DMW_MPC_SIGNER overrides the
+# Chain Signatures contract (default v1.signer-prod.testnet).
+#
+# Contract v2 deploys and initialises in ONE transaction (DeployContract + new; `new` is #[private], finding G).
 #
 # Writes .env: NEAR_NETWORK, DMW_CONTRACT, DMW_CONTRACT_KEYFILE (a path, not the key), KEEPER_ACCOUNT_ID,
 # KEEPER_PRIVATE_KEY, BASE_RPC, SOLANA_RPC.
 #
 # Expect (~1-2 min with a warm cargo cache): build, faucet lines, a deploy tx link, an init tx link,
-# get_config, and finally "deployed dmw-xxxxxx.testnet". Re-running on an initialised account redeploys
-# the code and keeps the state.
+# get_config, and finally "deployed dmw-xxxxxx.testnet". Re-running on an account initialised by contract v2
+# redeploys the code and keeps the state. A v1 account (its get_config has no mpc_signer) is refused: v2 changed the
+# storage layout, so v2 code must go to a fresh account (NEW=1).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 . scripts/lib.sh
@@ -54,12 +58,17 @@ else
   [ -f "$WASM" ] || WASM=contracts/dmw/target/wasm32-unknown-unknown/release/dmw.wasm
 fi
 
-if $ADMIN view "$ACCOUNT" get_config '{}' >/dev/null 2>&1; then
+ensure_keeper
+if CFG=$($ADMIN view "$ACCOUNT" get_config '{}' 2>/dev/null); then
+  echo "$CFG" | grep -q '"mpc_signer"' || die "$ACCOUNT runs a v1 contract; v2 changed the storage layout. Deploy to a fresh account: NEW=1 make deploy"
   say "redeploying code to $ACCOUNT (already initialised, state is kept)"
   $ADMIN deploy "$ACCOUNT" "$WASM"
+  say "keeper"
+  register_keeper "$ACCOUNT"
 else
-  say "deploying to $ACCOUNT and calling new({owner_id: $OWNER})"
-  $ADMIN deploy "$ACCOUNT" "$WASM" "{\"owner_id\":\"$OWNER\"}"
+  INIT="{\"owner_id\":\"$OWNER\",\"keeper_id\":\"$KEEPER_ACCOUNT_ID\"${DMW_MPC_SIGNER:+,\"mpc_signer\":\"$DMW_MPC_SIGNER\"}}"
+  say "deploying to $ACCOUNT and calling new($INIT) in the same transaction"
+  $ADMIN deploy "$ACCOUNT" "$WASM" "$INIT"
 fi
 
 set_env NEAR_NETWORK testnet
@@ -71,10 +80,6 @@ if [ -f "keys/$ACCOUNT.json" ]; then
 fi
 set_env BASE_RPC "${BASE_RPC:-https://sepolia.base.org}"
 set_env SOLANA_RPC "${SOLANA_RPC:-https://api.devnet.solana.com}"
-
-ensure_keeper
-say "set_keeper $KEEPER_ACCOUNT_ID"
-register_keeper "$ACCOUNT"
 
 say "get_config"
 $ADMIN view "$ACCOUNT" get_config '{}'
