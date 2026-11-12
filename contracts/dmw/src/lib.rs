@@ -1199,7 +1199,7 @@ impl Contract {
             let short = need - v.storage_deposit;
             if v.balance >= short {
                 v.balance -= short;
-                v.storage_deposit += short;
+                v.storage_deposit = add_yocto(v.storage_deposit, short);
             } else {
                 require!(
                     !strict,

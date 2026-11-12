@@ -923,11 +923,15 @@ impl Contract {
                     .unwrap_or_else(|| env::panic_str("args.evm is required for an evm payout"));
                 let a = effective_evm_args(a, &v.foreign, i);
                 if has_sig {
-                    // Fees are capped per chain (validate_evm_args), so the u128 products are small.
+                    // Fees are capped per chain (validate_evm_args, just below), so real products
+                    // are small; saturating math keeps an absurd input from overflowing before that.
                     require!(
-                        a.max_fee_per_gas.0 * 100 >= track.max_fee_per_gas * EVM_FEE_BUMP_PCT
-                            && a.max_priority_fee_per_gas.0 * 100
-                                >= track.max_priority_fee_per_gas * EVM_FEE_BUMP_PCT,
+                        a.max_fee_per_gas.0.saturating_mul(100)
+                            >= track.max_fee_per_gas.saturating_mul(EVM_FEE_BUMP_PCT)
+                            && a.max_priority_fee_per_gas.0.saturating_mul(100)
+                                >= track
+                                    .max_priority_fee_per_gas
+                                    .saturating_mul(EVM_FEE_BUMP_PCT),
                         "re-sign of a signed evm payout must raise both fees by >= 10%"
                     );
                 }
