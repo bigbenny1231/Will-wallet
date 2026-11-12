@@ -81,10 +81,10 @@ No `.env`, keys or near-cli credentials are needed beforehand. `make deploy` cre
 git clone https://github.com/bigbenny1231/will-wallet deadmans-wallet && cd deadmans-wallet
 make check     # verify toolchain   -> "All good." (optional tools only warn)
 make build     # build the contract -> contracts/dmw/target/near/dmw.wasm and its code hash (about 1 min)
-make test      # unit tests         -> contract "105 passed", keeper "90 passed", dashboard "99 passed", agent "61 passed" (runs npm ci first)
+make test      # unit tests         -> contract "134 passed", keeper "91 passed", dashboard "108 passed", agent "62 passed" (runs npm ci first)
 make attacks   # offline attacks    -> "7 attacks, 0 escaped policy, worst bounded loss 1 NEAR" (no keys, no chain)
-make deploy    # faucet accounts    -> creates dmw-<rand>.testnet + dmw-keeper-<rand>.testnet, deploys, inits,
-               #                       calls set_keeper, writes .env, prints "deployed dmw-xxxxxx.testnet", ends with "next: make demo"
+make deploy    # faucet accounts    -> creates dmw-<rand>.testnet + dmw-keeper-<rand>.testnet, deploys and inits in one
+               #                       transaction (keeper passed to new), writes .env, prints "deployed dmw-xxxxxx.testnet", ends with "next: make demo"
 make demo      # live demo          -> see below (about 1.5 min)
 make kill      # owner disappears   -> follows the keeper until Settled (about 4 min)
 make stop      # stop the background pulse and keeper
@@ -226,9 +226,9 @@ until someone pokes it; the `guest-sweep` workflow does that every ten minutes f
 | The contract signs a Monad transaction | TESTNET_SMOKE.md vault 14, [step 3](https://testnet.nearblocks.io/txns/DFmmyrRWNTUdsn3KLXuoHfjuaAcMoY7c71i2EUN3p976): `v1.signer-prod.testnet` signs path `monad-14`; the stored tx decodes to chain id 10143 from the derived address `0x360D0232…0e13`. Relay is pending funding (the RPC answers `insufficient balance`) |
 | Denied agent payments are logged, not reverted | `agent_pay` returns `{allowed:false, reason}`; the tx succeeds; see TESTNET_SMOKE.md item 5 |
 | Settlement deletes the keys | TESTNET_SMOKE.md item 8, key list before/after |
-| The contract itself requests MPC signatures | `docs/chainsig-notes.md`: NEAR txs where `dmw` calls `v1.signer-prod.testnet.sign`. The probe contract `ecrecover`s the Base signature on-chain to the derived address; for `dmw` the signed Base tx recovers off-chain (viem) to the derived address |
+| The contract itself requests MPC signatures | `docs/chainsig-notes.md`: NEAR txs where `dmw` calls `v1.signer-prod.testnet.sign`. The probe contract `ecrecover`s the Base signature on-chain to the derived address; for the live `dmw` (v1) the signed Base tx recovers off-chain (viem) to the derived address. Contract v2 does the check on-chain before it stores a signature |
 | Step 4 files and ratifies a Sputnik proposal | TESTNET_SMOKE.md, last section: vault 10 on the replaced contract `dmw-x8cx.testnet` (same step-4 code apart from the C-2 callback fix), [`add_proposal` from the contract](https://testnet.nearblocks.io/txns/FAzezve68HDjUDsNzsb8qV7KnE6SNE8kVap6S5Hmkd6e), proposal 0 on `estate-82bd1f.sputnik-v2.testnet`, [approved and executed](https://testnet.nearblocks.io/txns/5y9hspPGwhmzfU2ivNggFQhPrTaHtznqpaB5dNcfBgeB) |
-| The live contract is this source | `view_account dmw-979268.testnet` → code hash **`6s9oqxvBZfhWncW6irGH6zXTebeYUKTHh1pk1WSDxjYH`**, the build of `contracts/release/dmw.wasm` (this tree, with the C-2 fix), deployed Nov 11 2026 ([deploy](https://testnet.nearblocks.io/txns/BVz6Aq7ggJv9yG4gPzaawJktkAzH8XaHHQHTnfctneWC)). The hash comes from rustc 1.97.0 and cargo-near 0.23.0 with `cargo near build non-reproducible-wasm`: two separate clones of this tree gave it (`docs/FINAL_REVIEW.md`), and `make build` prints it; another toolchain gives a different one. It is **not** a reproducible build: `contract_source_metadata` returns `link` but `build_info: null`. The contract's only full-access key was [deleted](https://testnet.nearblocks.io/txns/Ft71mPBybxUGtPnuzjHxPbBpHMywvdvf3ZhkbLen4Yiq) right after setup, so this code cannot change. The old `dmw-x8cx.testnet` still runs the pre-fix build `HAxzQkJd…`; its key is lost, so it was replaced, not upgraded |
+| The live contract is the v1 source | `view_account dmw-979268.testnet` → code hash **`6s9oqxvBZfhWncW6irGH6zXTebeYUKTHh1pk1WSDxjYH`**, the build of `contracts/release/dmw.wasm` (the v1 tree, commit 10eb479, with the C-2 fix; this branch's source is contract v2, not deployed yet, see [`docs/SECURITY_FIXES_V2.md`](docs/SECURITY_FIXES_V2.md)), deployed Nov 11 2026 ([deploy](https://testnet.nearblocks.io/txns/BVz6Aq7ggJv9yG4gPzaawJktkAzH8XaHHQHTnfctneWC)). The hash comes from rustc 1.97.0 and cargo-near 0.23.0 with `cargo near build non-reproducible-wasm`: two separate clones of this tree gave it (`docs/FINAL_REVIEW.md`), and `make build` prints it; another toolchain gives a different one. It is **not** a reproducible build: `contract_source_metadata` returns `link` but `build_info: null`. The contract's only full-access key was [deleted](https://testnet.nearblocks.io/txns/Ft71mPBybxUGtPnuzjHxPbBpHMywvdvf3ZhkbLen4Yiq) right after setup, so this code cannot change. The old `dmw-x8cx.testnet` still runs the pre-fix build `HAxzQkJd…`; its key is lost, so it was replaced, not upgraded |
 | The Will NFT holds funds and redraws itself | `nft_token {"token_id":"4"}` → `media` is an on-chain SVG data URI (grey, Settled) |
 
 ## How NEAR fits
@@ -273,8 +273,9 @@ For estate attorneys: [one-page PDF](docs/one-pager/attorney-one-pager.pdf) (sou
 | --- | --- | --- |
 | Pulse key (phone / agent loop) | call `heartbeat` on this contract, ≤ 1 NEAR of gas | move funds, add keys, change the plan |
 | Agent key | call `agent_pay` within per-tx cap, daily cap and allowlist while the vault is `Alive` | exceed policy, pay once the vault is in `Warning`, extend the owner's life |
-| Owner (NFT holder) | edit plan, add/remove keys, heartbeat, transfer the NFT while alive | act after `Triggered` |
-| Anyone / keeper | `poke` after the deadline, `execute_step`, relay signed foreign txs, `mark_broadcast` | change heirs, amounts, destinations; block settlement |
+| Owner (NFT holder) | edit plan, add/remove keys, heartbeat (v2: confirms 1 yoctoNEAR in the wallet), end a guardian pause (v2), transfer the NFT while alive (v2: only while `Alive`, and the buyer gets a reset vault) | act after `Triggered` |
+| Anyone / keeper | `poke` after the deadline, `execute_step`, relay signed foreign txs | change heirs, amounts, destinations; block settlement |
+| Operator (v2: contract keeper, vault keeper, owner, heirs) | `mark_broadcast`, `resign_foreign`, and sign a foreign payout in its first hour | the same as anyone else; after the first hour anyone can sign, so settlement cannot stall |
 | Estate DAO | execute the ratification call the proposal names | anything else on the vault |
 | Contract | hold the plan, request MPC signatures, delete its own keys | sign for a foreign chain before `Triggered` |
 | Contract FullAccess key (deployer) | redeploy the code, and so move any vault's funds | — this is a testnet trust assumption ([SECURITY_REVIEW](docs/SECURITY_REVIEW.md) I-1). Mainnet: remove the key or gate upgrades behind a DAO |
@@ -290,7 +291,12 @@ redeployed; the other Medium/Low items are documented with their mitigations. Ro
 found 1 Critical, 3 Medium, 14 Low: a vault's "DAO" could keep the step-4 bond and still have it credited back, paid
 out of other vaults' NEAR (C-2). It was reproduced on a private testnet copy and is fixed in the source and in
 `contracts/release/dmw.wasm`, with the three Mediums and 11 of the Lows. That build is the live contract,
-`dmw-979268.testnet` (row "The live contract is this source" above). Full findings:
+`dmw-979268.testnet` (row "The live contract is the v1 source" above). A fourth pass (Nov 12) found 2 Medium and
+several Low items (an overdue Will NFT could be sold and then poked by the seller, the keeper could not be rotated on
+the locked contract, log flooding, unauthenticated `mark_broadcast`, a silent owner heartbeat, a non-private `new`,
+predictable derivation paths and more). All are fixed in this source as contract v2, each with a regression test
+([`docs/SECURITY_FIXES_V2.md`](docs/SECURITY_FIXES_V2.md)). v2 is not deployed yet: the live v1 contract cannot be
+upgraded, so v2 needs a new account. Full findings:
 [`docs/SECURITY_REVIEW.md`](docs/SECURITY_REVIEW.md), [`docs/SECURITY_REVIEW_2.md`](docs/SECURITY_REVIEW_2.md),
 [`docs/SECURITY_REVIEW_3.md`](docs/SECURITY_REVIEW_3.md). The live tests of the same day, with their transactions, are in
 [`docs/FINAL_REVIEW.md`](docs/FINAL_REVIEW.md).
@@ -313,9 +319,9 @@ What happens when something or someone fails. Each line is how the deployed cont
 | The guardian loses their key or disappears | Nothing changes. The vault runs on the owner's heartbeat alone | The owner can name another with `set_guardian` |
 | The agent is prompt-injected or its key leaks | It can pay allowlisted receivers up to the daily cap, and burn its 1 NEAR gas allowance | Per-payment cap, daily cap, allowlist, disarmed in `Warning`, deleted in step II ([attack suite](agent/ATTACK_SUITE.md)) |
 | No keeper is running | An overdue vault waits. Nothing is lost | `poke` and `execute_step` are open to any account, and the poke pays a bounty |
-| The MPC network does not answer in step III | That payout is marked `failed` after 10 minutes and settlement moves on | `resign_foreign` can request the signature again |
+| The MPC network does not answer in step III | That payout is marked `failed` after 10 minutes and settlement moves on | `resign_foreign` can request the signature again (v2: by an operator, 5 minutes after the last request) |
 | A derived source address is unfunded | The payout stays `signed` and is never relayed. This is the state of every foreign payout on testnet today | The owner must fund the address while alive; the dashboard shows it |
-| An heir's account does not exist | That transfer fails and returns to the vault; the Will NFT holder (the heir with the largest share) can claim it after settlement. If the missing account is that primary heir, the Will NFT goes to the missing name too, and the remainder can only be claimed by whoever later controls that account | Name accounts that exist, or implicit accounts; the sole or largest heir must exist |
+| An heir's account does not exist | The dashboard warns when an heir account does not exist (v2 branch). That transfer fails and returns to the vault; the Will NFT holder (the heir with the largest share) can claim it after settlement. If the missing account is that primary heir, the Will NFT goes to the missing name too, and the remainder can only be claimed by whoever later controls that account | Name accounts that exist, or implicit accounts; the sole or largest heir must exist |
 | The owner loses their own NEAR key | Nobody can change the plan, and the vault settles to the heirs when the heartbeats stop | This is the product working, not a recovery path |
 | The deployer key is compromised | The contract can be replaced and every vault drained | A testnet trust assumption; see the security model |
 
@@ -373,6 +379,9 @@ The author leads no other hackathon project.
 - Testnet only; three foreign chains (Base, Monad, Solana). Foreign payouts are signed by the MPC network, but none has been relayed yet:
   relaying needs the derived source addresses funded, and the faucets require a human login.
 - Not a reproducible build: the live code hash matches `make build` only with the same toolchain (see the table above).
+- This source is contract v2 (the Nov 12 security fixes, [`docs/SECURITY_FIXES_V2.md`](docs/SECURITY_FIXES_V2.md)); the live
+  contract is v1 until v2 is deployed to a new account. v2 is a 612 KB unoptimised wasm here (no `wasm-opt` on the
+  build machine); `wee_alloc` was deliberately not added.
 - The live contract has no FullAccess key, so nobody can upgrade it, and nobody can fix it in place either: a bug fix means a new account and moving to it, as on Nov 11 2026. (The replaced `dmw-x8cx.testnet` kept its deployer key, which could have upgraded it and moved any vault's funds.)
 - Not a legal instrument. The product configures alongside a will or trust; see the FAQ on the site.
 - Once a vault is poked it cannot be stopped; there is no cancel window between the poke and step I.

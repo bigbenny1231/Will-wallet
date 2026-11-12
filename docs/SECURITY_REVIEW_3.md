@@ -1,5 +1,8 @@
 # Security review 3: whole repository, final pass before submission
 
+> **Update, contract v2 (Nov 12 2026, not deployed yet).** Several statements here describe v1 and changed in v2:
+> test counts are now contract 134, keeper 91, dashboard 108, agent 62; the C-2 rule (the step-4 bond is never credited back) is unchanged, and `contracts/attack-c2.sh` now also allows the step-5 storage release; the keeper is passed to `new` and can hand itself over on a locked contract; the K-1 rule (only a derived source address goes to the RPC) now prefers the derived address over any stored one. See [`SECURITY_FIXES_V2.md`](SECURITY_FIXES_V2.md). The live contract `dmw-979268.testnet` still runs v1.
+
 Done 2026-11-10 on commit `0348a3e` (the tree that was live on both Vercel deployments and, for the contract,
 code hash `HAxzQkJdB9fdJtVANeCrLr46ZZzy88VdLBD3pFE87pqZ` on `dmw-x8cx.testnet`). Three AI reviewers that did not
 write the code each read one area from scratch (contract; keeper, agent, scripts and workflows; dashboard and site),

@@ -1,5 +1,8 @@
 # Security review: `contracts/dmw`
 
+> **Update, contract v2 (Nov 12 2026, not deployed yet).** Several statements here describe v1 and changed in v2:
+> `mark_broadcast` and `resign_foreign` are now operator-only (contract keeper, vault keeper, owner, heirs) with a 5-minute cooldown on every re-sign; step-3 args come from an operator for the first hour of each payout and from anyone after that (the timeout fallback this review recommended for M-2); every EVM signature is ecrecovered on-chain against the derived key; derivation paths are salted per vault. See [`SECURITY_FIXES_V2.md`](SECURITY_FIXES_V2.md). The live contract `dmw-979268.testnet` still runs v1.
+
 Independent review of the Dead Man's Wallet vault contract (near-sdk 5.30, Rust), done 2026-11-07
 against SPEC.md (including §2.7) and every file in `contracts/dmw/src` (`lib.rs`, `foreign.rs`,
 `nft.rs`, `types.rs`, `tests.rs`). The reviewer did not write the code.
