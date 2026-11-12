@@ -10,8 +10,8 @@ dependencies. Design rules are in [`../DESIGN.md`](../DESIGN.md) (binding); ever
 | `js/hero.js` | "Hold to stop your heartbeat": 1.5 s press-and-hold (pointer, touch, Space; Enter starts at once), then an 11 s client-side simulation of example vault 0042 with invented, labelled hashes. "Who should it arrive to?" names the heir (localStorage key `dmw-heir`; never sent); the seal rim, the ledger and the last line use it. `?sim=run`, `?sim=settled`, `?heir=Maria` for screenshots |
 | `js/sealhost.js` | the hero seal: the SVG seal always (the accessible image and the fallback), the WebGL seal from `js/seal3d.bundle.js` over it when `<html data-seal3d="on">` and WebGL works. Pointer tilt on desktop; DeviceOrientation on phones after "Tilt the seal" (iOS permission). Both seals tilt |
 | `js/seal3d.bundle.js` | built by `node design/seal3d/build.mjs` from `design/seal3d/` (three.js, MIT). Contract: `createSeal3D(canvas, opts)` and `supportsWebGL()`. Loaded only after the first pointer, touch, key or scroll, so it never costs first paint (`?seal3d` loads it at once) |
-| `js/story.js` | "Vault 5, as it happened": the recorded run of vault 5 on `dmw-979268.testnet`, the v1 contract before the live one (11 Nov 2026, 04:25 to 04:30 UTC) as one vertical ECG line drawn by scroll. Events come from the run's keeper log, agent transcript and recording events (`ci/testnet-results`, run 42972214388), spaced by the time between them; every transaction link goes to the chain |
-| `js/graph.js` | "One estate, read live": showcase vault 1 on the live `dmw-885364.testnet` as a node graph (vault, chains, recipients) from read-only `get_vault` calls, polled every 30 s on screen; edges pulse on load and when `last_beat_ms` changes. Select a node for its detail. Also the vault count, vault 1's last beat and demo vault 5's five steps, read now (vault 5 from `dmw-979268.testnet`, where it ran) |
+| `js/story.js` | "Vault 4, as it happened": the recorded run of vault 4 on `dmw-885364.testnet` (12 Nov 2026, 19:31 to 19:43 UTC) as one vertical ECG line drawn by scroll. Events come from the run's keeper log, agent transcript and recording events (`ci/testnet-results`, run 43290509255), spaced by the time between them; every transaction link goes to the chain |
+| `js/graph.js` | "One estate, read live": showcase vault 1 on the live `dmw-885364.testnet` as a node graph (vault, chains, recipients) from read-only `get_vault` calls, polled every 30 s on screen; edges pulse on load and when `last_beat_ms` changes. Select a node for its detail. Also the vault count, vault 1's last beat and demo vault 4's five steps, read now |
 | `js/sound.js` | opt-in sound (nav "Sound: off"), WebAudio only: a two-burst thump per beat, one 220 Hz tone with a slow decay at flatline, silence after settlement. Hidden with reduced motion |
 | `js/quiz.js` | "Would your crypto arrive?": four single-tap questions scored in the page; the verdict is drawn as a 1200x630 card on a canvas ("Download card", PNG) and can be copied as text |
 | `js/seal.js` | SVG seal helpers (state, word, rim inscription with the heir, title), reduced-motion check, `dmw:*` events |
@@ -54,9 +54,11 @@ subset, OFL (licences in `fonts/`).
 
 ## Demo video
 
-`assets/demo-v4-720p.mp4` is the v4 cut (2:41, vault 5 on the v1 contract `dmw-979268.testnet`, 5.6 MB), made by `docs/video/tools/v4` in the
-`testnet` workflow (edit run 42972214388). It is committed so a git-triggered deploy serves it. `assets/poster-v4.jpg` is its
-frame at 0:18. The v3 cut (vault 17 on the replaced `dmw-x8cx.testnet`) is in git history.
+`assets/demo-v4-720p.mp4` is the v4 cut (2:50, vault 4 on `dmw-885364.testnet`, 5.7 MB), made by `docs/video/tools/v4` in the
+`testnet` workflow (run 43290509255); `assets/demo-v4-x-720p.mp4` is the 2:14 cut for X (4.8 MB). Both are committed so a
+git-triggered deploy serves them. `assets/poster-v4.jpg` is the 720p cut's frame at 0:18 (`ffmpeg -ss 18 -i
+assets/demo-v4-720p.mp4 -frames:v 1 -q:v 3 assets/poster-v4.jpg`). The earlier v4 cut (2:41, vault 5 on the v1 contract
+`dmw-979268.testnet`, edit run 42972214388) and the v3 cut (vault 17 on the replaced `dmw-x8cx.testnet`) are in git history.
 
 ## Configure
 

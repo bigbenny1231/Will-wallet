@@ -38,9 +38,9 @@ deployed and locked (`dmw-885364.testnet`, `docs/LIVE_CONTRACT.md`), so it can b
 }
 ```
 
-## 2. X demo post (pick one; attach `site/assets/demo-v4-x-720p.mp4`, the 2:15 cut, or `site/assets/demo-v4-720p.mp4`, 2:41, from a Premium account)
+## 2. X demo post (pick one; attach `site/assets/demo-v4-x-720p.mp4`, the 2:14 cut, or `site/assets/demo-v4-720p.mp4`, 2:50, from a Premium account)
 
-Both are the v4 cut, filmed on `dmw-979268.testnet` (v1, the live contract on Nov 11; replaced by `dmw-885364.testnet` on Nov 12). Do not attach any v3 file: it was filmed on the replaced `dmw-x8cx.testnet`.
+Both are the v4 cut of vault 4, filmed on the live contract `dmw-885364.testnet` (run 43290509255). Do not attach the earlier 2:41 / 2:15 files (vault 5 on the replaced v1 `dmw-979268.testnet`) or any v3 file (the replaced `dmw-x8cx.testnet`).
 
 Lengths use X's counting (a link is 23 characters whatever its length). Each is under 280.
 
@@ -79,7 +79,7 @@ What would you test next?
 
 Each one shows the complete action in the video: a vault that is Alive, a stopped pulse, and five settlement steps to
 Settled. Variant A is the agent story (the Security track), B the heir story (the NFT and Open tracks), C the attack.
-X accepts 2:20 on a standard account and 10 minutes on Premium: the 2:15 cut fits either; the 2:41 cut needs Premium.
+X accepts 2:20 on a standard account and 10 minutes on Premium: the 2:14 cut fits either; the 2:50 cut needs Premium.
 
 ## 3. Thread, days 1 to 3 (technical)
 
@@ -152,7 +152,7 @@ curl -sI $DASH | head -1                             # 200
 curl -sI $DASH/vault/6 | head -1                     # 200 (SPA rewrite)
 curl -sI $DASH/pulse | head -1                       # 200
 curl -sI $SITE/assets/demo-v4-720p.mp4 | head -1        # 200 (the v4 cut, committed)
-ffprobe -v error -show_entries format=duration -of csv=p=0 site/assets/demo-v4-720p.mp4   # 160.99 (v4, vault 5 on dmw-979268.testnet (v1), 5.6 MB)
+ffprobe -v error -show_entries format=duration -of csv=p=0 site/assets/demo-v4-720p.mp4   # 170.18 (v4, vault 4 on dmw-885364.testnet, 5.7 MB)
 
 # 4. NEP-330 link check
 curl -s https://rpc.testnet.fastnear.com -H 'content-type: application/json' -d '{"jsonrpc":"2.0","id":1,"method":"query","params":{"request_type":"call_function","finality":"final","account_id":"dmw-885364.testnet","method_name":"contract_source_metadata","args_base64":"e30="}}' \
@@ -167,8 +167,8 @@ curl -sI https://github.com/bigbenny1231/will-wallet/tree/hackathon-submission |
 # full-access key, so it cannot change.
 
 # 5. the video
-ffprobe -v error -show_entries format=duration,size -of csv=p=0 site/assets/demo-v4-720p.mp4 site/assets/demo-v4-x-720p.mp4   # 160.99 / 134.72 s
-#   the 2:15 cut fits X's 2:20 limit for a standard account; the 2:41 cut needs Premium
+ffprobe -v error -show_entries format=duration,size -of csv=p=0 site/assets/demo-v4-720p.mp4 site/assets/demo-v4-x-720p.mp4   # 170.18 / 134.34 s
+#   the 2:14 cut fits X's 2:20 limit for a standard account; the 2:50 cut needs Premium
 
 # 6. the showcase vault (nothing is relayed until its addresses hold funds)
 cd keeper && DMW_CONTRACT=dmw-885364.testnet npm run derive -- --token 1   # Base 0x7F98...3f3b, Monad 0xa8fd...4b91, Solana CPRM...hZdc

@@ -2,14 +2,61 @@
 
 ## v4 (current)
 
-`site/assets/demo-v4-720p.mp4` (1280x720, 2:41, 5.6 MB) and the 1920x1080 master, plus `site/assets/demo-v4-x-720p.mp4`
-(2:15, for X, whose standard accounts take up to 2:20). Same story, stage, captions and cards as v3, filmed on
-`dmw-979268.testnet`, the live contract on Nov 11 2026 (v1; replaced on Nov 12 by `dmw-885364.testnet`, see
-`docs/LIVE_CONTRACT.md`), because v3's contract, `dmw-x8cx.testnet`, runs the code with finding C-2 and was replaced. Recorded by the `testnet` workflow (run 42958682328, Nov 11 2026, 04:25 to 04:30 UTC) and
-cut by its edit task (run 42972214388) from the raw footage; logs, EDL and stills are on the `ci/testnet-results` branch.
+`site/assets/demo-v4-720p.mp4` (1280x720, 2:50, 170.2 s, 5.7 MB) and the 1920x1080 master, plus
+`site/assets/demo-v4-x-720p.mp4` (2:14, 134.3 s, 4.8 MB, for X, whose standard accounts take up to 2:20). Same story, stage,
+captions and cards as v3, filmed on the live contract `dmw-885364.testnet` (contract v2, `docs/LIVE_CONTRACT.md`).
+Recorded and cut by the `testnet` workflow (run 43290509255, Nov 12 2026, 19:31 to 19:43 UTC) from the raw footage; logs,
+EDLs (`edl.txt`, `edl-x.txt`), captions, events and stills are on the `ci/testnet-results` branch under
+`results/43290509255/`. It replaces the first v4 recording (vault 5 on the v1 contract, below).
 
 Nothing is mocked and nothing is patched. Idle stretches play at 3x to 16x and are marked on screen; the dashboard showed
-no RPC banner during this run, so no stretch is cut. The cut is computed from the run's own events (`autoedl.mjs`).
+no RPC banner during this run, so no stretch is cut. The cut is computed from the run's own events (`autoedl.mjs`). The
+nine minutes between Warning and the poke (the guardian's pause held the deadline to 19:42:33) play at 16x.
+
+### The run (vault 4)
+
+Owner `dmw-demo-owner-0d86db.testnet`, heirs Sarah (`dmw-demo-sarah-2667.testnet`) 60 % and Ben (`dmw-demo-ben-2667.testnet`)
+40 %, agent allowlist `dmw-demo-api-2667.testnet`, guardian `dmw-demo-guardian-2667.testnet` (max pause 600 s), 60 s
+interval, grace 1. The contract keeper's key is gone (`docs/LIVE_CONTRACT.md`), so the owner named the demo keeper
+`dmw-keeper-bc6af4.testnet` as vault 4's keeper with `set_vault_keeper`; it poked the vault and ran the steps.
+
+| Time (UTC) | What happens | Proof |
+| --- | --- | --- |
+| setup | `make demo`: create_vault (4 NEAR), set_vault_keeper, CLI pulse key and agent key, Base + Solana payouts, the agent-demo allowed/denied pair; then `tools/v4/setup.sh`: a 1.5 NEAR deposit, the phone's pulse key, Base + Monad + Solana payouts and the guardian | [create_vault](https://testnet.nearblocks.io/txns/BKgEmaqNg4b2QVVCpSF2C7ZemJbZsUzAPfYJhyqaTEMu), [set_vault_keeper](https://testnet.nearblocks.io/txns/2AKYGnZBwr1tvWJJ8KwHxRVDVzDthyVLeFAGHcoRZsmU), [pulse key](https://testnet.nearblocks.io/txns/4SsAFHFWrRPe3i9jSzGfFoe9tQpRmZ2FTLGoqRtX17sg), [agent key](https://testnet.nearblocks.io/txns/GVaT54JAQ7FXRbUcK95DNYUZkfEznyGWS8c5vAxEvHAy), [Base + Solana payouts](https://testnet.nearblocks.io/txns/2SDNtH9zD7GhmbPAfVsSruvKEkwMzXgzFkBwCojDSKaJ), [allowed](https://testnet.nearblocks.io/txns/9zuCxuiz1akKL2aaj6XASCxw2jkWdqa4oSidEW8orRk5), [denied](https://testnet.nearblocks.io/txns/C2hsbdtzBLx6VWmk66J5XQRrnsCthBMf7ZfgQsXZkZTg), [deposit](https://testnet.nearblocks.io/txns/567LbmF1VceBGK1nD8dYyZ4N1pdu7LaL7J9oaExYqY17), [phone key](https://testnet.nearblocks.io/txns/GCAueShuBtGYELg2zUXKLuh8j2kQxa1u33N2nD9Nh58V), [three payouts](https://testnet.nearblocks.io/txns/E1csn16ctFAaLnMdfGpbjH6fa1hmbgF3Gmf34a6bqmY4), [guardian](https://testnet.nearblocks.io/txns/7yacvH79n9JwWT27gk1hNriHTPooGbaqBA7waYbYmiHf) |
+| 19:31:00 to 19:33:12 | the phone beats about every 20 s (heartbeats signed in the browser with the phone key) | phone page, dashboard |
+| 19:31:57 | `make agent` (scripted brain): INV-2041, 0.12 NEAR, allowed | [tx](https://testnet.nearblocks.io/txns/GiBg2hTapA1uMu39Wv9YJoCKHqqHXKiGtEio8PMwTLEA) |
+| 19:32:00 | INV-2042, 0.08 NEAR, allowed | [tx](https://testnet.nearblocks.io/txns/FZj6GKDAcnzL4AkWfA8bzWjvuvnfw87oNmKo7KyinsPj) |
+| 19:32:00 | the brain obeys the planted injection (2.45 NEAR to `stranger.testnet`); the wallet wrapper refuses, nothing signed | agent ledger (no tx exists) |
+| 19:32:08 | run 2, wrapper checks off: the contract denies 2.25 NEAR, `receiver_not_allowlisted`, logged | [tx](https://testnet.nearblocks.io/txns/BdAe16wBKJdoiNWZVntmusJjEckiyFvatwzsBZBdybRJ) |
+| 19:32:34 | the guardian pauses: the deadline moves from 19:34:27 to 19:42:33 (`paused` event, `paused_until_ms` 1794512553117) | event in the run's `events.json`; the logs keep only the tail of this tx hash, so no link |
+| 19:33:15 | hold to stop on the phone; last beat 19:33:12 | phone page |
+| 19:34:15 | the keeper sees Warning | keeper ledger |
+| 19:42:38 | the vault keeper pokes: Triggered, 0.05 NEAR bounty | [poke](https://testnet.nearblocks.io/txns/4aobfntQWvsB4FUhSaQtvxNFvNMKNCcuCod9n8mPXHAE) |
+| 19:42:42 | step I: heirs paid on NEAR, 60 / 40 | [step 1](https://testnet.nearblocks.io/txns/GfRYEWBSYKTgWwqjPFEXykxFvPvPzBb9dAXH6fe7KTiw) |
+| 19:42:46 | step II: pulse and agent keys deleted | [step 2](https://testnet.nearblocks.io/txns/2pUzmF1psUBL1FZAdkvqMaSAZkwuYHhfNcQLynTE1Qfi) |
+| 19:42:55 / 19:43:05 / 19:43:14 | step III: Base, Monad, Solana payouts signed by MPC | [Base](https://testnet.nearblocks.io/txns/2C5g8gQDjYkfvjHy9S9dtM6YnQneSNXBTHyDwS3vf2nh), [Monad](https://testnet.nearblocks.io/txns/3VrfD3FMJiRvFC6JUyh7JvkXERDxY1yJxH339z2RBCW8), [Solana](https://testnet.nearblocks.io/txns/FRz14Qnf78CCUXKaqXRRuZittY6JinV5FxDS8Eo6ULzA) |
+| 19:43:18 | step IV: no estate DAO on vault 4, skipped | [step 4](https://testnet.nearblocks.io/txns/8YjhLkVxGmXy1wfHDeu9hT31fDAZp246c1eyDPivtsGi) |
+| 19:43:33 | step V: Will NFT to `dmw-demo-sarah-2667.testnet`; Settled (the keeper's first step-5 transaction expired at 19:43:19 and it retried) | [step 5](https://testnet.nearblocks.io/txns/4KtyRoV1yMQMkEBQFPWUVjaFaf3BiQHUken68jAFWLJ7) |
+
+The foreign payouts are signed by MPC but not broadcast: the derived source addresses are unfunded, so the caption says
+"signed; relay pending funding".
+
+### How it was made
+
+`tools/v4`, run by `.github/workflows/testnet.yml` (task `record`/`finish` films, task `edit` re-cuts from the raw-footage
+artifact): `setup.sh` builds the vault, `record.sh` serves a production dashboard build and the stage, `run.mjs` drives the
+run with no manual steps and logs every story moment to `events.json`, `autoedl.mjs` builds the cut from those events
+(beats at 1x, fast stretches marked, RPC-banner stretches cut, captions held long enough to read), `assets.mjs` renders the
+cards and captions from HTML with the self-hosted fonts, and `cut.mjs` cuts and overlays in ffmpeg. The X cut is the same
+footage cut shorter (window scale 0.65, 134.3 s).
+
+## v4, first recording (vault 5 on the v1 contract, history)
+
+The first v4 cut (2:41, 5.6 MB, and a 2:15 X cut) was filmed on `dmw-979268.testnet`, the live contract on Nov 11 2026
+(v1; replaced on Nov 12 by `dmw-885364.testnet`), because v3's contract, `dmw-x8cx.testnet`, runs the code with finding
+C-2. Recorded by the `testnet` workflow (run 42958682328, Nov 11 2026, 04:25 to 04:30 UTC) and cut by its edit task (run
+42972214388); logs, EDL and stills are on the `ci/testnet-results` branch. The files are in git history; the cut above
+replaced them on the site. Nothing was mocked, and no stretch was cut.
 
 ### The run (vault 5)
 
@@ -34,15 +81,6 @@ phone pulse key, Base + Monad + Solana payouts and the guardian `dmw-demo-guardi
 | 04:29:52 / 04:30:00 / 04:30:10 | step III: Base, Monad, Solana payouts signed by MPC; relay pending funding | [Base](https://testnet.nearblocks.io/txns/2LowT3BxTG6FwMc9XoSfdXUDfJHCGhBNrxAbPJj1p2FZ), [Monad](https://testnet.nearblocks.io/txns/Deh6BcXrce9QxvysidGMpnQDBbGXSnufQSCrqF5CQmUY), [Solana](https://testnet.nearblocks.io/txns/5742KpKeQCHCVKavo8pRnyh95HEzNx1zErbrVRjBwHfX) |
 | 04:30:14 | step IV: no estate DAO on vault 5, skipped | [step 4](https://testnet.nearblocks.io/txns/8v3opWesMmGkcKLSBbsYE7Ryut6H5Zz3LGiFdqhSQW3r) |
 | 04:30:17 | step V: Will NFT to `dmw-demo-sarah-fb6b.testnet`; Settled at 04:30:18 | [step 5](https://testnet.nearblocks.io/txns/8Cr3SCgTscu3s1ykhKe17dPs4FBZsjXDi5uwDwpJSyuk) |
-
-### How it was made
-
-`tools/v4`, run by `.github/workflows/testnet.yml` (task `record`/`finish` films, task `edit` re-cuts from the raw-footage
-artifact): `setup.sh` builds the vault, `record.sh` serves a production dashboard build and the stage, `run.mjs` drives the
-run with no manual steps and logs every story moment to `events.json`, `autoedl.mjs` builds the cut from those events
-(beats at 1x, fast stretches marked, RPC-banner stretches cut, captions held long enough to read), `assets.mjs` renders the
-cards and captions from HTML with the self-hosted fonts, and `cut.mjs` cuts and overlays in ffmpeg. The X cut is the same
-footage cut to a 132 s target.
 
 ## v3 (on the replaced contract)
 

@@ -12,7 +12,9 @@ run this after editing anything in design/ and commit the result.
 - exports the mark (design/logo.svg): inlined between <!-- mark --> markers (nav, footer), site/assets/favicon.svg,
   favicon-32.png, apple-touch-icon.png, and dashboard/public/icons (same file names and sizes as before)
 
-The demo video is committed as site/assets/demo-v4-720p.mp4 (the v4 cut, 2:41, about 5.6 MB):
+The demo video is committed as site/assets/demo-v4-720p.mp4 (the v4 cut, 2:50, about 5.7 MB) and
+site/assets/demo-v4-x-720p.mp4 (2:14, for X): both are copied as they are from the testnet workflow's video output
+(docs/video/tools/v4, run 43290509255), with no re-encode. The older re-encode step, from the v3 file, was:
   ffmpeg -i docs/video/dmw-demo-v3-720p.mp4 -an -c:v libx264 -preset slow -crf 30 -tune stillimage \
          -pix_fmt yuv420p -movflags +faststart -r 24 site/assets/demo-v4-720p.mp4
 """

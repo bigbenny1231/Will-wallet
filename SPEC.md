@@ -362,7 +362,7 @@ Design: dark, calm, one accent; large type (recorded at 125%). No marketing copy
 
 ## 5. Site: `site/` (static, no build step to serve: `index.html` + `styles.css` + ES modules in `js/`, self-hosted fonts, no CDN, no Tailwind; the WebGL seal `js/seal3d.bundle.js` is three.js bundled by `design/seal3d/build.mjs`)
 
-> The paragraph below is the original brief. The shipped page (v4) has: the hold-to-stop hero, a trust strip, the vault 5
+> The paragraph below is the original brief. The shipped page (v4) has: the hold-to-stop hero, a trust strip, the vault 4
 > story, "run one yourself" (links to the dashboard's `/try`), the live estate graph of vault 1, the demo video, the quiz,
 > a builders section, the heir claim band, the security model, the attorney section, the FAQ and a "follow mainnet" link
 > to GitHub releases (there is no waitlist backend). `site/README.md` lists the modules.

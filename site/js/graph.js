@@ -1,25 +1,23 @@
 // Live estate graph: vault 1 on dmw-885364.testnet (the showcase vault), read with read-only JSON-RPC `query` calls (no keys, no writes).
 // Vault -> chains -> who receives what at settlement. Edges pulse on load and whenever the chain reports a new
 // heartbeat (polled every 30 s while the section is on screen). Also the live facts kept from v3: the vault count,
-// vault 1's last beat, and the demo vault's (5) five settlement steps as read now. The demo vault is the recorded v4 run on
-// the v1 contract dmw-979268.testnet, so it is read there; switch DEMO_CONTRACT and DEMO when a run on the live contract lands.
+// vault 1's last beat, and the demo vault's (4) five settlement steps as read now.
 import { emit, reducedMotion } from './seal.js';
 
 const CONTRACT = 'dmw-885364.testnet';
 const SHOWCASE = '1';   // keeper/SHOWCASE.md
-const DEMO = '5';       // the recorded run (docs/video/README.md v4, docs/LIVE_CONTRACT.md)
-const DEMO_CONTRACT = 'dmw-979268.testnet';   // where that run happened (v1, replaced by CONTRACT)
+const DEMO = '4';       // the recorded run (docs/video/README.md v4, docs/LIVE_CONTRACT.md)
 const RPCS = ['https://rpc.testnet.fastnear.com', 'https://rpc.testnet.near.org'];
 const NEARBLOCKS = 'https://testnet.nearblocks.io/txns/';
 const POLL_MS = 30000;
 
 // Settlement transactions of the demo vault, from the recorded run's keeper log (docs/video/README.md, v4).
 const V17_TX = {
-  step_1: ['2z5qMVsTmKmePkiWL8Kx4rPRzRo1homBMkb8dKMhxHzu'],
-  step_2: ['J2DjZKJPT92P7p21uwUaKdLtuFYmZD8kmm2Axe7TUTwa'],
-  step_3: ['2LowT3BxTG6FwMc9XoSfdXUDfJHCGhBNrxAbPJj1p2FZ', 'Deh6BcXrce9QxvysidGMpnQDBbGXSnufQSCrqF5CQmUY', '5742KpKeQCHCVKavo8pRnyh95HEzNx1zErbrVRjBwHfX'],
-  step_4: ['8v3opWesMmGkcKLSBbsYE7Ryut6H5Zz3LGiFdqhSQW3r'],
-  step_5: ['8Cr3SCgTscu3s1ykhKe17dPs4FBZsjXDi5uwDwpJSyuk'],
+  step_1: ['GfRYEWBSYKTgWwqjPFEXykxFvPvPzBb9dAXH6fe7KTiw'],
+  step_2: ['2pUzmF1psUBL1FZAdkvqMaSAZkwuYHhfNcQLynTE1Qfi'],
+  step_3: ['2C5g8gQDjYkfvjHy9S9dtM6YnQneSNXBTHyDwS3vf2nh', '3VrfD3FMJiRvFC6JUyh7JvkXERDxY1yJxH339z2RBCW8', 'FRz14Qnf78CCUXKaqXRRuZittY6JinV5FxDS8Eo6ULzA'],
+  step_4: ['8YjhLkVxGmXy1wfHDeu9hT31fDAZp246c1eyDPivtsGi'],
+  step_5: ['4KtyRoV1yMQMkEBQFPWUVjaFaf3BiQHUken68jAFWLJ7'],
 };
 const STEP_LABEL = {
   step_1: ['I', 'Heirs paid on NEAR'],
@@ -37,10 +35,10 @@ const CHAIN = {
   solana: { name: 'Solana', net: 'Solana devnet', unit: 'SOL', dec: 9 },
 };
 
-async function view(method, args, account = CONTRACT) {
+async function view(method, args) {
   const body = JSON.stringify({
     jsonrpc: '2.0', id: 'dmw-site', method: 'query',
-    params: { request_type: 'call_function', finality: 'final', account_id: account, method_name: method, args_base64: btoa(JSON.stringify(args)) },
+    params: { request_type: 'call_function', finality: 'final', account_id: CONTRACT, method_name: method, args_base64: btoa(JSON.stringify(args)) },
   });
   let last;
   for (const url of RPCS) {
@@ -119,7 +117,7 @@ export async function init() {
     [supply, v6, v17] = await Promise.all([
       view('nft_total_supply', {}),
       view('get_vault', { token_id: SHOWCASE }),
-      view('get_vault', { token_id: DEMO }, DEMO_CONTRACT),
+      view('get_vault', { token_id: DEMO }),
     ]);
   } catch (e) {
     console.warn('estate graph: RPC failed', e);
