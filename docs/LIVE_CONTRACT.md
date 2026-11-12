@@ -3,9 +3,8 @@
 `dmw-885364.testnet` runs contract v2 and replaces `dmw-979268.testnet`. The contract was hardened after a fourth
 review pass ([`SECURITY_FIXES_V2.md`](SECURITY_FIXES_V2.md)); `dmw-979268.testnet` runs v1, has no full-access key and
 could not be upgraded, and v2 changes the storage layout, so v2 went to a new account. Older records stay as history:
-the `dmw-979268.testnet` runs are summarised [at the end of this file](#before-this-dmw-979268testnet-v1), and every
-older record in `docs/`, `contracts/TESTNET_SMOKE.md`, `keeper/LIVE_RUN.md` and `agent/LIVE_TRANSCRIPT.md` is from
-`dmw-x8cx.testnet`, the contract before that.
+the `dmw-979268.testnet` runs are summarised [at the end of this file](#before-this-dmw-979268testnet-v1), and the
+records of `dmw-x8cx.testnet`, the contract before that, are in [`docs/history/`](history/README.md).
 
 Everything below was done by the repository's own `testnet` workflow ([`.github/workflows/testnet.yml`](../.github/workflows/testnet.yml)),
 run by the author from the Actions tab. Every account is a throwaway testnet faucet account whose key existed only on the
@@ -96,17 +95,19 @@ Result: attacker, heir and "DAO" together **-0.0355 NEAR**; the contract account
 no other vault paid for anything. The script ends with
 `C-2 drain: BLOCKED (bond not credited back, attacker lost money)`, and fails the workflow otherwise.
 
-## The contract keeper (an honest caveat)
+## The hosted keeper
 
-`new` named `dmw-keeper-2f6dcb.testnet` as the contract keeper. Its key existed only on the CI runner and is gone, and on
-a locked contract only the current keeper can hand the role over (`set_keeper`), so the global keeper of
-`dmw-885364.testnet` can never act again. Vaults are not stuck because of it:
+The repository's `keeper` workflow ([`.github/workflows/keeper.yml`](../.github/workflows/keeper.yml)) runs every 10
+minutes. A read-only view call checks for vaults that are past their deadline or Triggered; when there is one, the
+keeper pokes it and runs its steps until nothing is due, relays any signed foreign payout and records its hash with
+`mark_broadcast`. It signs as the contract keeper: a long-lived `dmw-keeper-<8 hex>.testnet` account whose key is
+derived on the runner from the repository secret `KEEPER_SEED` (`node scripts/near-admin.mjs derive-keeper`), and it
+tops itself up from the faucet. Details: [`keeper/README.md`](../keeper/README.md#hosted-keeper).
 
-- a vault owner can name a per-vault keeper with `set_vault_keeper` (1 yoctoNEAR), who is an operator for that vault;
-- the vault owner and every heir are operators too, and heirs can run the steps;
-- step III is open to anyone once its 1-hour operator window has passed (`step3_open_after_ms` 3600000 in `get_config`).
-
-The demo video run uses `set_vault_keeper` for exactly this reason.
+Vaults do not depend on any one keeper: a vault owner can also name a per-vault keeper with `set_vault_keeper`
+(1 yoctoNEAR), the vault owner and every heir are operators and can run the steps, `poke` and `execute_step` are open
+to any account, and step III is open to anyone once its 1-hour operator window has passed (`step3_open_after_ms`
+3600000 in `get_config`).
 
 ## The demo video, vault 4 (run 43290509255)
 
@@ -116,8 +117,8 @@ run of vault 4 on this contract, Nov 12 2026, from the phone's first beat at 19:
 40 %; agent allowlist `dmw-demo-api-2667.testnet`; guardian `dmw-demo-guardian-2667.testnet` (max pause 600 s); 60 s
 interval, grace 1. How it was filmed and cut: [`docs/video/README.md`](video/README.md) (v4).
 
-**Vault keeper.** The contract keeper's key is gone (see above), so the owner named the demo keeper
-`dmw-keeper-bc6af4.testnet` as vault 4's keeper with `set_vault_keeper`. That keeper poked the vault and ran the five steps.
+**Vault keeper.** The owner named the demo keeper `dmw-keeper-bc6af4.testnet` as vault 4's keeper with
+`set_vault_keeper`. That keeper poked the vault and ran the five steps.
 
 | Time (UTC) | What happens | Proof |
 | --- | --- | --- |
@@ -135,12 +136,13 @@ interval, grace 1. How it was filmed and cut: [`docs/video/README.md`](video/REA
 | 19:42:46 | step II: pulse and agent keys deleted | [step 2](https://testnet.nearblocks.io/txns/2pUzmF1psUBL1FZAdkvqMaSAZkwuYHhfNcQLynTE1Qfi) |
 | 19:42:55 / 19:43:05 / 19:43:14 | step III: Base, Monad, Solana payouts signed by MPC | [Base](https://testnet.nearblocks.io/txns/2C5g8gQDjYkfvjHy9S9dtM6YnQneSNXBTHyDwS3vf2nh), [Monad](https://testnet.nearblocks.io/txns/3VrfD3FMJiRvFC6JUyh7JvkXERDxY1yJxH339z2RBCW8), [Solana](https://testnet.nearblocks.io/txns/FRz14Qnf78CCUXKaqXRRuZittY6JinV5FxDS8Eo6ULzA) |
 | 19:43:18 | step IV: no estate DAO on vault 4, skipped | [step 4](https://testnet.nearblocks.io/txns/8YjhLkVxGmXy1wfHDeu9hT31fDAZp246c1eyDPivtsGi) |
-| 19:43:33 | step V: Will NFT to `dmw-demo-sarah-2667.testnet`; Settled (the keeper's first step-5 transaction expired at 19:43:19 and it retried) | [step 5](https://testnet.nearblocks.io/txns/4KtyRoV1yMQMkEBQFPWUVjaFaf3BiQHUken68jAFWLJ7) |
+| 19:43:33 | step V: Will NFT to `dmw-demo-sarah-2667.testnet`; Settled | [step 5](https://testnet.nearblocks.io/txns/4KtyRoV1yMQMkEBQFPWUVjaFaf3BiQHUken68jAFWLJ7) |
 
-**Relay.** The three foreign payouts are signed by NEAR's MPC network but none was broadcast: the derived source
-addresses (Base `0xe2DA1a2b7CF1EdB54b9234E270B0F24B26905c06`, Monad `0x708301D9e44e23ea9B11BE8558E4B4F638B4E457`, Solana
-`7PCGhe8EusakbHbdSREM7RAkDfRJLUvpqC8548qhUQg7`) are unfunded, so each stays `signed` and the keeper retries once they hold
-funds. The video's caption says the same: "signed; relay pending funding".
+**Relay.** The three foreign payouts are signed by NEAR's MPC network in step III. A keeper relays each signed
+transaction from its derived source address (Base `0xe2DA1a2b7CF1EdB54b9234E270B0F24B26905c06`, Monad
+`0x708301D9e44e23ea9B11BE8558E4B4F638B4E457`, Solana `7PCGhe8EusakbHbdSREM7RAkDfRJLUvpqC8548qhUQg7`) once the address
+holds the value and the fee, and records the hash on the vault with `mark_broadcast`; the vault page then links each
+payout to its explorer.
 
 ## Before this: `dmw-979268.testnet` (v1)
 

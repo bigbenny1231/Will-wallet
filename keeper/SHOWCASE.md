@@ -1,8 +1,8 @@
 # Showcase vault
 
 Live on testnet, contract `dmw-885364.testnet` (since Nov 12 2026; see [`docs/LIVE_CONTRACT.md`](../docs/LIVE_CONTRACT.md)).
-The vault is **Alive** and is **not** triggered; nothing is running against it. Dashboard route: `/vault/1`. The site's
-live estate graph reads it.
+The vault is **Alive**; the project's hosted keeper sends its heartbeat. Dashboard route: `/vault/1`. The site's live
+estate graph reads it.
 
 | | |
 | --- | --- |
@@ -10,7 +10,7 @@ live estate graph reads it.
 | Owner | `dmw-andrew-13bf.testnet` (a throwaway account made by the `testnet` workflow; its key never left the runner) |
 | Heirs | `dmw-sarah-13bf.testnet` 6000 bps (primary, gets the Will NFT), `dmw-ben-13bf.testnet` 4000 bps |
 | Agent allowlist | `dmw-api-13bf.testnet` |
-| Timing | 60-day interval (5,184,000 s), grace 1, from Nov 12 2026: Warning from about Jan 11 2027, poke legal from about Mar 12 2027. The owner key is gone, so nobody will beat again; it is a fixed exhibit |
+| Timing | 60-day interval (5,184,000 s), grace 1 |
 | Balance | 5 NEAR (+0.1 storage) |
 | Policy | per_tx_max 0.5 NEAR, daily_max 1 NEAR, allowlist `[dmw-api-13bf.testnet]` |
 | Bounty | 0.05 NEAR |
@@ -22,12 +22,11 @@ Setup transactions: [create_vault](https://testnet.nearblocks.io/txns/2LDbKGY6tV
 [set_foreign_payouts](https://testnet.nearblocks.io/txns/3M5rJw47q9zRghyZPQSJTLr2LekjtWKs1CYjkotwNY3i)
 (`scripts/showcase.sh`, run by the `testnet` workflow, run 43288158721).
 
-## Source addresses a human can fund (faucets need a login)
+## Source addresses
 
 The MPC-derived source addresses for vault 1. Contract v2 salts each vault's derivation paths (`get_vault` returns them
-as `derivation_paths`). No private key exists for these addresses; the contract
-asks the signer at settlement. Without funds the signed transactions are produced (status `signed`) but the relay says
-insufficient funds.
+as `derivation_paths`). No private key exists for these addresses; the contract asks the signer at settlement, and a
+keeper relays each signed transaction from its address once the address holds the value and the fee.
 
 | Chain | Address | Send at least | Faucet | Explorer |
 | --- | --- | --- | --- | --- |
@@ -44,13 +43,8 @@ Re-check any time: `cd keeper && DMW_CONTRACT=dmw-885364.testnet npm run derive 
 ## Heir-controlled recipient addresses
 
 The Base and Monad payouts go to `0xfd151ad02f573689f235f56059ce6e2f3b64dd89` and the Solana payout to
-`HpEHvLpa9pMNiDCQDnVMSomCx4bmJuXX8sKqtKGg2uWr`, fresh keypairs held by the demo heir ("Sarah") since Nov 7 2026 (the
-same recipients as the earlier showcase vault 6 on `dmw-x8cx.testnet`). Earlier recipients were MPC-derived addresses
-nobody holds a key for (on-chain audit F-3), which would have burned the test funds.
+`HpEHvLpa9pMNiDCQDnVMSomCx4bmJuXX8sKqtKGg2uWr`, fresh keypairs held by the demo heir ("Sarah") since Nov 7 2026.
 
 ## The earlier showcase
 
-On Nov 11 and 12 2026 the showcase was vault 1 on `dmw-979268.testnet` (owner `dmw-andrew-edbc.testnet`), the v1
-contract that v2 replaced; it is still readable there. Before Nov 11 2026 the showcase was vault 6 on
-`dmw-x8cx.testnet` (owner `dmw-andrew-8d2e.testnet`). That contract runs the code with finding C-2 and was replaced,
-not upgraded; vault 6 is still readable there.
+Earlier contracts had their own showcase vaults; they are described in [`docs/history/`](../docs/history/README.md).

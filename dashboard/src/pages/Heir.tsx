@@ -20,10 +20,11 @@ export default function Heir() {
   // Sarah" on the vault page), or all of them. A connected wallet is unaffected.
   const guestHeirs = isGuest && guest ? (guestAs ? [guestAs] : guest.heirs.map((h) => h.accountId)) : null;
   const accountId = isGuest ? null : activeId;
-  const [gid, setGid] = useState<HeirIdentity | null>(() => loadIdentity());
+  const googleOk = nearAuthAvailable();
+  // The Google identity is only read when heir sign-in with Google is switched on (config HEIR_GOOGLE).
+  const [gid, setGid] = useState<HeirIdentity | null>(() => (googleOk ? loadIdentity() : null));
   const [authBusy, setAuthBusy] = useState(false);
   const [authErr, setAuthErr] = useState<string | null>(null);
-  const googleOk = nearAuthAvailable();
 
   // A wallet account wins; otherwise the accounts NEAR Auth resolved for the Google identity.
   const candidates = useMemo(
@@ -125,10 +126,7 @@ export default function Heir() {
               {googleOk ? (
                 <>Google sign-in runs through NEAR Auth. Your Google identity controls one NEAR account, derived by the NEAR MPC network. No wallet, no seed phrase.</>
               ) : (
-                <>
-                  No wallet yet? MyNearWallet and Meteor both make a testnet account in a minute. Sign-in with Google through NEAR Auth is built and works from a local copy; on this address it waits for production credentials (
-                  <a className="link" href="https://github.com/bigbenny1231/will-wallet/blob/master/dashboard/docs/near-auth.md" target="_blank" rel="noreferrer">how it works today</a>).
-                </>
+<>No wallet yet? MyNearWallet and Meteor both make a testnet account in a minute.</>
               )}
             </p>
             {authErr && <div className="mt-4"><ErrorNote>{authErr}</ErrorNote></div>}

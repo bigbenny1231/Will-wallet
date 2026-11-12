@@ -6,6 +6,7 @@ import { useWallet } from "../lib/wallet";
 import { agentPayCall, claimCall, executeStepCall, pokeCall } from "../lib/calls";
 import { currentForeign, stepArgsFor } from "../lib/chains";
 import { chainMeta } from "../lib/chainmeta";
+import { groupPayouts, payoutNames, payoutTxUrl } from "../lib/payoutStatus";
 import { fmtDuration, fmtTime, yoctoToNear } from "../lib/format";
 import { lastEvent, parseStep1Detail } from "../lib/logparse";
 import { beatError, makeBeater } from "../lib/pulseSigner";
@@ -235,7 +236,7 @@ export default function GuestGuide({ v, now, guest }: { v: VaultView; now: numbe
 
   const paid = parseStep1Detail(lastEvent(v.log, "step_1")?.detail);
   const nameOf = (account: string) => guest.heirs.find((h) => h.accountId === account)?.name ?? account;
-  const signed = v.foreign.filter((p) => p.status === "signed" || p.status === "broadcast").map((p) => chainMeta(p.chain).short);
+  const payouts = groupPayouts(v.foreign);
   const txs = [...guest.txs].reverse();
 
   return (
@@ -374,8 +375,26 @@ export default function GuestGuide({ v, now, guest }: { v: VaultView; now: numbe
                   <>The heirs were paid on NEAR, with nothing to sign. </>
                 )}
                 The pulse and agent keys are deleted.{" "}
-                {signed.length > 0 && (
-                  <>NEAR’s MPC network signed the {signed.join(" and ")} payout{signed.length === 1 ? "" : "s"}; {signed.length === 1 ? "it is" : "they are"} not relayed, because the derived source {signed.length === 1 ? "address holds" : "addresses hold"} no funds. </>
+                {payouts.relayed.length > 0 && (
+                  <>
+                    A keeper relayed the {payoutNames(payouts.relayed)} payout{payouts.relayed.length === 1 ? "" : "s"} and recorded {payouts.relayed.length === 1 ? "it" : "them"} on the vault
+                    {payouts.relayed.map((p, i) => {
+                      const href = payoutTxUrl(p);
+                      return href ? (
+                        <span key={i}>
+                          {" "}
+                          <ExtLink href={href}>{chainMeta(p.chain).short} tx</ExtLink>
+                        </span>
+                      ) : null;
+                    })}
+                    .{" "}
+                  </>
+                )}
+                {payouts.signed.length > 0 && (
+                  <>NEAR’s MPC network signed the {payoutNames(payouts.signed)} payout{payouts.signed.length === 1 ? "" : "s"}; a keeper relays each signed payout from its derived source address once that address holds the value and the fee. </>
+                )}
+                {payouts.failed.length > 0 && (
+                  <>The {payoutNames(payouts.failed)} signature request{payouts.failed.length === 1 ? "" : "s"} timed out and can be made again. </>
                 )}
                 The Will NFT now belongs to {nameOf(v.owner_id)}.
               </p>

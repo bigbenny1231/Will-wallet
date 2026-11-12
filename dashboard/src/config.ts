@@ -39,6 +39,10 @@ export const MONAD_CHAIN_ID = 10143;
 /** Origin the phone opens for pairing. Defaults to this page's origin; set it when the dashboard runs on localhost. */
 export const PUBLIC_ORIGIN: string = (import.meta.env.VITE_PUBLIC_ORIGIN || "").replace(/\/$/, "");
 
+/** Heir sign-in with Google through NEAR Auth: a design kept in the code (docs/near-auth.md), off unless
+ *  VITE_HEIR_GOOGLE=1. With the flag off, the heir page shows no Google button and loads no NEAR Auth session. */
+export const HEIR_GOOGLE = import.meta.env.VITE_HEIR_GOOGLE === "1";
+
 /** NEAR Auth (FastAuth) for heir sign-in. The shared testnet Auth0 client only accepts http://localhost:3000. */
 export const NEAR_AUTH = {
   domain: import.meta.env.VITE_NEAR_AUTH_DOMAIN || (NETWORK === "mainnet" ? "login.auth.near.org" : "login.testnet.fast-auth.com"),

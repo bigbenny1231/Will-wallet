@@ -8,7 +8,7 @@
 import bs58 from "bs58";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { providers } from "near-api-js";
-import { MOCK, NEAR_AUTH, NETWORK, RPC, SIGNER_CONTRACT } from "../config";
+import { HEIR_GOOGLE, MOCK, NEAR_AUTH, NETWORK, RPC, SIGNER_CONTRACT } from "../config";
 import { mockApi } from "./mock";
 
 export interface HeirIdentity {
@@ -38,6 +38,7 @@ export const isImplicitAccount = (id: string) => /^[0-9a-f]{64}$/.test(id);
 
 /** NEAR Auth works only from origins registered as callback URLs on the Auth0 client. */
 export function nearAuthAvailable(origin = typeof window === "undefined" ? "" : window.location.origin): boolean {
+  if (!HEIR_GOOGLE) return false;
   if (MOCK) return true;
   return !!NEAR_AUTH.clientId && NEAR_AUTH.origins.includes(origin);
 }

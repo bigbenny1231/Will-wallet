@@ -6,7 +6,7 @@ Node 22, TypeScript, run through `tsx` (no build step). Spec: [`SPEC.md`](../SPE
 ```bash
 cd keeper && npm install
 cp .env.example .env        # then fill it in; see the table below
-npm test                    # 90 unit tests, no network
+npm test                    # unit tests, no network
 ```
 
 ## Do X, see Y
@@ -102,7 +102,7 @@ There is one message per transition per vault. A heartbeat that brings the vault
   "owner_id": "andrew.testnet",
   "warning_at_ms": 1794236400000,
   "trigger_at_ms": 1794243600000,
-  "contract": "dmw-x8cx.testnet"
+  "contract": "dmw-c17cf5.testnet"
 }
 ```
 
@@ -112,32 +112,38 @@ There is one message per transition per vault. A heartbeat that brings the vault
 - With `--token` or `--owner-prefix`, only matching vaults are reported.
 - The POST has a 5 second timeout. It is sent in the background and awaited at the end of the pass, so it does not hold up a settlement action. A failure is logged as `notify ... was not delivered (HTTP 404)` and the loop carries on. Nothing is retried.
 - The webhook URL is a secret. It is never written to the log; error text is stripped of the URL, its host and its path before it is printed.
-- Tested with an injected `fetch` in `test/notify.test.ts`. No message has been posted to a real Slack or Discord webhook from this code yet.
+- Tested with an injected `fetch` in `test/notify.test.ts`.
 
-## Hosted guest sweep (GitHub Actions)
+## Hosted keeper
 
-The dashboard's guest mode creates throwaway accounts named `dmw-guest-<random>.testnet`, each with a short-interval vault on the public contract. A visitor who leaves would otherwise leave that vault overdue with nobody to settle it. [`.github/workflows/keeper.yml`](../.github/workflows/keeper.yml) (`guest-sweep`) settles those vaults and no others.
-
-It runs every 10 minutes and on manual dispatch, one run at a time:
+[`.github/workflows/keeper.yml`](../.github/workflows/keeper.yml) (`keeper`) is the project's hosted keeper for the
+live testnet contract. It runs every 10 minutes and on manual dispatch, one run at a time, and settles every due vault
+on the contract, not only the project's own.
 
 1. Checkout, Node 22, `npm ci` in `keeper/`.
-2. Pre-check, read-only: `npx tsx src/cli.ts due --owner-prefix dmw-guest- --github-output`. With `work=false` the job ends here. No account is created and nothing is sent.
-3. With `work=true` it picks a keeper account. If the repository secrets `KEEPER_ACCOUNT_ID` and `KEEPER_PRIVATE_KEY` are both set it uses them. Otherwise it creates a one-off account `dmw-sweep-<random>.testnet` from the testnet faucet with `node scripts/near-admin.mjs create`, masks the new key in the log, and passes it to the keeper through the environment. The keeper earns the poke bounty, so the account pays for its own gas.
-4. Sweep: `npx tsx src/cli.ts keeper --until-idle --max-seconds 240 --owner-prefix dmw-guest- --poll 5`.
+2. Pre-check, read-only: `npx tsx src/cli.ts due --github-output`. With `work=false` the job ends here; no key is
+   loaded and nothing is sent.
+3. If a `testnet` workflow run is in progress, it waits for the next slot: that run drives its own vaults with the
+   same keeper account, and two signers on one key would race for nonces.
+4. It loads the contract keeper: `node scripts/near-admin.mjs derive-keeper` derives the long-lived account
+   `dmw-keeper-<8 hex>.testnet` and its ed25519 key from the repository secret `KEEPER_SEED` (HKDF-SHA256), the same
+   account the deploy names in `new`. The key is masked in the log and passed to the keeper through the environment;
+   it exists only in the secret and in the runner's memory. Below 4 NEAR the account is topped up from the faucet
+   (`keeper_topup` in `scripts/lib.sh`).
+5. Keep: `npx tsx src/cli.ts keeper --until-idle --max-seconds 480 --poll 5`. It pokes each due vault, runs its steps
+   to Settled, relays signed foreign payouts and records them with `mark_broadcast`.
 
-The contract and RPC come from the repository variables `DMW_CONTRACT` (default `dmw-885364.testnet`; `dmw-979268.testnet` on Nov 11 and 12 2026, `dmw-x8cx.testnet` before that) and `NEAR_RPC` (default `https://rpc.testnet.fastnear.com`). The workflow passes them as environment variables; there is no `.env` on the runner.
+As the contract keeper it is an operator on every vault: it can run step III inside the first hour, re-sign a stale
+Solana payout, and re-sign an EVM payout at honest fees. The contract and RPC come from the repository variables
+`DMW_CONTRACT` and `NEAR_RPC` (default `https://rpc.testnet.fastnear.com`); there is no `.env` on the runner.
+`DMW_NOTIFY_WEBHOOK` is not passed to the workflow.
 
-Setup: none is required. One optional step: add the repository secrets `KEEPER_ACCOUNT_ID` and `KEEPER_PRIVATE_KEY` (Settings, Secrets and variables, Actions) for a funded testnet account. Then the sweep does not depend on the faucet, and that account can be registered with `set_keeper` so it may re-sign stale Solana payouts. Use a testnet account that holds nothing else.
+Setup: add the repository secret `KEEPER_SEED` (at least 32 characters; Settings, Secrets and variables, Actions).
+Without it the workflow still keeps, with a one-off faucet account that is not the contract keeper, and step III then
+waits out its first hour.
 
-What to expect:
-
-- Foreign payouts of guest vaults are signed and stay `signed`. Their derived source addresses are unfunded, so the relay fails and is not retried after settlement.
-- A one-off faucet account is not the contract's registered keeper. It cannot re-sign a signed Solana payout. That only matters for a funded source with an expired blockhash.
-- Each run that finds work without the secrets leaves one faucet account behind with its remaining testnet NEAR. If the faucet refuses, that run fails and the next one tries again.
-- `DMW_NOTIFY_WEBHOOK` is not passed to the workflow. Guest vaults have no owner to notify.
-- GitHub may start scheduled runs late, and it disables schedules in a repository with no activity for 60 days.
-
-What has been tested: the filter, the sweep and the pre-check are unit-tested against the mock backend (`test/sweep.test.ts`). The pre-check was run read-only against `dmw-x8cx.testnet` on 2026-11-09, before the first guest run on the live contract, and reported 19 vaults, none of them a guest vault, `work=false`. The sweep step's shell script was dry-run locally with a stub in place of the faucet and the mock backend. The same command settled an abandoned guest vault on a private testnet copy on 2026-11-09 (see `dashboard/README.md`). The workflow has run on GitHub on its schedule since 2026-11-10 04:31 UTC. Its first live sweep was vault 24 on `dmw-x8cx.testnet`, a guest vault created at 04:56 UTC and left alone on purpose: the next scheduled run made a one-off account (`dmw-sweep-d8d431e9f8.testnet`), poked the vault and ran all five steps to Settled (`docs/FINAL_REVIEW.md`).
+The filter, the sweep and the pre-check are unit-tested against the mock backend (`test/sweep.test.ts`). Run links:
+[`docs/LIVE_CONTRACT.md`](../docs/LIVE_CONTRACT.md).
 
 ## Layout
 
@@ -145,5 +151,5 @@ What has been tested: the filter, the sweep and the pre-check are unit-tested ag
 - `src/keeperLoop.ts` the poll loop; `src/backend.ts` NEAR calls with retry; `src/mock.ts` the mock vault
 - `src/chainsApi.ts` the interface to `src/chains/` (derive / evm / solana); `src/relay.ts` classifies relay errors
 - `src/notify.ts` owner notifications; `src/commands/due.ts` the read-only sweep pre-check
-- `LIVE_RUN.md` a real testnet run with every tx link; `SHOWCASE.md` the demo-video vault and the addresses to fund
+- `SHOWCASE.md` the showcase vault and its source addresses; the first end-to-end testnet runs, on an earlier contract, are in [`docs/history/KEEPER_LIVE_RUN.md`](../docs/history/KEEPER_LIVE_RUN.md)
 - `src/commands/` one file per CLI command; `test/` vitest

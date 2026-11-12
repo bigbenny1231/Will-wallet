@@ -1,4 +1,5 @@
 import { chainMeta } from "../lib/chainmeta";
+import { payoutTxUrl } from "../lib/payoutStatus";
 import { links } from "../config";
 import { fmtTime, humanizeYocto, shortAccount, shortAddr, unitsFor } from "../lib/format";
 import { lastEvent, parseStep1Detail } from "../lib/logparse";
@@ -22,10 +23,7 @@ const MARK: Record<StepStatus, string> = {
 };
 const WORD: Record<StepStatus, string> = { pending: "", active: "now", done: "done" };
 
-function payoutLink(p: ForeignPayout) {
-  if (!p.tx_hash) return null;
-  return chainMeta(p.chain).tx(p.tx_hash);
-}
+const payoutLink = (p: ForeignPayout) => payoutTxUrl(p);
 
 const PAYOUT_TONE: Record<ForeignPayout["status"], string> = {
   pending: "text-text-2",
