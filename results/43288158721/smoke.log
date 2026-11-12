@@ -1,0 +1,356 @@
+## create vault (interval 120 s while we set it up, grace 1, 5 NEAR + 0.1 storage)
+## (testnet txs take ~5-10 s each, so the alive phase runs at 120 s and set_timing drops it to 20 s before the owner goes silent)
+$ node contracts/tools/tx.mjs call dmw-smoke-owner-e440.testnet dmw-885364.testnet create_vault {...} 100 5.1
+tx https://testnet.nearblocks.io/txns/G3RQyqTrfopxTRuVumhUct4eGYi7hERT8fnjaPURqgN9
+  log: EVENT_JSON:{"standard":"dmw","version":"1.0.0","event":"vault_created","data":{"token_id":"2","owner_id":"dmw-smoke-owner-e440.testnet","balance":"5000000000000000000000000","heartbeat_interval_s":120,"grace_missed":1}}
+  log: EVENT_JSON:{"standard":"nep171","version":"1.0.0","event":"nft_mint","data":[{"owner_id":"dmw-smoke-owner-e440.testnet","token_ids":["2"]}]}
+  result: "2"
+TOKEN=2
+pulse key ed25519:JVk8qh8kMuYm4JKRko559cHuxT483JuDSLbaPY5rtWd, agent key ed25519:DrKcBrsJRpPaHycVi3reVdJpHikPVPaC8uURzuK6SaLi (private keys not recorded)
+
+## add pulse + agent keys (function-call keys on dmw-885364.testnet)
+
+$ node contracts/tools/tx.mjs call dmw-smoke-owner-e440.testnet dmw-885364.testnet add_pulse_key {"token_id":"2","public_key":"ed25519:JVk8qh8kMuYm4JKRko559cHuxT483JuDSLbaPY5rtWd"} 50 1y
+tx https://testnet.nearblocks.io/txns/4sUmigjx4dYz7gXLzhedY7RFFpzcgNe4sP5o59CG5ReC
+  log: EVENT_JSON:{"standard":"dmw","version":"1.0.0","event":"key_add_requested","data":{"token_id":"2","public_key":"ed25519:JVk8qh8kMuYm4JKRko559cHuxT483JuDSLbaPY5rtWd","kind":"Pulse"}}
+  log: EVENT_JSON:{"standard":"dmw","version":"1.0.0","event":"key_added","data":{"token_id":"2","public_key":"ed25519:JVk8qh8kMuYm4JKRko559cHuxT483JuDSLbaPY5rtWd","kind":"Pulse","method":"heartbeat"}}
+  result: true
+
+$ node contracts/tools/tx.mjs call dmw-smoke-owner-e440.testnet dmw-885364.testnet add_agent_key {"token_id":"2","public_key":"ed25519:DrKcBrsJRpPaHycVi3reVdJpHikPVPaC8uURzuK6SaLi"} 50 1y
+tx https://testnet.nearblocks.io/txns/75jCa4tsuvHjhHpa1LQbHdMhGWoni65Zv14M9soLKG8T
+  log: EVENT_JSON:{"standard":"dmw","version":"1.0.0","event":"key_add_requested","data":{"token_id":"2","public_key":"ed25519:DrKcBrsJRpPaHycVi3reVdJpHikPVPaC8uURzuK6SaLi","kind":"Agent"}}
+  log: EVENT_JSON:{"standard":"dmw","version":"1.0.0","event":"key_added","data":{"token_id":"2","public_key":"ed25519:DrKcBrsJRpPaHycVi3reVdJpHikPVPaC8uURzuK6SaLi","kind":"Agent","method":"agent_pay"}}
+  result: true
+
+$ node scripts/near-admin.mjs keys dmw-885364.testnet   # filtered to the two new keys
+{"access_key": {"nonce": 277405121000000, "permission": {"FunctionCall": {"allowance": "1000000000000000000000000", "method_names": ["heartbeat"], "receiver_id": "dmw-885364.testnet"}}}, "public_key": "ed25519:JVk8qh8kMuYm4JKRko559cHuxT483JuDSLbaPY5rtWd"}
+{"access_key": {"nonce": 277405128000000, "permission": {"FunctionCall": {"allowance": "1000000000000000000000000", "method_names": ["agent_pay"], "receiver_id": "dmw-885364.testnet"}}}, "public_key": "ed25519:DrKcBrsJRpPaHycVi3reVdJpHikPVPaC8uURzuK6SaLi"}
+
+## heartbeat signed by the pulse key (signer = contract account)
+$ node contracts/tools/tx.mjs call-with-key dmw-885364.testnet <pulse-private-key> dmw-885364.testnet heartbeat '{"token_id":"2"}' 10
+tx https://testnet.nearblocks.io/txns/8BtTTTGQsFnLiDdtZew5KZEA2QkFx1vvMSAng7tyq2nw
+  log: EVENT_JSON:{"standard":"dmw","version":"1.0.0","event":"heartbeat","data":{"token_id":"2","by":"pulse_key","was":"Alive","next_due_ms":1794511206018,"pause_cleared":false}}
+  result: 1794511086018
+
+## owner heartbeat: contract v2 requires exactly 1 yoctoNEAR on the owner's path (finding F)
+tx https://testnet.nearblocks.io/txns/6iTFkyK2xvq5J7hXCLkAp2r72TCDmVoLLQFN4cMg6cb8
+  error: {"index":0,"kind":{"index":0,"kind":{"FunctionCallError":{"ExecutionError":"Smart contract panicked: Requires attached deposit of exactly 1 yoctoNEAR"}}}}
+(rejected without the yocto, as expected)
+
+$ node contracts/tools/tx.mjs call dmw-smoke-owner-e440.testnet dmw-885364.testnet heartbeat {"token_id":"2"} 10 1y
+tx https://testnet.nearblocks.io/txns/4y2tt6kdJ4ZDG8gKTgYZH4ne31tcCiwBpgWq1XUmaXvZ
+  log: EVENT_JSON:{"standard":"dmw","version":"1.0.0","event":"heartbeat","data":{"token_id":"2","by":"owner","was":"Alive","next_due_ms":1794511211118,"pause_cleared":false}}
+  result: 1794511091118
+
+## pulse key cannot call agent_pay (access-key scope, rejected before execution)
+$ node contracts/tools/tx.mjs call-with-key dmw-885364.testnet <pulse-private-key> dmw-885364.testnet agent_pay '{...}' 30
+  error: Transaction method name agent_pay isn't allowed by the access key
+(rejected as expected)
+
+## agent_pay: allowed, then denied x3
+$ node contracts/tools/tx.mjs call-with-key dmw-885364.testnet <agent-private-key> dmw-885364.testnet agent_pay '{"token_id":"2","receiver_id":"dmw-smoke-h2-e440.testnet","amount":"300000000000000000000000","memo":"api credits"}' 30
+tx https://testnet.nearblocks.io/txns/CwFpQeNW7YrkryKdqDXSXKEiuEQKjw6PC2FwhMdGM8bL
+  log: EVENT_JSON:{"standard":"dmw","version":"1.0.0","event":"agent_pay_allowed","data":{"token_id":"2","receiver_id":"dmw-smoke-h2-e440.testnet","amount":"300000000000000000000000","daily_spent":"300000000000000000000000","memo":"api credits"}}
+  result: {"allowed":true,"reason":null,"receiver_id":"dmw-smoke-h2-e440.testnet","amount":"300000000000000000000000","daily_spent":"300000000000000000000000","balance":"2700000000000000000000000"}
+$ node contracts/tools/tx.mjs call-with-key dmw-885364.testnet <agent-private-key> dmw-885364.testnet agent_pay '{"token_id":"2","receiver_id":"dmw-smoke-h2-e440.testnet","amount":"900000000000000000000000"}' 30
+tx https://testnet.nearblocks.io/txns/ASrki5NJ5BLikdxfnEa9WtvSShg6pGZHCEGhrVpCzNTq
+  log: EVENT_JSON:{"standard":"dmw","version":"1.0.0","event":"agent_pay_denied","data":{"token_id":"2","receiver_id":"dmw-smoke-h2-e440.testnet","amount":"900000000000000000000000","reason":"over_per_tx_max","memo":""}}
+  result: {"allowed":false,"reason":"over_per_tx_max","receiver_id":"dmw-smoke-h2-e440.testnet","amount":"900000000000000000000000","daily_spent":"300000000000000000000000","balance":"2700000000000000000000000"}
+$ node contracts/tools/tx.mjs call-with-key dmw-885364.testnet <agent-private-key> dmw-885364.testnet agent_pay '{"token_id":"2","receiver_id":"dmw-smoke-owner-e440.testnet","amount":"100000000000000000000000"}' 30
+tx https://testnet.nearblocks.io/txns/HmeECQHy6giraJiFguxnftqxqDpEV6GcAFLf7cfGZNzs
+  log: EVENT_JSON:{"standard":"dmw","version":"1.0.0","event":"agent_pay_denied","data":{"token_id":"2","receiver_id":"dmw-smoke-owner-e440.testnet","amount":"100000000000000000000000","reason":"receiver_not_allowlisted","memo":""}}
+  result: {"allowed":false,"reason":"receiver_not_allowlisted","receiver_id":"dmw-smoke-owner-e440.testnet","amount":"100000000000000000000000","daily_spent":"300000000000000000000000","balance":"2700000000000000000000000"}
+$ node contracts/tools/tx.mjs call-with-key dmw-885364.testnet <agent-private-key> dmw-885364.testnet agent_pay '{"token_id":"2","receiver_id":"dmw-smoke-h2-e440.testnet","amount":"400000000000000000000000"}' 30
+tx https://testnet.nearblocks.io/txns/DF8Mvhaqx1t376HNer8uLdL8ZfZMWwaAorY7BhUuwJzX
+  log: EVENT_JSON:{"standard":"dmw","version":"1.0.0","event":"agent_pay_allowed","data":{"token_id":"2","receiver_id":"dmw-smoke-h2-e440.testnet","amount":"400000000000000000000000","daily_spent":"700000000000000000000000","memo":""}}
+  result: {"allowed":true,"reason":null,"receiver_id":"dmw-smoke-h2-e440.testnet","amount":"400000000000000000000000","daily_spent":"700000000000000000000000","balance":"2300000000000000000000000"}
+$ node contracts/tools/tx.mjs call-with-key dmw-885364.testnet <agent-private-key> dmw-885364.testnet agent_pay '{"token_id":"2","receiver_id":"dmw-smoke-h2-e440.testnet","amount":"400000000000000000000000"}' 30
+tx https://testnet.nearblocks.io/txns/9EPGiBR2BRdjyKJnf57FTL1zudCr57a2mkRhPDMKPD82
+  log: EVENT_JSON:{"standard":"dmw","version":"1.0.0","event":"agent_pay_denied","data":{"token_id":"2","receiver_id":"dmw-smoke-h2-e440.testnet","amount":"400000000000000000000000","reason":"over_daily_max","memo":""}}
+  result: {"allowed":false,"reason":"over_daily_max","receiver_id":"dmw-smoke-h2-e440.testnet","amount":"400000000000000000000000","daily_spent":"700000000000000000000000","balance":"2300000000000000000000000"}
+
+## set_timing to 20 s / grace 1, then one last pulse-key heartbeat
+
+$ node contracts/tools/tx.mjs call dmw-smoke-owner-e440.testnet dmw-885364.testnet set_timing {"token_id":"2","heartbeat_interval_s":20,"grace_missed":1} 30 1y
+tx https://testnet.nearblocks.io/txns/49p8Ci7zAMPDF3vHJnkGEdRNqUNtUXUsKEm9f1LkDqtq
+  log: EVENT_JSON:{"standard":"dmw","version":"1.0.0","event":"timing_set","data":{"token_id":"2","heartbeat_interval_s":20,"grace_missed":1}}
+  result: (empty)
+$ node contracts/tools/tx.mjs call-with-key dmw-885364.testnet <pulse-private-key> dmw-885364.testnet heartbeat '{"token_id":"2"}' 10
+tx https://testnet.nearblocks.io/txns/Enr7319HBF9y4UZXFC59p34k8LTDwEtLE6jNGW2pX7fx
+  log: EVENT_JSON:{"standard":"dmw","version":"1.0.0","event":"heartbeat","data":{"token_id":"2","by":"pulse_key","was":"Alive","next_due_ms":1794511127003,"pause_cleared":false}}
+  result: 1794511107003
+
+## poke too early
+
+$ node contracts/tools/tx.mjs call dmw-smoke-h1-e440.testnet dmw-885364.testnet poke {"token_id":"2"} 30
+tx https://testnet.nearblocks.io/txns/Fg9QpkQrDmN9KFDhqMA7tHE1mMh4cQLZpgE3JfVHqiih
+  error: {"index":0,"kind":{"index":0,"kind":{"FunctionCallError":{"ExecutionError":"Smart contract panicked: not_due"}}}}
+(not_due as expected)
+
+## owner goes silent; wait until trigger_at_ms
+state=Alive
+state=Alive
+state=Alive
+state=Alive
+state=Warning
+state=Warning
+state=Warning
+state=Warning
+
+## poke (heir earns the bounty)
+
+$ node contracts/tools/tx.mjs call dmw-smoke-h1-e440.testnet dmw-885364.testnet poke {"token_id":"2"} 30
+tx https://testnet.nearblocks.io/txns/CvhmAuNdsJEvxXoFb6YGdhKfG6aquDsu4EHzKGkSnozu
+  log: EVENT_JSON:{"standard":"dmw","version":"1.0.0","event":"triggered","data":{"token_id":"2","by":"dmw-smoke-h1-e440.testnet","bounty":"50000000000000000000000","trigger_at_ms":1794511147003}}
+  result: "50000000000000000000000"
+
+## heartbeat after trigger is rejected
+tx https://testnet.nearblocks.io/txns/97742PnNaJGybKdpUBSydsnPuWbNVLMvCU71THcvKA6U
+  error: {"index":0,"kind":{"index":0,"kind":{"FunctionCallError":{"ExecutionError":"Smart contract panicked: vault_triggered"}}}}
+(vault_triggered as expected)
+
+## execute_step until Settled
+
+$ node contracts/tools/tx.mjs call dmw-smoke-h1-e440.testnet dmw-885364.testnet execute_step {"token_id":"2"} 300
+tx https://testnet.nearblocks.io/txns/qrqCXfPpoAtEnN4vAi7zmSsJFsQi8EfmtxJ4mDJrBnS
+  log: EVENT_JSON:{"standard":"dmw","version":"1.0.0","event":"step_1","data":{"token_id":"2","payouts":[{"account_id":"dmw-smoke-h1-e440.testnet","amount":"1290000000000000000000000"},{"account_id":"dmw-smoke-h2-e440.testnet","amount":"860000000000000000000000"}],"reserve":"100000000000000000000000"}}
+  result: 2
+
+$ node contracts/tools/tx.mjs call dmw-smoke-h1-e440.testnet dmw-885364.testnet execute_step {"token_id":"2"} 300
+tx https://testnet.nearblocks.io/txns/3NDBBzh9CjKWB8fRJoTYGyVSELMQKLYm6GkbDL2CNTp7
+  log: EVENT_JSON:{"standard":"dmw","version":"1.0.0","event":"step_2","data":{"token_id":"2","deleted_keys":["ed25519:JVk8qh8kMuYm4JKRko559cHuxT483JuDSLbaPY5rtWd","ed25519:DrKcBrsJRpPaHycVi3reVdJpHikPVPaC8uURzuK6SaLi"]}}
+  result: 3
+
+$ node contracts/tools/tx.mjs call dmw-smoke-h1-e440.testnet dmw-885364.testnet execute_step {"token_id":"2"} 300
+tx https://testnet.nearblocks.io/txns/G8RqKSYnL5UkdVjGHfVLxM2Uq394cuQUH3LTBAs6Pipw
+  log: EVENT_JSON:{"standard":"dmw","version":"1.0.0","event":"step_3","data":{"token_id":"2","foreign":0}}
+  result: 4
+
+$ node contracts/tools/tx.mjs call dmw-smoke-h1-e440.testnet dmw-885364.testnet execute_step {"token_id":"2"} 300
+tx https://testnet.nearblocks.io/txns/Hmvb4kh2R3ha3bv5raT6Kq2DFzxG1tNA7UGMGc8EzgUi
+  log: EVENT_JSON:{"standard":"dmw","version":"1.0.0","event":"step_4","data":{"token_id":"2","dao_id":null}}
+  result: 5
+
+$ node contracts/tools/tx.mjs call dmw-smoke-h1-e440.testnet dmw-885364.testnet execute_step {"token_id":"2"} 300
+tx https://testnet.nearblocks.io/txns/6NVKxvsCEHZ1kCeWXLbb8MLVcmzuhDB9xxH1CCxXbwn
+  log: EVENT_JSON:{"standard":"dmw","version":"1.0.0","event":"step_5","data":{"token_id":"2","old_owner_id":"dmw-smoke-owner-e440.testnet","new_owner_id":"dmw-smoke-h1-e440.testnet","remaining":"100000000000000000000000","storage_released":"59020000000000000000000","split":[{"account_id":"dmw-smoke-h1-e440.testnet","amount":"35412000000000000000000"},{"account_id":"dmw-smoke-h2-e440.testnet","amount":"23608000000000000000000"}]}}
+  log: EVENT_JSON:{"standard":"dmw","version":"1.0.0","event":"settled","data":{"token_id":"2","old_owner_id":"dmw-smoke-owner-e440.testnet","new_owner_id":"dmw-smoke-h1-e440.testnet","remaining":"100000000000000000000000","storage_released":"59020000000000000000000","split":[{"account_id":"dmw-smoke-h1-e440.testnet","amount":"35412000000000000000000"},{"account_id":"dmw-smoke-h2-e440.testnet","amount":"23608000000000000000000"}]}}
+  log: EVENT_JSON:{"standard":"nep171","version":"1.0.0","event":"nft_transfer","data":[{"old_owner_id":"dmw-smoke-owner-e440.testnet","new_owner_id":"dmw-smoke-h1-e440.testnet","token_ids":["2"],"memo":"settlement"}]}
+  result: 6
+
+$ node contracts/tools/tx.mjs call dmw-smoke-h1-e440.testnet dmw-885364.testnet execute_step {"token_id":"2"} 300
+tx https://testnet.nearblocks.io/txns/91XqRnu4Q3QTFjcbVAqZdkLtc5cDwrC86zxHLWvy21qz
+  error: {"index":0,"kind":{"index":0,"kind":{"FunctionCallError":{"ExecutionError":"Smart contract panicked: already_settled"}}}}
+(already_settled as expected)
+
+## pulse/agent keys gone from the contract account?
+pulse present: False  agent present: False
+
+## claim reserve as new Will NFT owner (dmw-smoke-h1-e440.testnet)
+
+$ node contracts/tools/tx.mjs call dmw-smoke-h1-e440.testnet dmw-885364.testnet claim {"token_id":"2"} 30
+tx https://testnet.nearblocks.io/txns/9VM2X6vAvuzA6NLGsETeEGsavjBwz3mnza5tvsQjrFEo
+  log: EVENT_JSON:{"standard":"dmw","version":"1.0.0","event":"claim","data":{"token_id":"2","account_id":"dmw-smoke-h1-e440.testnet","amount":"100000000000000000000000"}}
+  result: "100000000000000000000000"
+
+## final get_vault
+
+$ node scripts/near-admin.mjs view dmw-885364.testnet get_vault {"token_id":"2"}
+{
+  "token_id": "2",
+  "owner_id": "dmw-smoke-h1-e440.testnet",
+  "state": "Settled",
+  "heartbeat_interval_s": 20,
+  "grace_missed": 1,
+  "last_beat_ms": 1794511107003,
+  "warning_at_ms": 1794511127003,
+  "trigger_at_ms": 1794511147003,
+  "balance": "0",
+  "bounty": "50000000000000000000000",
+  "heirs": [
+    {
+      "account_id": "dmw-smoke-h1-e440.testnet",
+      "bps": 6000
+    },
+    {
+      "account_id": "dmw-smoke-h2-e440.testnet",
+      "bps": 4000
+    }
+  ],
+  "foreign": [],
+  "pulse_keys": [],
+  "agent_keys": [],
+  "policy": {
+    "per_tx_max": "500000000000000000000000",
+    "daily_max": "800000000000000000000000",
+    "allowlist": [
+      "dmw-smoke-h2-e440.testnet"
+    ]
+  },
+  "daily_spent": "700000000000000000000000",
+  "daily_window_start_ms": 1794511093548,
+  "spends": [
+    {
+      "ms": 1794511093548,
+      "amount": "300000000000000000000000"
+    },
+    {
+      "ms": 1794511100053,
+      "amount": "400000000000000000000000"
+    }
+  ],
+  "dao_id": null,
+  "dao_proposal_id": null,
+  "step": 6,
+  "foreign_index": 0,
+  "foreign_inflight": false,
+  "created_ms": 1794511075767,
+  "log": [
+    {
+      "ms": 1794511075767,
+      "event": "vault_created",
+      "detail": "dmw-smoke-owner-e440.testnet",
+      "seq": 0
+    },
+    {
+      "ms": 1794511078729,
+      "event": "key_add_requested",
+      "detail": "heartbeat ed25519:JVk8qh8kMuYm4JKRko559cHuxT483JuDSLbaPY5rtWd",
+      "seq": 1
+    },
+    {
+      "ms": 1794511080052,
+      "event": "key_added",
+      "detail": "heartbeat ed25519:JVk8qh8kMuYm4JKRko559cHuxT483JuDSLbaPY5rtWd",
+      "seq": 2
+    },
+    {
+      "ms": 1794511082529,
+      "event": "key_add_requested",
+      "detail": "agent_pay ed25519:DrKcBrsJRpPaHycVi3reVdJpHikPVPaC8uURzuK6SaLi",
+      "seq": 3
+    },
+    {
+      "ms": 1794511083766,
+      "event": "key_added",
+      "detail": "agent_pay ed25519:DrKcBrsJRpPaHycVi3reVdJpHikPVPaC8uURzuK6SaLi",
+      "seq": 4
+    },
+    {
+      "ms": 1794511086018,
+      "event": "heartbeat",
+      "detail": "pulse_key",
+      "seq": 5
+    },
+    {
+      "ms": 1794511091118,
+      "event": "heartbeat",
+      "detail": "owner",
+      "seq": 6
+    },
+    {
+      "ms": 1794511093548,
+      "event": "agent_pay_allowed",
+      "detail": "dmw-smoke-h2-e440.testnet 300000000000000000000000",
+      "seq": 7
+    },
+    {
+      "ms": 1794511096507,
+      "event": "agent_pay_denied",
+      "detail": "over_per_tx_max dmw-smoke-h2-e440.testnet 900000000000000000000000",
+      "seq": 8
+    },
+    {
+      "ms": 1794511098342,
+      "event": "agent_pay_denied",
+      "detail": "receiver_not_allowlisted dmw-smoke-owner-e440.testnet 100000000000000000000000",
+      "seq": 9
+    },
+    {
+      "ms": 1794511100053,
+      "event": "agent_pay_allowed",
+      "detail": "dmw-smoke-h2-e440.testnet 400000000000000000000000",
+      "seq": 10
+    },
+    {
+      "ms": 1794511102622,
+      "event": "agent_pay_denied",
+      "detail": "over_daily_max dmw-smoke-h2-e440.testnet 400000000000000000000000",
+      "seq": 11
+    },
+    {
+      "ms": 1794511105040,
+      "event": "timing_set",
+      "detail": "20s x1",
+      "seq": 12
+    },
+    {
+      "ms": 1794511107003,
+      "event": "heartbeat",
+      "detail": "pulse_key",
+      "seq": 13
+    },
+    {
+      "ms": 1794511151154,
+      "event": "triggered",
+      "detail": "by dmw-smoke-h1-e440.testnet, bounty 50000000000000000000000",
+      "seq": 14
+    },
+    {
+      "ms": 1794511156658,
+      "event": "step_1",
+      "detail": "dmw-smoke-h1-e440.testnet 1.29 NEAR, dmw-smoke-h2-e440.testnet 0.86 NEAR",
+      "seq": 15
+    },
+    {
+      "ms": 1794511162037,
+      "event": "step_2",
+      "detail": "2 keys deleted",
+      "seq": 16
+    },
+    {
+      "ms": 1794511166978,
+      "event": "step_3",
+      "detail": "foreign payouts done",
+      "seq": 17
+    },
+    {
+      "ms": 1794511171828,
+      "event": "step_4",
+      "detail": "no dao; skipped",
+      "seq": 18
+    },
+    {
+      "ms": 1794511176104,
+      "event": "step_5",
+      "detail": "will nft -> dmw-smoke-h1-e440.testnet",
+      "seq": 19
+    },
+    {
+      "ms": 1794511176104,
+      "event": "settled",
+      "detail": "dmw-smoke-h1-e440.testnet",
+      "seq": 20
+    },
+    {
+      "ms": 1794511183999,
+      "event": "claim",
+      "detail": "dmw-smoke-h1-e440.testnet 100000000000000000000000",
+      "seq": 21
+    }
+  ],
+  "guardian_id": null,
+  "max_pause_s": 0,
+  "paused_until_ms": 0,
+  "derivation_paths": {
+    "base": "base-2-daba18621b2c4ec0",
+    "monad": "monad-2-daba18621b2c4ec0",
+    "solana": "sol-2-daba18621b2c4ec0"
+  },
+  "keeper_id": null,
+  "storage_bytes": 2294,
+  "storage_deposit": "40980000000000000000000"
+}
+
+## nft_token owner + media prefix
+dmw-smoke-h1-e440.testnet data:image/svg+xml;base64,PHN2ZyB4bWxucz... {"state":"Settled","trigger_at_ms":1794511147003,"heirs":2}

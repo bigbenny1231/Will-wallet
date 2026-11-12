@@ -1,0 +1,71 @@
+## deploy the attacker's "DAO" (dao.dmw-att-36c7.testnet, contracts/tools/evil-dao)
+tx https://testnet.nearblocks.io/txns/Eogi5JhnoFYFmnUiGPZFChxLDk4YtMRa6KxvnjQS9Q4c
+start: attacker 7.9858  heir 0.5000  dao 1.5000  contract 17.1341 NEAR
+
+## create_vault: 10 s interval, grace 0, heir 100 %, 1.7 NEAR
+tx https://testnet.nearblocks.io/txns/3MbrsAeamBT48QcPayvEvv7VtcHENo6ic4LFjCQcadHA
+  log: EVENT_JSON:{"standard":"dmw","version":"1.0.0","event":"vault_created","data":{"token_id":"3","owner_id":"dmw-att-36c7.testnet","balance":"1600000000000000000000000","heartbeat_interval_s":10,"grace_missed":0}}
+  log: EVENT_JSON:{"standard":"nep171","version":"1.0.0","event":"nft_mint","data":[{"owner_id":"dmw-att-36c7.testnet","token_ids":["3"]}]}
+  result: "3"
+TOKEN=3
+
+## set_dao -> dao.dmw-att-36c7.testnet
+tx https://testnet.nearblocks.io/txns/E4FLSmUnBFhJ1USWa4x8ZHfZHScyLLdCn4zndDso4ni2
+  log: EVENT_JSON:{"standard":"dmw","version":"1.0.0","event":"dao_set","data":{"token_id":"3","dao_id":"dao.dmw-att-36c7.testnet"}}
+  result: (empty)
+
+## wait for the deadline, then poke
+tx https://testnet.nearblocks.io/txns/74df83nys7KPkLpDGDwsAvHGJ31UnWt5cjGiPxy4m1tf
+  log: EVENT_JSON:{"standard":"dmw","version":"1.0.0","event":"triggered","data":{"token_id":"3","by":"dmw-att-36c7.testnet","bounty":"10000000000000000000000","trigger_at_ms":1794511214106}}
+  result: "10000000000000000000000"
+
+## execute_step (step 1)
+tx https://testnet.nearblocks.io/txns/9LfB8f2wXAS4xeTYVdy9mJg3X6itTdicRYKVzMvuPYzv
+  log: EVENT_JSON:{"standard":"dmw","version":"1.0.0","event":"step_1","data":{"token_id":"3","payouts":[{"account_id":"heir.dmw-att-36c7.testnet","amount":"90000000000000000000000"}],"reserve":"1500000000000000000000000"}}
+  result: 2
+vault balance after step 1: 1.5000 NEAR, step now 2, state Triggered
+
+## execute_step (step 2)
+tx https://testnet.nearblocks.io/txns/GedXFVdrLkp2TeBTEwtu4qtj8Mz62po4mdHZ7DacipCn
+  log: EVENT_JSON:{"standard":"dmw","version":"1.0.0","event":"step_2","data":{"token_id":"3","deleted_keys":[]}}
+  result: 3
+vault balance after step 2: 1.5000 NEAR, step now 3, state Triggered
+
+## execute_step (step 3)
+tx https://testnet.nearblocks.io/txns/77jUVabhhdRRhEKQUdvkKFeHQZnLD2zyS2FhEPCgBzkn
+  log: EVENT_JSON:{"standard":"dmw","version":"1.0.0","event":"step_3","data":{"token_id":"3","foreign":0}}
+  result: 4
+vault balance after step 3: 1.5000 NEAR, step now 4, state Triggered
+
+## execute_step (step 4)
+tx https://testnet.nearblocks.io/txns/BbynLc57Cz6iUiqTgr2vacBkAgWbhsdywWLVJ5zc7X6N
+  log: EVENT_JSON:{"standard":"dmw","version":"1.0.0","event":"step_4","data":{"token_id":"3","dao_id":"dao.dmw-att-36c7.testnet","description":"Dead Man's Wallet: vault 3 settled; heirs: heir.dmw-att-36c7.testnet 10000bps"}}
+  receipt failure: {"ActionError":{"index":0,"kind":{"FunctionCallError":{"ExecutionError":"Smart contract panicked: staged failure: the bond was kept"}}}}
+  log: EVENT_JSON:{"standard":"dmw","version":"1.0.0","event":"dao_proposal_failed","data":{"token_id":"3","dao_id":"dao.dmw-att-36c7.testnet"}}
+  result: 5
+vault balance after step 4: 0.5000 NEAR, step now 5, state Triggered
+
+## execute_step (step 5)
+tx https://testnet.nearblocks.io/txns/HYWrqrksuRkyhXwFUBNFZ1GUrwYmWox3AELmi66YBZn4
+  log: EVENT_JSON:{"standard":"dmw","version":"1.0.0","event":"step_5","data":{"token_id":"3","old_owner_id":"dmw-att-36c7.testnet","new_owner_id":"heir.dmw-att-36c7.testnet","remaining":"500000000000000000000000","storage_released":"69610000000000000000000","split":[{"account_id":"heir.dmw-att-36c7.testnet","amount":"69610000000000000000000"}]}}
+  log: EVENT_JSON:{"standard":"dmw","version":"1.0.0","event":"settled","data":{"token_id":"3","old_owner_id":"dmw-att-36c7.testnet","new_owner_id":"heir.dmw-att-36c7.testnet","remaining":"500000000000000000000000","storage_released":"69610000000000000000000","split":[{"account_id":"heir.dmw-att-36c7.testnet","amount":"69610000000000000000000"}]}}
+  log: EVENT_JSON:{"standard":"nep171","version":"1.0.0","event":"nft_transfer","data":[{"old_owner_id":"dmw-att-36c7.testnet","new_owner_id":"heir.dmw-att-36c7.testnet","token_ids":["3"],"memo":"settlement"}]}
+  result: 6
+vault balance after step 5: 0.5000 NEAR, step now 6, state Settled
+
+## the vault's own log for step 4
+{"ms": 1794511206693, "event": "dao_set", "detail": "dao.dmw-att-36c7.testnet", "seq": 1}
+{"ms": 1794511241127, "event": "step_4", "detail": "add_proposal on dao.dmw-att-36c7.testnet", "seq": 6}
+{"ms": 1794511242933, "event": "dao_proposal_failed", "detail": "add_proposal failed; continuing", "seq": 7}
+
+## claim as the heir
+tx https://testnet.nearblocks.io/txns/9XnasVLjouNA5C8VKqykqzsa4YTQZRje3FDKRjtD2Dif
+  log: EVENT_JSON:{"standard":"dmw","version":"1.0.0","event":"claim","data":{"token_id":"3","account_id":"heir.dmw-att-36c7.testnet","amount":"500000000000000000000000"}}
+  result: "500000000000000000000000"
+
+## result
+vault balance after step 3: 1.5000  after step 4: 0.5000  (bond 1 NEAR)  after step 5: 0.5000  (storage release goes to the heirs)
+claim paid: 0.5000 NEAR
+attacker + heir + dao, net: -0.0355 NEAR
+contract account: 17.1341 -> 17.1644 NEAR
+C-2 drain: BLOCKED (bond not credited back, attacker lost money)

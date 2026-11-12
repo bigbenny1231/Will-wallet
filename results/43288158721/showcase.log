@@ -1,0 +1,12 @@
+== showcase accounts (suffix 13bf)
+created dmw-andrew-13bf.testnet  key saved to keys/dmw-andrew-13bf.testnet.json
+created dmw-sarah-13bf.testnet  key saved to keys/dmw-sarah-13bf.testnet.json
+created dmw-ben-13bf.testnet  key saved to keys/dmw-ben-13bf.testnet.json
+created dmw-api-13bf.testnet  key saved to keys/dmw-api-13bf.testnet.json
+== create_vault (60 days, grace 1, 5 NEAR + 0.1 storage)
+tx https://testnet.nearblocks.io/txns/2LDbKGY6tV3PWuKNNUtUhYodVofyUFo9TMtxmbJN9tLf
+  result: "1"
+0x7F985ce93d5A3fa32519F3be334d61d93d275f3b== foreign payouts (Base 0.0005 ETH, Monad 0.01 MON, Solana 0.01 SOL)
+tx https://testnet.nearblocks.io/txns/3M5rJw47q9zRghyZPQSJTLr2LekjtWKs1CYjkotwNY3i
+  result: (empty)
+showcase vault 1 on dmw-885364.testnet (owner dmw-andrew-13bf.testnet); sources base 0x7F985ce93d5A3fa32519F3be334d61d93d275f3b monad 0xa8fdcc94b902c32E2aF0788A48A4d082adbE4b91 solana CPRMvCbJ8uebgt4BsNhm94eNB8cfsSXsN1ffKMUMhZdc

@@ -1,0 +1,4 @@
+./scripts/demo.sh
+== accounts
+faucet 429: Rate limit exceeded, retry in 12 hours.
+make: *** [Makefile:48: demo] Error 1

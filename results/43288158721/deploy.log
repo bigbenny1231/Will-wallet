@@ -1,0 +1,115 @@
+== creating dmw-885364.testnet (testnet faucet)
+created dmw-885364.testnet  key saved to keys/dmw-885364.testnet.json
+== using prebuilt contracts/release/dmw.wasm
+== keeper account dmw-keeper-2f6dcb.testnet (testnet faucet)
+created dmw-keeper-2f6dcb.testnet  key saved to keys/dmw-keeper-2f6dcb.testnet.json
+== deploying to dmw-885364.testnet and calling new({"owner_id":"dmw-885364.testnet","keeper_id":"dmw-keeper-2f6dcb.testnet"}) in the same transaction
+tx https://testnet.nearblocks.io/txns/B4h939RafZ3c7z24aJ9U6FyG7JwCypwGjjKQX4VsRTr2
+== get_config
+{
+  "owner_id": "dmw-885364.testnet",
+  "next_id": 1,
+  "storage_fee": "100000000000000000000000",
+  "storage_byte_cost": "10000000000000000000",
+  "key_allowance": "1000000000000000000000000",
+  "reserve_with_dao": "1500000000000000000000000",
+  "reserve_no_dao": "100000000000000000000000",
+  "dao_bond": "1000000000000000000000000",
+  "default_bounty": "10000000000000000000000",
+  "max_bounty": "1000000000000000000000000",
+  "max_bounty_bps": 1000,
+  "min_deposit": "10000000000000000000000",
+  "mpc_signer": "v1.signer-prod.testnet",
+  "mpc_sign_deposit": "1",
+  "keeper": "dmw-keeper-2f6dcb.testnet",
+  "chains": [
+    {
+      "chain": "base",
+      "kind": "evm",
+      "chain_id": 84532,
+      "path": "base-<token_id>-<salt>",
+      "domain_id": 0,
+      "rpc": "https://sepolia.base.org",
+      "explorer_tx": "https://sepolia.basescan.org/tx/",
+      "max_fee_per_gas": "100000000000",
+      "non_keeper_max_fee_per_gas": "10000000000",
+      "max_payouts": 4,
+      "min_gas_limit": "50000"
+    },
+    {
+      "chain": "monad",
+      "kind": "evm",
+      "chain_id": 10143,
+      "path": "monad-<token_id>-<salt>",
+      "domain_id": 0,
+      "rpc": "https://testnet-rpc.monad.xyz",
+      "explorer_tx": "https://testnet.monadexplorer.com/tx/",
+      "max_fee_per_gas": "1000000000000",
+      "non_keeper_max_fee_per_gas": "200000000000",
+      "max_payouts": 1,
+      "min_gas_limit": "50000"
+    },
+    {
+      "chain": "solana",
+      "kind": "solana",
+      "cluster": "devnet",
+      "path": "sol-<token_id>-<salt>",
+      "domain_id": 1,
+      "rpc": "https://api.devnet.solana.com",
+      "explorer_tx": "https://explorer.solana.com/tx/"
+    }
+  ],
+  "min_pause_s": 10,
+  "max_pause_s": 7776000,
+  "resign_cooldown_ms": 300000,
+  "step3_open_after_ms": 3600000
+}
+
+deployed dmw-885364.testnet   https://testnet.nearblocks.io/address/dmw-885364.testnet
+written to .env: DMW_CONTRACT=dmw-885364.testnet, KEEPER_ACCOUNT_ID=dmw-keeper-2f6dcb.testnet (keys in keys/, gitignored)
+next: make demo
+{
+  "version": "0.1.0",
+  "link": "https://github.com/bigbenny1231/will-wallet/tree/6c581107017ad53414a2970a1b85497c35d4c57d",
+  "standards": [
+    {
+      "standard": "nep171",
+      "version": "1.2.0"
+    },
+    {
+      "standard": "nep177",
+      "version": "2.0.0"
+    },
+    {
+      "standard": "nep181",
+      "version": "1.0.0"
+    },
+    {
+      "standard": "nep297",
+      "version": "1.0.0"
+    },
+    {
+      "standard": "dmw",
+      "version": "2.0.0"
+    },
+    {
+      "standard": "nep330",
+      "version": "1.3.0"
+    }
+  ],
+  "build_info": {
+    "build_environment": "sourcescan/cargo-near:0.23.0-rust-1.99.1@sha256:8013f039e8005627f10ae66b5519d1a6eeeed7d7aef4b5067d5e9a86c4302fcc",
+    "build_command": [
+      "cargo",
+      "near",
+      "build",
+      "non-reproducible-wasm",
+      "--locked"
+    ],
+    "contract_path": "contracts/dmw",
+    "source_code_snapshot": "git+https://github.com/bigbenny1231/will-wallet?rev=6c581107017ad53414a2970a1b85497c35d4c57d",
+    "output_wasm_path": "/home/near/code/contracts/dmw/target/near/dmw.wasm"
+  }
+}
+on-chain code_hash 8geWkWLte1vsnVStUZtoNkNoL2b6sgLh5wPuSH9n4tna
+7229e0449924c5da231091e7427ca717943efdfcd5088d4fc789232bde624247  contracts/release/dmw.wasm

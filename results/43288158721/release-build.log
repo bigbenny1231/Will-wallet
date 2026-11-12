@@ -1,0 +1,439 @@
+Note: `near` CLI configuration is stored in "/home/runner/.config/near-cli/config.toml"
+• Opening repo and determining HEAD and relative path of contract...
+current HEAD (/home/runner/work/Will-wallet/Will-wallet/.git/): 6c581107017ad53414a2970a1b85497c35d4c57d
+• done
+
+• Checking if git is dirty...
+• done
+
+• Cloning project repo to a temporary build site, removing uncommitted changes...
+current HEAD (/tmp/.tmpMlLaHY/.git/): 6c581107017ad53414a2970a1b85497c35d4c57d
+• Collecting cargo project metadata from temporary build site...
+• done
+
+• Parsing `[package.metadata.near.reproducible_build]` section of contract's `Cargo.toml` ...
+• done
+
+• Applying and validating `[package.metadata.near.reproducible_build]` section of contract's `Cargo.toml` ...
+
+applied reproducible build metadata: 
+    build variant: <DEFAULT>
+    image: sourcescan/cargo-near:0.23.0-rust-1.99.1
+    image digest: sha256:8013f039e8005627f10ae66b5519d1a6eeeed7d7aef4b5067d5e9a86c4302fcc
+    passed environment variables: []
+    container build command: ["cargo", "near", "build", "non-reproducible-wasm", "--locked"]
+    cloneable remote of git repository: https://github.com/bigbenny1231/will-wallet
+
+• done
+
+using `container_build_command` from `[package.metadata.near.reproducible_build]` in Cargo.toml
+• Performing `docker` sanity check...
+• done
+
+• Checking that specified image is available...
+docker image to be used: sourcescan/cargo-near:0.23.0-rust-1.99.1@sha256:8013f039e8005627f10ae66b5519d1a6eeeed7d7aef4b5067d5e9a86c4302fcc
+
+docker.io/sourcescan/cargo-near@sha256:8013f039e8005627f10ae66b5519d1a6eeeed7d7aef4b5067d5e9a86c4302fcc: Pulling from sourcescan/cargo-near
+2ec981fa50fa: Pulling fs layer
+789ff72f798d: Pulling fs layer
+549457ddbe8a: Pulling fs layer
+dd2f29cb11a3: Pulling fs layer
+dd2f29cb11a3: Waiting
+2ec981fa50fa: Verifying Checksum
+2ec981fa50fa: Download complete
+dd2f29cb11a3: Verifying Checksum
+dd2f29cb11a3: Download complete
+789ff72f798d: Verifying Checksum
+789ff72f798d: Download complete
+2ec981fa50fa: Pull complete
+549457ddbe8a: Verifying Checksum
+549457ddbe8a: Download complete
+789ff72f798d: Pull complete
+549457ddbe8a: Pull complete
+dd2f29cb11a3: Pull complete
+Digest: sha256:8013f039e8005627f10ae66b5519d1a6eeeed7d7aef4b5067d5e9a86c4302fcc
+Status: Downloaded newer image for sourcescan/cargo-near@sha256:8013f039e8005627f10ae66b5519d1a6eeeed7d7aef4b5067d5e9a86c4302fcc
+docker.io/sourcescan/cargo-near:0.23.0-rust-1.99.1@sha256:8013f039e8005627f10ae66b5519d1a6eeeed7d7aef4b5067d5e9a86c4302fcc
+• done
+
+• Running build in docker command step...
+build command in container: cargo near build non-reproducible-wasm --locked
+
+Note: `near` CLI configuration is stored in "/home/near/.config/near-cli/config.toml"
+[INFO]-[container] cargo-near/src/commands/build/actions/non_reproducible_wasm/mod.rs:247 - Passed additional environment pairs:
+│    []
+[INFO]-[container] cargo-near-build/src/near/build/mod.rs:527 - Command execution:
+ |    Command {
+ |        program: "rustc",
+ |        args: [
+ |            "rustc",
+ |            "-vV",
+ |        ],
+ |        env: CommandEnv {
+ |            clear: false,
+ |            vars: {
+ |                "RUSTUP_TOOLCHAIN": Some(
+ |                    "1.99.1-x86_64-unknown-linux-gnu",
+ |                ),
+ |            },
+ |        },
+ |        create_pidfd: false,
+ |    }
+• Collecting cargo project metadata...
+[INFO]-[container] cargo-near-build/src/types/cargo/metadata.rs:268 - Fetching cargo metadata for /home/near/code/contracts/dmw/Cargo.toml
+[INFO]-[container] cargo-near-build/src/types/cargo/metadata.rs:285 - Command execution:
+ |    Command {
+ |        program: "/home/near/.rustup/toolchains/1.99.1-x86_64-unknown-linux-gnu/bin/cargo",
+ |        args: [
+ |            "/home/near/.rustup/toolchains/1.99.1-x86_64-unknown-linux-gnu/bin/cargo",
+ |            "metadata",
+ |            "--format-version",
+ |            "1",
+ |            "--manifest-path",
+ |            "/home/near/code/contracts/dmw/Cargo.toml",
+ |            "--locked",
+ |        ],
+ |        create_pidfd: false,
+ |    }
+• done
+
+• Checking rustc version...
+INFO: contract's near-sdk targets protocol version 85; rustc 1.99.1 accepted (bulk-memory opcodes supported by nearcore VM)
+• done
+
+• Checking the host environment...
+[INFO]-[container] cargo-near-build/src/cargo_native/target.rs:56 - Command execution:
+ |    `RUSTUP_TOOLCHAIN=1.99.1-x86_64-unknown-linux-gnu rustc --target wasm32-unknown-unknown --print target-libdir`
+[INFO]-[container] cargo-near-build/src/cargo_native/target.rs:15 - Found wasm32-unknown-unknown in "/home/near/.rustup/toolchains/1.99.1-x86_64-unknown-linux-gnu/lib/rustlib/wasm32-unknown-unknown/lib"
+[INFO]-[container] cargo-near-build/src/types/cargo/metadata.rs:94 - Resolved output directory: /home/near/code/contracts/dmw/target/near
+[INFO]-[container] cargo-near-build/src/types/near/build/buildtime_env/command.rs:43 - NEP330_BUILD_INFO_BUILD_COMMAND=["cargo","near","build","non-reproducible-wasm","--locked"]
+[INFO]-[container] cargo-near-build/src/env_keys.rs:87 - Variables, relevant for reproducible builds:
+ |    {
+ |        "NEP330_BUILD_INFO_BUILD_ENVIRONMENT": "sourcescan/cargo-near:0.23.0-rust-1.99.1@sha256:8013f039e8005627f10ae66b5519d1a6eeeed7d7aef4b5067d5e9a86c4302fcc",
+ |        "NEP330_BUILD_INFO_SOURCE_CODE_SNAPSHOT": "git+https://github.com/bigbenny1231/will-wallet?rev=6c581107017ad53414a2970a1b85497c35d4c57d",
+ |        "NEP330_BUILD_INFO_CONTRACT_PATH": "contracts/dmw",
+ |        "NEP330_LINK": "https://github.com/bigbenny1231/will-wallet/tree/6c581107017ad53414a2970a1b85497c35d4c57d",
+ |    }
+• done
+
+• Generating ABI
+[INFO]-[container] cargo-near-build/src/cargo_native/compile.rs:156 - Invoking cargo:
+ |    Command {
+ |        program: "/home/near/.rustup/toolchains/1.99.1-x86_64-unknown-linux-gnu/bin/cargo",
+ |        args: [
+ |            "/home/near/.rustup/toolchains/1.99.1-x86_64-unknown-linux-gnu/bin/cargo",
+ |            "build",
+ |            "--message-format=json-render-diagnostics",
+ |            "--features",
+ |            "near-sdk/__abi-generate",
+ |            "--locked",
+ |            "--color",
+ |            "never",
+ |        ],
+ |        env: CommandEnv {
+ |            clear: false,
+ |            vars: {
+ |                "CARGO_ENCODED_RUSTFLAGS": None,
+ |                "CARGO_NEAR_ABI_GENERATION": Some(
+ |                    "true",
+ |                ),
+ |                "CARGO_NEAR_ABI_SCHEMA_VERSION": Some(
+ |                    "0.4.0",
+ |                ),
+ |                "CARGO_NEAR_VERSION": Some(
+ |                    "cargo-near-build 0.11.5",
+ |                ),
+ |                "CARGO_PROFILE_DEV_DEBUG": Some(
+ |                    "0",
+ |                ),
+ |                "CARGO_PROFILE_DEV_LTO": Some(
+ |                    "off",
+ |                ),
+ |                "CARGO_PROFILE_DEV_OPT_LEVEL": Some(
+ |                    "0",
+ |                ),
+ |                "CARGO_TARGET_DIR": Some(
+ |                    "/home/near/code/contracts/dmw/target/cargo-near-abi",
+ |                ),
+ |                "NEP330_BUILD_INFO_BUILD_COMMAND": Some(
+ |                    "[\"cargo\",\"near\",\"build\",\"non-reproducible-wasm\",\"--locked\"]",
+ |                ),
+ |                "NEP330_BUILD_INFO_OUTPUT_WASM_PATH": Some(
+ |                    "/home/near/code/contracts/dmw/target/near/dmw.wasm",
+ |                ),
+ |                "NEP330_VERSION": Some(
+ |                    "0.1.0",
+ |                ),
+ |                "RUSTFLAGS": Some(
+ |                    "-Awarnings",
+ |                ),
+ |                "RUSTUP_TOOLCHAIN": Some(
+ |                    "1.99.1-x86_64-unknown-linux-gnu",
+ |                ),
+ |            },
+ |        },
+ |        cwd: Some(
+ |            "/home/near/code/contracts/dmw",
+ |        ),
+ |        create_pidfd: false,
+ |    }
+ │     Updating crates.io index
+ │  Downloading crates ...
+ │   Downloaded serde_derive_internals v0.29.1
+ │   Downloaded schemars_derive v0.8.22
+ │   Downloaded schemars v0.8.22
+ │   Downloaded near-abi v0.4.5
+ │    Compiling proc-macro2 v1.0.107
+ │    Compiling quote v1.0.47
+ │    Compiling unicode-ident v1.0.27
+ │    Compiling typenum v1.20.1
+ │    Compiling syn v3.0.9
+ │    Compiling syn v2.0.119
+ │    Compiling hashbrown v0.17.1
+ │    Compiling equivalent v1.0.3
+ │    Compiling zmij v1.0.23
+ │    Compiling serde_core v1.0.229
+ │    Compiling serde_derive v1.0.229
+ │    Compiling winnow v1.0.5
+ │    Compiling itoa v1.0.18
+ │    Compiling memchr v2.8.3
+ │    Compiling ident_case v1.0.1
+ │    Compiling toml_parser v1.1.5+spec-1.1.0
+ │    Compiling indexmap v2.14.2
+ │    Compiling hybrid-array v0.4.15
+ │    Compiling serde v1.0.229
+ │    Compiling serde_json v1.0.154
+ │    Compiling toml_datetime v1.1.3+spec-1.1.0
+ │    Compiling toml_edit v0.25.19+spec-1.1.0
+ │    Compiling serde_derive_internals v0.29.1
+ │    Compiling foldhash v0.2.0
+ │    Compiling cfg_aliases v0.2.2
+ │    Compiling schemars v0.8.22
+ │    Compiling borsh v1.8.1
+ │    Compiling schemars_derive v0.8.22
+ │    Compiling proc-macro-crate v3.5.0
+ │    Compiling block-buffer v0.12.1
+ │    Compiling crypto-common v0.2.2
+ │    Compiling once_cell v1.21.4
+ │    Compiling dyn-clone v1.0.20
+ │    Compiling const-oid v0.10.2
+ │    Compiling version_check v0.9.5
+ │    Compiling generic-array v0.14.9
+ │    Compiling digest v0.11.3
+ │    Compiling borsh-derive v1.8.1
+ │    Compiling cfg-if v1.0.5
+ │    Compiling strsim v0.11.1
+ │    Compiling darling_core v0.24.1
+ │    Compiling keccak v0.2.2
+ │    Compiling sha3 v0.11.0
+ │    Compiling rustversion v1.0.23
+ │    Compiling hex v0.4.3
+ │    Compiling fnv v1.0.7
+ │    Compiling bs58 v0.5.1
+ │    Compiling darling_core v0.20.11
+ │    Compiling darling_macro v0.24.1
+ │    Compiling darling v0.24.1
+ │    Compiling serde_with_macros v3.24.0
+ │    Compiling block-buffer v0.10.4
+ │    Compiling crypto-common v0.1.6
+ │    Compiling base64 v0.23.1
+ │    Compiling serde_with v3.24.0
+ │    Compiling digest v0.10.7
+ │    Compiling darling_macro v0.20.11
+ │    Compiling near-account-id v3.0.0
+ │    Compiling near-gas v0.3.7
+ │    Compiling near-token v0.3.6
+ │    Compiling near-crypto-hash v0.2.0
+ │    Compiling near-sdk-macros v5.30.1
+ │    Compiling cpufeatures v0.3.1
+ │    Compiling heck v0.5.0
+ │    Compiling base64 v0.22.1
+ │    Compiling near-sdk-core v4.4.2
+ │    Compiling strum_macros v0.26.4
+ │    Compiling sha2 v0.11.1
+ │    Compiling darling v0.20.11
+ │    Compiling ripemd v0.1.3
+ │    Compiling near-digest v0.1.5
+ │    Compiling digest-io v0.1.0
+ │    Compiling cfg_eval v0.1.2
+ │    Compiling semver v1.0.28
+ │    Compiling Inflector v0.11.4
+ │    Compiling strum v0.26.3
+ │    Compiling near-abi v0.4.5
+ │    Compiling near-global-contracts v0.3.3
+ │    Compiling near-sdk-env v0.1.9
+ │    Compiling bytes v1.12.1
+ │    Compiling rustc-hex v2.1.0
+ │    Compiling hex-literal v1.1.0
+ │    Compiling near-sys v0.4.1
+ │    Compiling near-sdk v5.30.1
+ │    Compiling rlp v0.6.1
+ │    Compiling omni-transaction v0.5.0
+ │    Compiling near-contract-standards v5.30.1
+ │    Compiling dmw v0.1.0 (/home/near/code/contracts/dmw)
+ │     Finished `dev` profile [unoptimized] target(s) in 32.09s
+• Extracting ABI...
+[INFO]-[container] cargo-near-build/src/near/abi/generate/dylib.rs:16 - A dylib was built at "/home/near/code/contracts/dmw/target/cargo-near-abi/debug/libdmw.so" with format elf for architecture x86_64
+[INFO]-[container] cargo-near-build/src/near/abi/generate/dylib.rs:32 - Detected NEAR ABI symbols:
+ |    {
+ |        "__near_abi_nft_transfer",
+ |        "__near_abi_contract_source_metadata",
+ |        "__near_abi_foreign_fail",
+ |        "__near_abi_new",
+ |    }
+• done
+
+• Compressing ABI to be embedded..
+• done
+
+• Building contract
+[INFO]-[container] cargo-near-build/src/cargo_native/compile.rs:156 - Invoking cargo:
+ |    Command {
+ |        program: "/home/near/.rustup/toolchains/1.99.1-x86_64-unknown-linux-gnu/bin/cargo",
+ |        args: [
+ |            "/home/near/.rustup/toolchains/1.99.1-x86_64-unknown-linux-gnu/bin/cargo",
+ |            "build",
+ |            "--message-format=json-render-diagnostics",
+ |            "--target",
+ |            "wasm32-unknown-unknown",
+ |            "--profile",
+ |            "release",
+ |            "--locked",
+ |            "--features",
+ |            "near-sdk/__abi-embed",
+ |            "--color",
+ |            "never",
+ |        ],
+ |        env: CommandEnv {
+ |            clear: false,
+ |            vars: {
+ |                "CARGO_ENCODED_RUSTFLAGS": Some(
+ |                    "-C\u{1f}link-arg=-s\u{1f}--cfg\u{1f}near",
+ |                ),
+ |                "CARGO_NEAR_ABI_PATH": Some(
+ |                    "/home/near/code/contracts/dmw/target/near/dmw_abi.zst",
+ |                ),
+ |                "CARGO_NEAR_ABI_SCHEMA_VERSION": Some(
+ |                    "0.4.0",
+ |                ),
+ |                "CARGO_NEAR_VERSION": Some(
+ |                    "cargo-near-build 0.11.5",
+ |                ),
+ |                "NEP330_BUILD_INFO_BUILD_COMMAND": Some(
+ |                    "[\"cargo\",\"near\",\"build\",\"non-reproducible-wasm\",\"--locked\"]",
+ |                ),
+ |                "NEP330_BUILD_INFO_OUTPUT_WASM_PATH": Some(
+ |                    "/home/near/code/contracts/dmw/target/near/dmw.wasm",
+ |                ),
+ |                "NEP330_VERSION": Some(
+ |                    "0.1.0",
+ |                ),
+ |                "RUSTUP_TOOLCHAIN": Some(
+ |                    "1.99.1-x86_64-unknown-linux-gnu",
+ |                ),
+ |            },
+ |        },
+ |        cwd: Some(
+ |            "/home/near/code/contracts/dmw",
+ |        ),
+ |        create_pidfd: false,
+ |    }
+ │    Compiling proc-macro2 v1.0.107
+ │    Compiling quote v1.0.47
+ │    Compiling unicode-ident v1.0.27
+ │    Compiling ident_case v1.0.1
+ │    Compiling zmij v1.0.23
+ │    Compiling hashbrown v0.17.1
+ │    Compiling syn v3.0.9
+ │    Compiling syn v2.0.119
+ │    Compiling serde_core v1.0.229
+ │    Compiling winnow v1.0.5
+ │    Compiling equivalent v1.0.3
+ │    Compiling indexmap v2.14.2
+ │    Compiling toml_datetime v1.1.3+spec-1.1.0
+ │    Compiling toml_parser v1.1.5+spec-1.1.0
+ │    Compiling toml_edit v0.25.19+spec-1.1.0
+ │    Compiling serde_derive v1.0.229
+ │    Compiling cfg_aliases v0.2.2
+ │    Compiling borsh v1.8.1
+ │    Compiling proc-macro-crate v3.5.0
+ │    Compiling once_cell v1.21.4
+ │    Compiling strsim v0.11.1
+ │    Compiling serde v1.0.229
+ │    Compiling darling_core v0.24.1
+ │    Compiling borsh-derive v1.8.1
+ │    Compiling typenum v1.20.1
+ │    Compiling darling_macro v0.24.1
+ │    Compiling hybrid-array v0.4.15
+ │    Compiling proc-macro-error-attr3 v3.1.1
+ │    Compiling serde_json v1.0.154
+ │    Compiling proc-macro-error3 v3.1.1
+ │    Compiling darling v0.24.1
+ │    Compiling rustversion v1.0.23
+ │    Compiling foldhash v0.2.0
+ │    Compiling itoa v1.0.18
+ │    Compiling memchr v2.8.3
+ │    Compiling bs58 v0.5.1
+ │    Compiling near-sys v0.4.1
+ │    Compiling hex v0.4.3
+ │    Compiling fnv v1.0.7
+ │    Compiling darling_core v0.20.11
+ │    Compiling near-sdk-env v0.1.9
+ │    Compiling serde_with_macros v3.24.0
+ │    Compiling impl-tools-lib v0.12.0
+ │    Compiling crypto-common v0.2.2
+ │    Compiling block-buffer v0.12.1
+ │    Compiling base64 v0.23.1
+ │    Compiling serde_with v3.24.0
+ │    Compiling digest v0.11.3
+ │    Compiling impl-tools v0.12.0
+ │    Compiling darling_macro v0.20.11
+ │    Compiling near-token v0.3.6
+ │    Compiling near-account-id v3.0.0
+ │    Compiling near-gas v0.3.7
+ │    Compiling heck v0.5.0
+ │    Compiling near-crypto-hash v0.2.0
+ │    Compiling base64 v0.22.1
+ │    Compiling near-sdk-macros v5.30.1
+ │    Compiling wee_alloc v0.4.5
+ │    Compiling near-sdk-core v4.4.2
+ │    Compiling strum_macros v0.26.4
+ │    Compiling darling v0.20.11
+ │    Compiling near-digest v0.1.5
+ │    Compiling cfg_eval v0.1.2
+ │    Compiling cfg-if v0.1.10
+ │    Compiling strum v0.26.3
+ │    Compiling Inflector v0.11.4
+ │    Compiling memory_units v0.4.0
+ │    Compiling near-global-contracts v0.3.3
+ │    Compiling bytes v1.12.1
+ │    Compiling hex-literal v1.1.0
+ │    Compiling rustc-hex v2.1.0
+ │    Compiling rlp v0.6.1
+ │    Compiling near-sdk v5.30.1
+ │    Compiling omni-transaction v0.5.0
+ │    Compiling near-contract-standards v5.30.1
+ │    Compiling dmw v0.1.0 (/home/near/code/contracts/dmw)
+ │     Finished `release` profile [optimized] target(s) in 33.39s
+
+• Running an optimize for size post-step with wasm-opt --enable-nontrapping-float-to-int --enable-bulk-memory...
+    Finished wasm-opt -O in 3s 865ms
+• done
+
+✓ Contract successfully built! (in CARGO_NEAR_BUILD_ENVIRONMENT=sourcescan/cargo-near:0.23.0-rust-1.99.1@sha256:8013f039e8005627f10ae66b5519d1a6eeeed7d7aef4b5067d5e9a86c4302fcc)
+     -                Binary: /home/near/code/contracts/dmw/target/near/dmw.wasm
+     -                  Size: 497.3 KB (497329 bytes)
+     - SHA-256 checksum hex : 7229e0449924c5da231091e7427ca717943efdfcd5088d4fc789232bde624247
+     - SHA-256 checksum bs58: 8geWkWLte1vsnVStUZtoNkNoL2b6sgLh5wPuSH9n4tna
+     -                   ABI: /home/near/code/contracts/dmw/target/near/dmw_abi.json
+     -          Embedded ABI: /home/near/code/contracts/dmw/target/near/dmw_abi.zst
+    Finished cargo near build in 1m 12s
+Here is the console command if you ever need to re-run it again:
+cargo near build non-reproducible-wasm --locked
+     -                Binary: /home/runner/work/Will-wallet/Will-wallet/contracts/dmw/target/near/dmw.wasm
+     -                  Size: 497.3 KB (497329 bytes)
+     - SHA-256 checksum hex : 7229e0449924c5da231091e7427ca717943efdfcd5088d4fc789232bde624247
+     - SHA-256 checksum bs58: 8geWkWLte1vsnVStUZtoNkNoL2b6sgLh5wPuSH9n4tna
+Here is the console command if you ever need to re-run it again:
+cargo near build reproducible-wasm
+source 6c581107017ad53414a2970a1b85497c35d4c57d  code hash 8geWkWLte1vsnVStUZtoNkNoL2b6sgLh5wPuSH9n4tna  497329 bytes

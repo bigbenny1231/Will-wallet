@@ -1,0 +1,14 @@
+{
+ "token": "1",
+ "owner": "dmw-andrew-13bf.testnet",
+ "heirs": [
+  "dmw-sarah-13bf.testnet",
+  "dmw-ben-13bf.testnet"
+ ],
+ "api": "dmw-api-13bf.testnet",
+ "sources": {
+  "base": "0x7F985ce93d5A3fa32519F3be334d61d93d275f3b",
+  "monad": "0xa8fdcc94b902c32E2aF0788A48A4d082adbE4b91",
+  "solana": "CPRMvCbJ8uebgt4BsNhm94eNB8cfsSXsN1ffKMUMhZdc"
+ }
+}
