@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { AnthropicBrain, OpenAICompatBrain, fromAnthropicResponse, fromOpenAIResponse, pickAnthropicModel, toAnthropicMessages, toOpenAIMessages, type FetchLike } from '../src/brains/llm.js';
+import { ANTHROPIC_DEFAULT_MODEL, AnthropicBrain, OpenAICompatBrain, fromAnthropicResponse, fromOpenAIResponse, toAnthropicMessages, toOpenAIMessages, type FetchLike } from '../src/brains/llm.js';
 import { autoBrain, makeBrain } from '../src/brains/index.js';
 import { loadAgentEnv, parseDotenv } from '../src/env.js';
 import type { Message } from '../src/types.js';
@@ -28,16 +28,20 @@ describe('LLM brains map the tool protocol', () => {
     const seen: any[] = [];
     const b = new AnthropicBrain('sk-test', 'claude-sonnet-x', fakeFetch({ content: [{ type: 'text', text: 'ok' }, { type: 'tool_use', id: 't9', name: 'done', input: { summary: 's' } }] }, seen));
     const step = await b.step(history);
-    expect(step).toEqual({ thought: 'ok', calls: [{ id: 't9', name: 'done', args: { summary: 's' } }] });
+    expect(step).toMatchObject({ thought: 'ok', calls: [{ id: 't9', name: 'done', args: { summary: 's' } }] });
     expect(seen[0].url).toBe('https://api.anthropic.com/v1/messages');
     expect(seen[0].headers['x-api-key']).toBe('sk-test');
     expect(seen[0].body.tools.map((t: any) => t.name)).toEqual(['read_inbox', 'pay', 'done']);
     expect(seen[0].body.model).toBe('claude-sonnet-x');
   });
-  it('anthropic: model is the newest sonnet from /v1/models, with a fallback', async () => {
-    expect(await pickAnthropicModel('k', fakeFetch({ data: [{ id: 'claude-opus-9' }, { id: 'claude-sonnet-9' }, { id: 'claude-sonnet-4-5' }] }))).toBe('claude-sonnet-9');
-    const broken: FetchLike = async () => ({ ok: false, status: 500, text: async () => 'x' });
-    expect(await pickAnthropicModel('k', broken)).toBe('claude-sonnet-4-5');
+  it('anthropic: default model claude-sonnet-5-5, overridden by --model, then ANTHROPIC_MODEL; no model-list call', async () => {
+    expect(ANTHROPIC_DEFAULT_MODEL).toBe('claude-sonnet-5-5');
+    const seen: any[] = [];
+    const f = fakeFetch({ content: [] }, seen);
+    expect(((await makeBrain('anthropic', { ANTHROPIC_API_KEY: 'k' }, { fetch: f })) as AnthropicBrain).model).toBe('claude-sonnet-5-5');
+    expect(((await makeBrain('anthropic', { ANTHROPIC_API_KEY: 'k', ANTHROPIC_MODEL: 'claude-opus-5-5' }, { fetch: f })) as AnthropicBrain).model).toBe('claude-opus-5-5');
+    expect(((await makeBrain('anthropic', { ANTHROPIC_API_KEY: 'k', ANTHROPIC_MODEL: 'claude-opus-5-5' }, { fetch: f, model: 'claude-haiku-5-5' })) as AnthropicBrain).model).toBe('claude-haiku-5-5');
+    expect(seen).toEqual([]);
   });
   it('openai-compatible: assistant tool_calls and tool messages, parsed reply, bearer auth', async () => {
     const msgs = toOpenAIMessages(history);

@@ -27,8 +27,8 @@ export async function runAgent(o: RunOpts): Promise<Summary> {
   for (let n = 1; n <= maxSteps; n++) {
     s.steps = n;
     const step = await brain.step(history);
-    transcript.add(formatStep(n, step.thought));
-    history.push({ role: 'assistant', text: step.thought, calls: step.calls });
+    transcript.add(formatStep(n, step.thought, { reasoning: step.reasoning, meta: step.meta }));
+    history.push({ role: 'assistant', text: step.thought, calls: step.calls, ...(step.raw ? { raw: step.raw } : {}) });
 
     if (step.calls.length === 0) {
       if (nudged) {

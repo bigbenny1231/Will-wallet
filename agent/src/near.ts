@@ -1,7 +1,7 @@
 // The real NEAR backend of the chain port. It is built from ONE secret: the agent function-call key.
 // The signer account is the dmw contract itself, because the contract adds the agent key to its own account
 // (add_agent_key -> AddKey FunctionCall{receiver: contract, methods: [agent_pay]}). There is no other account.
-import { Account, KeyPair, KeyPairSigner, providers } from 'near-api-js';
+import { Account, KeyPair, KeyPairSigner, providers, transactions } from 'near-api-js';
 import type { AccessKeyInfo, TxResult, VaultChain, VaultView } from './types.js';
 import { withRetry } from './util.js';
 
@@ -78,14 +78,23 @@ export class NearChain implements VaultChain {
 
   async agentPay(args: { token_id: string; receiver_id: string; amount: string; memo?: string }): Promise<TxResult> {
     // No retry: a signed transaction is sent once. A retry could double-spend within the allowlist.
-    const outcome = await this.account.callFunctionRaw({
-      contractId: this.contractId,
-      methodName: 'agent_pay',
-      args,
-      gas: AGENT_PAY_GAS,
-      deposit: 0n,
+    // throwOnFailure false: a contract panic comes back as TxResult.failure WITH its transaction hash, so the
+    // transcript can link the failed transaction instead of only quoting an error.
+    const outcome = await this.account.signAndSendTransaction({
+      receiverId: this.contractId,
+      actions: [transactions.functionCall('agent_pay', args, AGENT_PAY_GAS, 0n)],
       waitUntil: 'EXECUTED',
+      throwOnFailure: false,
     });
     return toTxResult(outcome);
   }
+}
+
+/** A short, readable reason from a node failure JSON (`status.Failure`), for reports. */
+export function failureReason(failure: string): string {
+  const panic = failure.match(/Smart contract panicked: ([^"\\]+)/);
+  if (panic) return `contract panicked: ${panic[1].trim()}`;
+  const exec = failure.match(/"ExecutionError":"([^"]+)"/);
+  if (exec) return exec[1];
+  return failure.slice(0, 160);
 }

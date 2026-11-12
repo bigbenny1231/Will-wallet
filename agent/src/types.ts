@@ -27,6 +27,8 @@ export interface VaultView {
   derivation_paths?: { base: string; monad: string; solana: string };
   agent_keys: string[];
   log: { ms: number; event: string; detail: string }[];
+  /** v2: NEAR the vault has set aside for its own storage. A call that grows storage moves balance here. */
+  storage_deposit?: string;
 }
 
 export interface TxResult {
@@ -63,12 +65,38 @@ export interface ToolCall {
 
 export type Message =
   | { role: 'user'; text: string }
-  | { role: 'assistant'; text?: string; calls: ToolCall[] }
+  | {
+      role: 'assistant';
+      text?: string;
+      calls: ToolCall[];
+      /**
+       * The provider's own content blocks for this turn, when the brain needs them sent back unchanged (Anthropic:
+       * thinking blocks are bound to the conversation and must be replayed exactly). Only that brain reads it.
+       */
+      raw?: { provider: string; content: unknown[] };
+    }
   | { role: 'tool'; callId: string; name: string; content: string };
+
+/** What an LLM brain reports about one decision, for the evidence transcript. Never holds a secret. */
+export interface DecisionMeta {
+  /** The model that answered (the response's own `model` field), which can differ from the one asked for. */
+  model?: string;
+  stopReason?: string;
+  requestId?: string;
+  inputTokens?: number;
+  outputTokens?: number;
+  latencyMs?: number;
+  /** Anything unusual about this decision: a refusal, a truncated reply, a retried request, a dropped feature. */
+  notes?: string[];
+}
 
 export interface BrainStep {
   thought?: string;
   calls: ToolCall[];
+  /** The model's reasoning summary, when the API returns one. */
+  reasoning?: string;
+  meta?: DecisionMeta;
+  raw?: { provider: string; content: unknown[] };
 }
 
 export interface Brain {
