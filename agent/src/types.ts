@@ -24,7 +24,7 @@ export interface VaultView {
   /** v2 only: the agent spends inside the rolling 24 h window. */
   spends?: { ms: number; amount: string }[];
   /** v2 only: the salted MPC derivation paths of this vault's foreign source addresses. */
-  derivation_paths?: { base: string; monad: string; solana: string; salt: string };
+  derivation_paths?: { base: string; monad: string; solana: string };
   agent_keys: string[];
   log: { ms: number; event: string; detail: string }[];
 }

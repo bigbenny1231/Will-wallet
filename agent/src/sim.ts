@@ -85,7 +85,7 @@ export function simVault(now = Date.now(), over: Partial<VaultView> = {}): Vault
     daily_spent: '0',
     daily_window_start_ms: 0,
     spends: [],
-    derivation_paths: { base: 'base-1-00000000000000a1', monad: 'monad-1-00000000000000a1', solana: 'solana-1-00000000000000a1', salt: '00000000000000a1' },
+    derivation_paths: { base: 'base-1-00000000000000a1', monad: 'monad-1-00000000000000a1', solana: 'sol-1-00000000000000a1' },
     agent_keys: ['ed25519:SIMULATEDAGENTKEY'],
     log: [],
     ...over,
