@@ -9,8 +9,8 @@ storage layout. Going live therefore means a new account: `NEW=1 make deploy`. `
 a v1 account.
 
 **Tests.** Every row below has at least one regression test. After the first pass `cargo test` ran 134 contract tests:
-the 105 from v1 plus 29 new ones. The second review (below) brings it to 146: the reviewer's 4 tests in `audit_v2.rs`
-and 8 more in `tests.rs`.
+the 105 from v1 plus 29 new ones. The second review (below) brings it to 148: the reviewer's 4 tests in `audit_v2.rs`
+and 1 in `audit_v2b.rs`, and 9 more in `tests.rs`.
 
 **How the tests were checked.** The tests target behaviour that v1 lacks. Most of them would not even compile against
 10eb479, because the interface changed. They were not run against the old wasm. Attacks B and D were reproduced on
@@ -105,11 +105,40 @@ and pass now. `cargo fmt` reflowed that file; no test logic changed.
 | **F1 (high).** Any operator (every heir, the vault owner, the vault keeper) could re-sign a Solana payout that was already `signed` or `broadcast`. Solana has no nonce, so each new blockhash gave a second valid payment from the shared `sol-<id>-<salt>` address, every 5 minutes. | `foreign.rs resign_foreign`: a `signed`/`broadcast` Solana payout may only be re-signed by a keeper, `lib.rs is_keeper` (the contract owner while it is not the contract itself, the contract keeper, the vault keeper). Heirs and the vault owner may re-sign a `failed` Solana payout. EVM is unchanged: the nonce is pinned per payout, so a re-sign only replaces the transaction, and at most one can land. `mark_broadcast` was checked for the same class: it only labels a `signed` payout whose hash matches, and since both `signed` and `broadcast` are keeper-only for a Solana re-sign, it opens nothing. A failed re-sign never flips a payout to `failed`. | `audit_heir_can_resign_broadcast_solana_payout`, `r2_f1_signed_solana_resign_is_keeper_only`, `r2_f1_vault_keeper_may_resign_signed_solana`, `r2_f1_heir_may_still_bump_signed_evm_payout`; `h1_mark_broadcast_rejects_fake_hash_and_resign_still_possible` |
 | **F2 (medium).** The key-allowance refund only counted key calls that succeeded. Panicked calls and padded arguments burn allowance gas from the contract balance without being counted, so `remove_key`, step 2 and a sale refunded about 0.99 NEAR of other vaults' money per cycle. | The refund is gone (v1 behaviour): `lib.rs release_key` only drops the key from `key_index` and its access-key bytes from `storage_bytes`. `note_key_gas`, `KeyRecord.spent`, `KEY_CALL_OVERHEAD_GAS` and `KEY_REFUND_MARGIN` are removed; `take_keys`, `move_owner`, step 2 and `remove_key` credit nothing, and their events no longer carry `allowance_refund` (the `key_add_failed` / `key_add_revoked` events now do: 1 NEAR or 0). The same applies to `on_key_added`'s revoke paths (final audit L-11 and L-12: a key that lands after a trigger or a sale, or over the cap of 5): the key existed until its delete landed, and an owner can time that window and burn the allowance with failing calls, so those paths no longer refund either. Only a failed AddKey (no key ever existed) still returns the allowance. | `audit_key_refund_ignores_reverted_key_calls`, `v2_remove_key_does_not_refund_allowance`, `v2_b_sale_resets_vault_for_buyer`; updated: `l11_revoked_key_add_keeps_allowance_once_the_key_existed` (was `l11_revoked_key_add_refunds_allowance`), `l12_key_cap_enforced_when_add_lands` |
 | **F3 (low).** Credits that landed after step 1's bps split (the step-5 storage release, key refunds, late refunds and deposits) went 100% to the primary heir through `claim`. | Key refunds no longer exist (F2). A new `Vault.unsplit` counts deposits and refunded agent spends or bounties that land while Triggered after step 1 (`lib.rs credit`, used by `deposit` and `on_transfer_done`). Step 5 pays the released storage deposit plus `unsplit` to the heirs by bps (`heir_shares`, shared with step 1), with the usual failed-transfer callback. The NFT owner still claims the unspent reserve, a failed heir transfer (the heir cannot receive it) and anything credited after settlement. | `audit_post_step1_credits_skip_the_heir_split`, `r2_f3_post_step1_credits_split_by_bps`, `step4_failed_dao_call_never_recredits_the_bond` |
-| **F4 (low).** After the 1-hour window a stranger (or any heir) could sign an EVM payout at the fee cap with a 100k gas limit. A re-sign needed 110% of the cap, so nobody could ever re-sign it. | `foreign.rs is_fee_bump`: a fee at the chain cap counts as a valid bump, so a cap signature can be replaced (for example with a lower gas limit). `limit_non_keeper_evm_args`: in step 3 and in `resign_foreign`, a non-keeper's `max_fee_per_gas` is clamped to 50% of the cap, its priority fee to 10% of the cap, and its gas limit to the chain floor (50 000). Clamped, not rejected, so settlement never stalls on it. Honest fees are far below (Base about 0.001 gwei of 100; Monad about 202 gwei of 1000). | `audit_stranger_cap_fee_signature_blocks_every_resign`, `r2_f4_non_keeper_step3_fees_are_clamped`, `r2_f4_cap_signature_can_be_resigned_at_the_cap` |
+| **F4 (low).** After the 1-hour window a stranger (or any heir) could sign an EVM payout at the fee cap with a 100k gas limit. A re-sign needed 110% of the cap, so nobody could ever re-sign it. | `foreign.rs is_fee_bump`: a fee at the chain cap counts as a valid bump, so a cap signature can be replaced (for example with a lower gas limit). `limit_non_keeper_evm_args`: in step 3 and in `resign_foreign`, a non-keeper's `max_fee_per_gas` is clamped to 50% of the cap, its priority fee to 10% of the cap, and its gas limit to the chain floor (50 000). Clamped, not rejected, so settlement never stalls on it. Honest fees are far below (Base about 0.001 gwei of 100; Monad about 202 gwei of 1000). **Tightened by G1 below:** the clamp is now per chain (Base 10 gwei, Monad 200 gwei) and a keeper is no longer bound by the bump rule. | `audit_stranger_cap_fee_signature_blocks_every_resign`, `r2_f4_non_keeper_step3_fees_are_clamped`, `r2_f4_cap_signature_can_be_resigned_at_the_cap` |
 | **Info.** `set_keeper` took no deposit, so a function-call key of the keeper account could hand the global role over. | `set_keeper` is `#[payable]` and calls `assert_one_yocto`. | `r2_set_keeper_needs_one_yocto`, `v2_c_keeper_rotates_itself_on_locked_contract`, `set_keeper_is_owner_only` |
 | **Info.** An owner `unpause` (1 yocto, a signed owner call) did not count as proof of life, so it could make the vault due at once. | `unpause` also sets `last_beat_ms = now`. SPEC had no rule against it. The guardian is still not re-armed until the next heartbeat. | `r2_unpause_restarts_the_heartbeat_clock`, `v2_l4_owner_unpause` |
 
+**G1 (low), found on the reviewer's second pass.** F4 was only partly closed. The re-sign fee ratchet still only went
+up. An heir (inside the operator window, racing the keeper right after step 2) or anyone (after the hour) could sign
+first at the clamped 50% of the cap: 50 gwei max fee and 10 gwei priority on Base with the 50 000 gas floor, so a node
+demands value + 0.0025 ETH (Monad: value + 0.025 MON against an honest buffer of about 0.01 MON). The keeper could
+then only re-sign at 110% of that or at the cap, never at an honest fee, so the payout could not be mined unless
+someone topped up the derived address.
+
+| Fix | Tests |
+| --- | --- |
+| `foreign.rs resign_foreign`: a keeper (`is_keeper`) may re-sign a `signed`/`broadcast` EVM payout at any fee and gas limit within the caps. The nonce is pinned per payout, so the new tx can only replace the old one, never pay twice. The 110% (or at-the-cap) bump rule now applies only to non-keepers. `limit_non_keeper_evm_args` clamps a non-keeper's max fee, and its priority fee (never above the max fee), to the new per-chain `EvmChain::non_keeper_max_fee_per_gas` (published in `get_config().chains[]`): **Base 10 gwei** (10% of the cap; 50 000 gas x 10 gwei = 0.0005 ETH above the value) and **Monad 200 gwei** (20% of the cap). On Monad, 10% would be 100 gwei, exactly Monad's base-fee floor, with no headroom at all. 200 gwei x the 50 000 gas floor = 0.01 MON, the honest buffer: an honest keeper signs 2 x base fee + priority, about 202 gwei. The keeper backend (`keeperLoop.ts handleStale`, `NearBackend.isKeeperFor`) now re-signs at the fresh honest fees when it is the contract or vault keeper, and bumps only otherwise. | `audit_v2b.rs audit2_heir_preempts_keeper_and_keeper_cannot_lower_fees`, `r2_g1_keeper_may_resign_evm_at_any_fee_and_gas`, `r2_f4_non_keeper_step3_fees_are_clamped`; updated: `c1_evm_resign_reuses_nonce_and_requires_fee_bump` (the same-fee refusal is now shown for an heir); keeper "EVM re-sign as the keeper sends the fresh honest fees" and "... as a non-keeper operator ... 1.1 x last" |
+
+One line of `audit_v2b.rs` was changed: it asserted the old 50% clamp (`cap / 2`) for the heir's signature, and now
+asserts the new 10% (`cap / 10`). The finding's assertion (the keeper's honest re-sign is accepted) is unchanged.
+
+**Non-keeper gas limit (info, with G1).** A non-keeper still signs with the chain's 50 000 gas floor. That covers a plain
+transfer to an EOA and to the usual contract recipients: a Safe or smart-wallet `receive` takes about 26-30k gas, a
+WETH-like deposit about 45k (final audit H-5). A higher non-keeper limit was not chosen. Monad bills the full gas limit,
+so 100 000 gas would double the balance a node demands, above the honest buffer. On Base, 100 000 gas at 10 gwei would
+need 0.001 ETH on top of the value, where honest fees need almost nothing. **Residual:** if a recipient needs more than
+50 000 gas, a non-keeper's signature that gets relayed reverts on chain, burns the payout's pinned nonce and strands its
+funds in the source address. Since G1, a keeper can re-sign with a higher gas limit at any time before something is
+mined. The dashboard now warns, on Create and on the vault page, when an EVM payout recipient has code (`eth_getCode`,
+`dashboard/src/lib/chains.ts contractRecipients`, tested in `accounts.test.ts`).
+
 **Documented, not changed.**
+
+- **A vault keeper can re-sign a Solana payout.** The vault keeper is chosen by the vault owner (`set_vault_keeper`)
+  and counts as a keeper, so it can re-sign a `signed` or `broadcast` Solana payout. Each re-sign is a potential second
+  payment, as in v1 for the contract keeper. Owners should name only a vault keeper they trust as much as the
+  contract keeper, and the keeper must check that the old signature never landed before re-signing.
 
 - **Foreign balances go with the vault on a sale.** A Will NFT sale resets the vault for the buyer but keeps its salt,
   so `base-`, `monad-` and `sol-<id>-<salt>` stay the same addresses. Whatever the seller left there now funds the
@@ -135,5 +164,8 @@ and pass now. `cargo fmt` reflowed that file; no test logic changed.
 - Removing a key, selling the Will NFT and settlement no longer return any of the 1 NEAR key allowance.
 - At step 5, each heir receives their bps share of the released storage deposit and of anything credited after step 1.
 - Only the keeper relays a fresh Solana signature for a payout that already has one.
+- The keeper can re-sign an EVM payout at an honest fee even after an heir or a stranger signed it at a higher one;
+  an heir's or a stranger's EVM fees are clamped to 10 gwei on Base and 200 gwei on Monad.
+- The dashboard warns when an EVM payout recipient is a contract.
 - `set_keeper` needs a wallet confirmation (1 yoctoNEAR).
 - `unpause` also counts as a heartbeat.
