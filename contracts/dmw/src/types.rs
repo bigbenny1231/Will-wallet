@@ -107,13 +107,12 @@ pub struct Spend {
     pub amount: U128,
 }
 
-/// A registered pulse/agent key: the vault it serves and the gas it is estimated to have burned
-/// from its allowance (v2: `remove_key` and settlement refund the unspent part to the vault).
+/// A registered pulse/agent key: the vault it serves. The key's 1 NEAR gas allowance is the cost
+/// of the key and is never refunded (v2 second review, F2).
 #[near(serializers = [borsh])]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct KeyRecord {
     pub token_id: u64,
-    pub spent: u128,
 }
 
 /// Derivation paths of a vault's foreign source addresses (v2: salted, owner-bound).
@@ -169,6 +168,10 @@ pub struct Vault {
     pub storage_bytes: u64,
     /// yoctoNEAR held for this vault's storage (>= storage_bytes x byte cost).
     pub storage_deposit: u128,
+    /// Credits that landed in `balance` after step 1 split it (deposits, refunds of agent spends
+    /// and bounties). Step 5 pays them, with the released storage deposit, to the heirs by bps
+    /// (second review F3), so they do not all go to the NFT owner through `claim`.
+    pub unsplit: u128,
     /// Guardian config and pause state. NOT part of the stored `Vault` bytes (existing
     /// vaults keep their layout): kept in the raw slot `guard:<token_id>` and filled in
     /// by `Contract::load` on every read.

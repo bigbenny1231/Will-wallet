@@ -85,8 +85,16 @@ pub const MAX_EVM_GAS_LIMIT: u128 = 100_000;
 /// transfer to an EOA still costs 21 000; Monad bills the limit (50 000 x 202 gwei ~ 0.01 MON).
 pub const EVM_GAS_LIMIT_FLOOR: u128 = 50_000;
 /// Re-signing a `signed`/`broadcast` EVM payout needs both fee fields >= 110% of the last
-/// request (and still within the chain's cap).
+/// request, or at the chain's cap (second review F4: a signature at the cap stays re-signable,
+/// e.g. with a lower gas limit, instead of needing a fee above the cap).
 pub const EVM_FEE_BUMP_PCT: u128 = 110;
+/// EVM fees a non-keeper (heir, vault owner, or anyone once the step-3 window is open) may pick,
+/// as a share of the chain's cap: max fee <= 50% of the cap, priority fee <= 10% of the cap, and
+/// the gas limit is the chain floor (second review F4). Larger values are clamped, not rejected,
+/// so settlement never stalls on them. Only a keeper (`Contract::is_keeper`) signs beyond these.
+/// Honest fees sit far below: Base ~0.001 gwei of a 100 gwei cap; Monad ~202 gwei of 1000.
+pub const NON_KEEPER_MAX_FEE_PCT: u128 = 50;
+pub const NON_KEEPER_PRIORITY_FEE_PCT: u128 = 10;
 /// Minimum age of the last signature request before any payout may be re-signed (Solana: the
 /// old blockhash is long expired; EVM: rate limit on fee ratchets and status flips).
 pub const RESIGN_COOLDOWN_MS: u64 = 5 * 60 * 1000;
@@ -398,6 +406,31 @@ pub fn effective_evm_args(mut a: EvmArgs, foreign: &[ForeignPayout], index: usiz
     a
 }
 
+/// Clamp validated EVM args into what a non-keeper may choose (see `NON_KEEPER_MAX_FEE_PCT`).
+pub fn limit_non_keeper_evm_args(mut a: EvmArgs, chain: ForeignChain) -> EvmArgs {
+    let c = chain
+        .evm()
+        .unwrap_or_else(|| env::panic_str("not an evm chain"));
+    // cap <= 1e12 wei: these products cannot overflow.
+    let max_fee = c.max_fee_per_gas * NON_KEEPER_MAX_FEE_PCT / 100;
+    let max_prio = c.max_fee_per_gas * NON_KEEPER_PRIORITY_FEE_PCT / 100;
+    a.max_fee_per_gas = U128(a.max_fee_per_gas.0.min(max_fee));
+    a.max_priority_fee_per_gas = U128(
+        a.max_priority_fee_per_gas
+            .0
+            .min(max_prio)
+            .min(a.max_fee_per_gas.0),
+    );
+    a.gas_limit = U128(c.min_gas_limit);
+    a
+}
+
+/// True when `new` is a valid replacement fee for `last`: >= 110% of it, or at the chain cap
+/// (a signature already at the cap can still be replaced; second review F4).
+pub fn is_fee_bump(new: u128, last: u128, cap: u128) -> bool {
+    new >= cap || new.saturating_mul(100) >= last.saturating_mul(EVM_FEE_BUMP_PCT)
+}
+
 /// The chain's transaction id for a stored `signed_tx`: EVM `0x` + keccak256(raw) (lower
 /// hex), Solana base58 of the first signature. `mark_broadcast` only accepts this value.
 pub fn expected_tx_id(chain: ForeignChain, signed_tx: &str) -> Result<String, String> {
@@ -598,12 +631,16 @@ impl Contract {
         let me = env::current_account_id();
         let path = v.path(token_id, payout.chain);
         let now = env::block_timestamp_ms();
+        let keeper = self.is_keeper(&v, &env::predecessor_account_id());
         match payout.chain {
             ForeignChain::Base | ForeignChain::Monad => {
                 let a = args.and_then(|a| a.evm).unwrap_or_else(|| {
                     env::panic_str("step 3: args.evm is required for an evm payout")
                 });
-                let a = effective_evm_args(a, &foreign, index);
+                let mut a = effective_evm_args(a, &foreign, index);
+                if !keeper {
+                    a = limit_non_keeper_evm_args(a, payout.chain);
+                }
                 write_track(
                     token_id,
                     index,
@@ -876,8 +913,15 @@ impl Contract {
     /// v2 rules (findings C and E): only an operator (contract keeper, vault keeper, vault owner,
     /// heir) may re-sign; every re-sign waits `RESIGN_COOLDOWN_MS` after the last request (a fee
     /// ratchet or status flipping can't be spammed, and an old Solana blockhash has expired); an
-    /// EVM payout that has a signature needs both fees >= 110% of the last request and within the
-    /// chain cap; the EVM nonce stays pinned per payout. One re-sign per payout in flight.
+    /// EVM payout that has a signature needs both fees >= 110% of the last request (or at the
+    /// chain cap) and within the cap; the EVM nonce stays pinned per payout. One re-sign per
+    /// payout in flight.
+    ///
+    /// Second review: a Solana transfer has no nonce, so a fresh signature over a new blockhash is
+    /// a second valid payment from the same derived address. A Solana payout that is already
+    /// `signed` or `broadcast` may therefore only be re-signed by a keeper (contract owner while
+    /// unlocked, contract keeper, vault keeper), as in v1; heirs and the vault owner may only
+    /// re-sign a `failed` one (F1). A non-keeper's EVM fees are clamped like in step 3 (F4).
     pub fn resign_foreign(&mut self, token_id: TokenRef, index: u32, args: StepArgs) -> Promise {
         let before = env::storage_usage();
         let id = token_id.id();
@@ -914,6 +958,11 @@ impl Contract {
             payout.status,
             ForeignStatus::Signed | ForeignStatus::Broadcast
         );
+        let keeper = self.is_keeper(&v, &pred);
+        require!(
+            !(has_sig && payout.chain == ForeignChain::Solana) || keeper,
+            "only the keeper may re-sign a signed or broadcast solana payout (no nonce: a new signature is a second payment)"
+        );
         let me = env::current_account_id();
         let path = v.path(id, payout.chain);
         let promise = match payout.chain {
@@ -921,18 +970,26 @@ impl Contract {
                 let a = args
                     .evm
                     .unwrap_or_else(|| env::panic_str("args.evm is required for an evm payout"));
-                let a = effective_evm_args(a, &v.foreign, i);
+                let mut a = effective_evm_args(a, &v.foreign, i);
+                if !keeper {
+                    a = limit_non_keeper_evm_args(a, payout.chain);
+                }
                 if has_sig {
-                    // Fees are capped per chain (validate_evm_args, just below), so real products
-                    // are small; saturating math keeps an absurd input from overflowing before that.
+                    // Fees are capped per chain (validated above), so real products are small;
+                    // saturating math keeps an absurd stored value from overflowing.
+                    let cap = payout
+                        .chain
+                        .evm()
+                        .unwrap_or_else(|| env::panic_str("not an evm chain"))
+                        .max_fee_per_gas;
                     require!(
-                        a.max_fee_per_gas.0.saturating_mul(100)
-                            >= track.max_fee_per_gas.saturating_mul(EVM_FEE_BUMP_PCT)
-                            && a.max_priority_fee_per_gas.0.saturating_mul(100)
-                                >= track
-                                    .max_priority_fee_per_gas
-                                    .saturating_mul(EVM_FEE_BUMP_PCT),
-                        "re-sign of a signed evm payout must raise both fees by >= 10%"
+                        is_fee_bump(a.max_fee_per_gas.0, track.max_fee_per_gas, cap)
+                            && is_fee_bump(
+                                a.max_priority_fee_per_gas.0,
+                                track.max_priority_fee_per_gas,
+                                cap
+                            ),
+                        "re-sign of a signed evm payout must raise both fees by >= 10% (or to the chain cap)"
                     );
                 }
                 let (t, _) = evm_transfer_for(&payout, &a).unwrap_or_else(|e| env::panic_str(&e));

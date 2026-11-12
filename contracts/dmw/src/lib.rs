@@ -14,6 +14,8 @@ mod nft;
 pub mod types;
 
 #[cfg(test)]
+mod audit_v2;
+#[cfg(test)]
 mod tests;
 
 pub use foreign::{EvmArgs, ForeignChain, ForeignPayout, ForeignStatus, SolanaArgs, StepArgs};
@@ -43,12 +45,12 @@ pub const MAX_BOUNTY_BPS: u128 = 1_000; // 10%
 pub const MIN_DEPOSIT: u128 = near(10); // 0.01 NEAR
 /// Gas allowance of every pulse/agent function-call key (paid by the contract account).
 pub const KEY_ALLOWANCE: u128 = near(1000); // 1 NEAR (~90 heartbeats at 10 TGas)
-/// Gas price used to account a key's spend (yocto per gas; the protocol minimum). Each key call is
-/// charged prepaid gas + `KEY_CALL_OVERHEAD_GAS` at this price, which over-counts the real burn.
+/// The protocol's minimum gas price (yocto per gas). Only for reasoning about the allowance: a key
+/// call burns at least its gas at this price from the allowance, whether or not the call succeeds.
+/// v2 second review (F2): the allowance is the cost of the key and is never refunded; a contract
+/// cannot see the gas of key calls that panicked, so any refund estimate could pay a vault out of
+/// the other vaults' NEAR.
 pub const KEY_GAS_PRICE: u128 = 100_000_000;
-pub const KEY_CALL_OVERHEAD_GAS: u64 = 5_000_000_000_000;
-/// Kept back when a key's unspent allowance is refunded (calls already in flight when it is deleted).
-pub const KEY_REFUND_MARGIN: u128 = near(10); // 0.01 NEAR
 /// Storage an access key takes on the contract account (not visible to `env::storage_usage` in
 /// the call that adds it; charged to the vault explicitly).
 pub const ACCESS_KEY_STORAGE_BYTES: u64 = 200;
@@ -258,6 +260,7 @@ impl Contract {
             step3_progress_ms: 0,
             storage_bytes: 0,
             storage_deposit: STORAGE_FEE,
+            unsplit: 0,
             guard: Guard::default(),
         };
         let data = json!({
@@ -290,7 +293,7 @@ impl Contract {
                 "deposits from anyone but the vault owner must be >= 0.01 NEAR"
             );
         }
-        v.balance = add_yocto(v.balance, amount);
+        credit(&mut v, amount, true);
         let data = json!({"token_id": id.to_string(), "amount": yocto(amount), "from": from});
         record(&mut v, id, "deposit", &yocto(amount), data);
         self.vaults.insert(&id, &v);
@@ -334,9 +337,6 @@ impl Contract {
             v.guard.paused_until_ms = 0;
             write_guard(id, &v.guard);
         }
-        if via_key {
-            self.note_key_gas(&signer_pk);
-        }
         let by = if via_key { "pulse_key" } else { "owner" };
         let data = json!({"token_id": id.to_string(), "by": by, "was": was.as_str(), "next_due_ms": v.warning_at_ms(), "pause_cleared": clear});
         record(&mut v, id, "heartbeat", by, data);
@@ -359,7 +359,7 @@ impl Contract {
     }
 
     /// Remove a pulse or agent key from the vault and delete it from the contract account. The
-    /// unspent part of its gas allowance (estimated, less a margin) goes back to the vault.
+    /// key's gas allowance is not refunded (it is the cost of the key; second review F2).
     #[payable]
     pub fn remove_key(&mut self, token_id: TokenRef, public_key: PublicKey) {
         let before = env::storage_usage();
@@ -373,14 +373,14 @@ impl Contract {
             v.pulse_keys.len() + v.agent_keys.len() < n,
             "key not in vault"
         );
-        let refund = self.release_key(&mut v, &public_key);
+        self.release_key(&mut v, &public_key);
         let pk_str = String::from(&public_key);
         record(
             &mut v,
             id,
             "key_removed",
             &pk_str,
-            json!({"token_id": id.to_string(), "public_key": pk_str, "allowance_refund": yocto(refund)}),
+            json!({"token_id": id.to_string(), "public_key": pk_str}),
         );
         self.vaults.insert(&id, &v);
         Promise::new(env::current_account_id())
@@ -413,7 +413,6 @@ impl Contract {
             receiver_id != env::current_account_id(),
             "receiver cannot be the dmw contract"
         );
-        self.note_key_gas(&signer_pk);
         let now = env::block_timestamp_ms();
         prune_spends(&mut v, now);
         let reason = policy_check(&v, now, &receiver_id, amount.0);
@@ -722,10 +721,10 @@ impl Contract {
         after
     }
 
-    /// Owner only, exactly 1 yoctoNEAR, while not Triggered: end a running pause now (L-4). The
-    /// deadline falls back to the heartbeat deadline (it may already have passed: the owner asked
-    /// for that). It does NOT re-arm the guardian's pause for this cycle; only a heartbeat does,
-    /// so a guardian can never stack pauses through the owner.
+    /// Owner only, exactly 1 yoctoNEAR, while not Triggered: end a running pause now (L-4). A
+    /// signed owner call is proof of life, so it also restarts the heartbeat clock (second review):
+    /// unpausing can never make the vault due at once. It does NOT re-arm the guardian's pause for
+    /// this cycle; only a heartbeat does, so a guardian can never stack pauses through the owner.
     #[payable]
     pub fn unpause(&mut self, token_id: TokenRef) -> u64 {
         let before = env::storage_usage();
@@ -739,6 +738,7 @@ impl Contract {
         // pause that ran out), so clients still read "pause used" until the next heartbeat.
         v.guard.paused_until_ms = now;
         write_guard(id, &v.guard);
+        v.last_beat_ms = now;
         let after = v.trigger_at_ms();
         let data = json!({"token_id": id.to_string(), "trigger_at_ms": after, "previous_trigger_at_ms": previous});
         record(&mut v, id, "unpaused", &format!("trigger at {after}"), data);
@@ -944,8 +944,11 @@ impl Contract {
     /// The contract owner, or the current keeper, sets (or clears) the contract keeper. The keeper
     /// may hand over to a successor itself, so the role stays rotatable after the contract
     /// account's full-access key is deleted (`owner_id` is then the contract itself; v2, C). On
-    /// such a locked contract the role can be handed over but not cleared.
+    /// such a locked contract the role can be handed over but not cleared. Exactly 1 yoctoNEAR
+    /// (second review): a function-call access key of the keeper cannot hand the role over.
+    #[payable]
     pub fn set_keeper(&mut self, account_id: Option<AccountId>) {
+        assert_one_yocto();
         let pred = env::predecessor_account_id();
         let me = env::current_account_id();
         require!(
@@ -998,10 +1001,14 @@ impl Contract {
         let over_cap = list_len >= MAX_KEYS_PER_KIND;
         if !ok || v.stored != StoredState::Live || owner_changed || over_cap {
             // AddKey failed, the vault triggered, the Will NFT changed hands, or the kind is full,
-            // while the key was being added: it never served the vault, so its allowance goes back
-            // to the vault (final audit L-11), and a key that exists is deleted right away.
+            // while the key was being added: the key is deleted right away if it exists. Only when
+            // AddKey itself failed (so no key ever existed) does the allowance go back to the vault
+            // (final audit L-11). A key that did exist could sign calls until its delete lands, and
+            // panicked calls burn allowance gas the contract cannot see: the allowance is the cost of
+            // the key (second review F2), so no refund on that path.
             self.key_index.remove(&public_key);
-            v.balance = add_yocto(v.balance, KEY_ALLOWANCE);
+            let refund = if !ok && !unexpected { KEY_ALLOWANCE } else { 0 };
+            v.balance = add_yocto(v.balance, refund);
             v.storage_bytes = v.storage_bytes.saturating_sub(ACCESS_KEY_STORAGE_BYTES);
             let (event, why) = if !ok {
                 ("key_add_failed", "add key failed")
@@ -1022,7 +1029,7 @@ impl Contract {
                 token_id,
                 event,
                 &detail,
-                json!({"token_id": token_id.to_string(), "public_key": pk_str, "kind": kind, "reason": why}),
+                json!({"token_id": token_id.to_string(), "public_key": pk_str, "kind": kind, "reason": why, "allowance_refund": yocto(refund)}),
             );
             self.vaults.insert(&token_id, &v);
             if ok || unexpected {
@@ -1069,7 +1076,10 @@ impl Contract {
         }
         let before = env::storage_usage();
         if let Some(mut v) = self.load(token_id) {
-            v.balance = add_yocto(v.balance, amount.0);
+            // Money that was part of the pre-split balance (an agent spend or a bounty) is split
+            // by bps at step 5 when it comes back after step 1. A failed heir or claim transfer is
+            // the residual and stays claimable by the NFT owner.
+            credit(&mut v, amount.0, kind == "agent_pay" || kind == "bounty");
             if kind == "agent_pay" {
                 refund_spend(&mut v, amount.0);
             }
@@ -1178,6 +1188,21 @@ impl Contract {
             || v.heirs.iter().any(|h| &h.account_id == who)
     }
 
+    /// The trusted relayers of a vault's settlement: the contract owner (while it is not the
+    /// locked contract itself), the contract keeper and the vault keeper. Heirs and the vault owner
+    /// are operators but not keepers (second review F1, F4): only a keeper may re-sign a Solana
+    /// payout that already has a signature, and only a keeper picks EVM fees beyond the
+    /// non-keeper limits.
+    pub(crate) fn is_keeper(&self, v: &Vault, who: &AccountId) -> bool {
+        let me = env::current_account_id();
+        if who == &me {
+            return false;
+        }
+        who == &self.owner_id
+            || self.keeper_id.as_ref() == Some(who)
+            || v.keeper_id.as_ref() == Some(who)
+    }
+
     /// Attribute the storage change since `before` to vault `id` (v2, L-9). The vault's storage
     /// deposit must cover `storage_bytes x byte cost`; any shortfall moves from the vault balance.
     /// `strict` (owner-initiated growth) panics when the balance cannot cover it; otherwise the
@@ -1230,30 +1255,12 @@ impl Contract {
         excess
     }
 
-    /// Account the gas a key-signed call can burn from the key's allowance (prepaid gas +
-    /// overhead at the minimum gas price). Over-counts, so a refund never exceeds what is left.
-    fn note_key_gas(&mut self, pk: &PublicKey) {
-        if let Some(mut rec) = self.key_index.get(pk) {
-            let gas = u128::from(
-                env::prepaid_gas()
-                    .as_gas()
-                    .saturating_add(KEY_CALL_OVERHEAD_GAS),
-            );
-            rec.spent = rec.spent.saturating_add(gas.saturating_mul(KEY_GAS_PRICE));
-            self.key_index.insert(pk, &rec);
-        }
-    }
-
-    /// Drop a key from the registry and credit the vault with its unspent allowance.
-    fn release_key(&mut self, v: &mut Vault, pk: &PublicKey) -> u128 {
-        let refund = self
-            .key_index
-            .remove(pk)
-            .map(|rec| KEY_ALLOWANCE.saturating_sub(rec.spent.saturating_add(KEY_REFUND_MARGIN)))
-            .unwrap_or(0);
-        v.balance = add_yocto(v.balance, refund);
+    /// Drop a key from the registry and stop charging the vault for its access-key bytes. Nothing
+    /// is credited: the gas allowance is the cost of the key (second review F2). Key calls that
+    /// panic burn allowance gas the contract never sees, so no refund estimate is safe.
+    fn release_key(&mut self, v: &mut Vault, pk: &PublicKey) {
+        self.key_index.remove(pk);
         v.storage_bytes = v.storage_bytes.saturating_sub(ACCESS_KEY_STORAGE_BYTES);
-        refund
     }
 
     fn add_key(&mut self, id: u64, pk: PublicKey, kind: KeyKind) -> Promise {
@@ -1279,13 +1286,7 @@ impl Contract {
         v.balance -= KEY_ALLOWANCE;
         // The access key's own bytes on the contract account (charged here, released on delete).
         v.storage_bytes = v.storage_bytes.saturating_add(ACCESS_KEY_STORAGE_BYTES);
-        self.key_index.insert(
-            &pk,
-            &KeyRecord {
-                token_id: id,
-                spent: 0,
-            },
-        );
+        self.key_index.insert(&pk, &KeyRecord { token_id: id });
         let pk_str = String::from(&pk);
         record(
             &mut v,
@@ -1335,19 +1336,8 @@ impl Contract {
                     RESERVE_NO_DAO
                 };
                 let distributable = v.balance.saturating_sub(reserve);
-                let mut paid_total = 0u128;
-                let mut payouts = vec![];
-                for h in &v.heirs {
-                    // bps <= 10_000 and distributable <= total NEAR supply: no overflow.
-                    let amt = distributable
-                        .checked_mul(u128::from(h.bps))
-                        .unwrap_or_else(|| env::panic_str("amount overflow"))
-                        / 10_000;
-                    if amt > 0 {
-                        paid_total = add_yocto(paid_total, amt);
-                        payouts.push((h.account_id.clone(), amt));
-                    }
-                }
+                let payouts = heir_shares(&v.heirs, distributable);
+                let paid_total = payouts.iter().fold(0u128, |t, (_, amt)| add_yocto(t, *amt));
                 v.balance -= paid_total; // sum of bps shares of `distributable` <= balance
                 v.step = 2;
                 let data = json!({
@@ -1369,11 +1359,11 @@ impl Contract {
                 PromiseOrValue::Value(2)
             }
             2 => {
-                let (keys, refund) = self.take_keys(&mut v);
+                let keys = self.take_keys(&mut v);
                 v.step = 3;
                 v.foreign_index = 0;
                 v.step3_progress_ms = now;
-                let data = json!({"token_id": id.to_string(), "deleted_keys": keys, "allowance_refund": yocto(refund)});
+                let data = json!({"token_id": id.to_string(), "deleted_keys": keys});
                 record(
                     &mut v,
                     id,
@@ -1501,7 +1491,20 @@ impl Contract {
                 v.stored = StoredState::Settled;
                 v.step = 6;
                 let released = Self::release_storage(&mut v);
-                let data = json!({"token_id": id.to_string(), "old_owner_id": old, "new_owner_id": heir, "remaining": yocto(v.balance), "storage_released": yocto(released)});
+                // Second review F3: everything credited after step 1's split (the released storage
+                // deposit, late deposits and refunds) goes to the heirs by bps, like step 1. What
+                // stays (the unspent reserve, rounding dust) is claimable by the NFT owner.
+                let split = add_yocto(released, v.unsplit).min(v.balance);
+                v.unsplit = 0;
+                let payouts = heir_shares(&v.heirs, split);
+                for (_, amt) in &payouts {
+                    v.balance -= *amt; // sum of bps shares of `split` <= split <= balance
+                }
+                let data = json!({
+                    "token_id": id.to_string(), "old_owner_id": old, "new_owner_id": heir,
+                    "remaining": yocto(v.balance), "storage_released": yocto(released),
+                    "split": payouts.iter().map(|(a, amt)| json!({"account_id": a, "amount": yocto(*amt)})).collect::<Vec<_>>(),
+                });
                 record(
                     &mut v,
                     id,
@@ -1514,6 +1517,9 @@ impl Contract {
                 self.index_remove(&old, id);
                 self.index_add(&heir, id);
                 nft::emit_transfer(&old, &heir, id, Some("settlement"));
+                for (acc, amt) in payouts {
+                    self.transfer_with_refund(id, &acc, amt, "heir");
+                }
                 PromiseOrValue::Value(6)
             }
             s => env::panic_str(&format!("invalid step {s}")),
@@ -1563,19 +1569,18 @@ impl Contract {
         v.step
     }
 
-    /// Drain both key lists, release them from the global registry and credit the vault with
-    /// their unspent allowances. Returns the keys to delete and the total refund.
-    fn take_keys(&mut self, v: &mut Vault) -> (Vec<PublicKey>, u128) {
+    /// Drain both key lists and release them from the global registry (no allowance refund,
+    /// second review F2). Returns the keys to delete.
+    fn take_keys(&mut self, v: &mut Vault) -> Vec<PublicKey> {
         let keys: Vec<PublicKey> = v
             .pulse_keys
             .drain(..)
             .chain(v.agent_keys.drain(..))
             .collect();
-        let mut refund = 0u128;
         for k in &keys {
-            refund = add_yocto(refund, self.release_key(v, k));
+            self.release_key(v, k);
         }
-        (keys, refund)
+        keys
     }
 
     fn index_add(&mut self, owner: &AccountId, id: u64) {
@@ -1613,7 +1618,7 @@ impl Contract {
         let old = v.owner_id.clone();
         v.owner_id = to.clone();
         let live = v.stored == StoredState::Live;
-        let (revoked, refund) = if live { self.take_keys(v) } else { (vec![], 0) };
+        let revoked = if live { self.take_keys(v) } else { vec![] };
         if live {
             v.last_beat_ms = env::block_timestamp_ms();
             v.heirs = vec![Heir {
@@ -1635,13 +1640,38 @@ impl Contract {
             id,
             "owner_changed",
             &format!("{old} -> {to}"),
-            json!({"token_id": id.to_string(), "old_owner_id": old, "new_owner_id": to, "revoked_keys": revoked, "allowance_refund": yocto(refund), "reset": live}),
+            json!({"token_id": id.to_string(), "old_owner_id": old, "new_owner_id": to, "revoked_keys": revoked, "reset": live}),
         );
         self.vaults.insert(&id, v);
         delete_keys(revoked);
         self.index_remove(&old, id);
         self.index_add(to, id);
         nft::emit_transfer(&old, to, id, memo);
+    }
+}
+
+/// Each heir's bps share of `amount` (non-zero shares only). bps sum to 10_000, so the shares sum
+/// to at most `amount`.
+fn heir_shares(heirs: &[Heir], amount: u128) -> Vec<(AccountId, u128)> {
+    heirs
+        .iter()
+        .filter_map(|h| {
+            // bps <= 10_000 and amount <= total NEAR supply: no overflow.
+            let amt = amount
+                .checked_mul(u128::from(h.bps))
+                .unwrap_or_else(|| env::panic_str("amount overflow"))
+                / 10_000;
+            (amt > 0).then(|| (h.account_id.clone(), amt))
+        })
+        .collect()
+}
+
+/// Credit `amount` to the vault balance. `splittable` money that lands after step 1 split the
+/// balance (and before settlement) is also counted in `unsplit`, so step 5 splits it (F3).
+fn credit(v: &mut Vault, amount: u128, splittable: bool) {
+    v.balance = add_yocto(v.balance, amount);
+    if splittable && v.stored == StoredState::Triggered && v.step >= 2 {
+        v.unsplit = add_yocto(v.unsplit, amount);
     }
 }
 

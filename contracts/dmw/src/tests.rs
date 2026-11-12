@@ -694,16 +694,17 @@ fn step4_failed_dao_call_never_recredits_the_bond() {
     // a second, late callback changes nothing either
     assert_eq!(c.on_dao_proposal(1, Err(near_sdk::PromiseError::Failed)), 5);
     assert_eq!(v(&c).balance, reserve - DAO_BOND);
-    // step 5 and the claim hand out exactly what the vault still holds, plus the part of the
-    // storage deposit the settled vault no longer needs (v2, L-9)
+    // step 5 splits the storage deposit the settled vault no longer needs among the heirs by bps
+    // (v2 L-9, second review F3); the claim hands out exactly what the vault still holds
     let deposit = v(&c).storage_deposit;
     Ctx::new().by("keeper.testnet").at(T0 + 42_000).set();
     let _ = c.execute_step(1.into(), None);
     let released = deposit - v(&c).storage_deposit;
     assert!(released > 0);
+    assert_eq!(v(&c).balance, reserve - DAO_BOND);
     let heir = v(&c).owner_id.clone();
     Ctx::new().by(heir.as_str()).set();
-    assert_eq!(c.claim(1.into()).0, reserve - DAO_BOND + released);
+    assert_eq!(c.claim(1.into()).0, reserve - DAO_BOND);
     assert_eq!(v(&c).balance, 0);
 }
 
@@ -1468,7 +1469,7 @@ fn c1_solana_signed_resign_only_by_operator_after_cooldown() {
 #[should_panic(expected = "only the contract owner")]
 fn set_keeper_is_owner_only() {
     let mut c = setup();
-    Ctx::new().by("mallory.testnet").set();
+    Ctx::new().by("mallory.testnet").dep(1).set();
     c.set_keeper(Some(acc("mallory.testnet")));
 }
 
@@ -1571,7 +1572,7 @@ fn h1_mark_broadcast_rejects_fake_hash_and_resign_still_possible() {
     c.mark_broadcast(1.into(), 0, real.clone());
     assert_eq!(v(&c).foreign[0].tx_hash.as_deref(), Some(real.as_str()));
     // a `broadcast` payout whose tx never landed is not bricked: the keeper can re-sign
-    Ctx::new().by("deployer.testnet").set();
+    Ctx::new().by("deployer.testnet").dep(1).set();
     c.set_keeper(Some(acc("keeper.testnet")));
     Ctx::new()
         .by("keeper.testnet")
@@ -2334,10 +2335,11 @@ fn l10_contract_cannot_be_heir_or_nft_receiver() {
     assert_eq!(v(&c).owner_id, owner());
 }
 
-/// L-11: a key that lands after the vault changed hands (or triggered) is deleted at once; it never
-/// served the vault, so the vault gets its 1 NEAR allowance back.
+/// L-11: a key that lands after the vault changed hands (or triggered) is deleted at once. Since the
+/// second review (F2) its allowance is not refunded: the key existed until the delete landed and
+/// could burn allowance gas with calls that panic. Only a failed AddKey returns the allowance.
 #[test]
-fn l11_revoked_key_add_refunds_allowance() {
+fn l11_revoked_key_add_keeps_allowance_once_the_key_existed() {
     let mut c = setup();
     let start = v(&c).balance;
     Ctx::new().dep(1).set();
@@ -2349,12 +2351,20 @@ fn l11_revoked_key_add_refunds_allowance() {
         .by("dmw.testnet")
         .set_with_result(PromiseResult::Successful(vec![]));
     assert!(!c.on_key_added(1, pk(3), KeyKind::Agent, Some(owner())));
-    assert_eq!(v(&c).balance, start, "allowance refunded");
+    // second review F2: the key existed (and could sign calls until its delete lands), so its
+    // allowance is not refunded; only a failed AddKey returns it
+    assert_eq!(
+        v(&c).balance,
+        start - KEY_ALLOWANCE,
+        "no refund for a key that existed"
+    );
     assert_eq!(deleted_keys(), vec![pk(3)]);
+    assert!(!c.key_index.contains_key(&pk(3)));
 }
 
 /// L-12: `add_key` counts confirmed keys only, so requests sent together could overshoot the cap of
-/// 5 per kind. The callback enforces it again: the extra key is deleted and its allowance refunded.
+/// 5 per kind. The callback enforces it again: the extra key is deleted (its allowance is not refunded
+/// since the second review, F2: the key existed until the delete landed).
 #[test]
 fn l12_key_cap_enforced_when_add_lands() {
     let mut c = setup();
@@ -2376,7 +2386,8 @@ fn l12_key_cap_enforced_when_add_lands() {
     assert!(!c.on_key_added(1, pk(6), KeyKind::Pulse, Some(owner())));
     assert_eq!(v(&c).pulse_keys.len(), MAX_KEYS_PER_KIND);
     assert!(!c.key_index.contains_key(&pk(6)));
-    assert_eq!(v(&c).balance, start - 5 * KEY_ALLOWANCE);
+    // second review F2: the sixth key existed until its delete lands, so no refund
+    assert_eq!(v(&c).balance, start - 6 * KEY_ALLOWANCE);
     assert_eq!(deleted_keys(), vec![pk(6)]);
 }
 
@@ -2423,7 +2434,7 @@ fn v2_b_overdue_vault_cannot_be_sold_then_poked() {
 }
 
 /// B: a sale resets the vault for the buyer: sole heir, no payouts/DAO/keys/guardian/vault keeper,
-/// default bounty and policy, fresh clock. Keys are deleted and their allowance refunded.
+/// default bounty and policy, fresh clock. Keys are deleted; their allowance is not refunded.
 #[test]
 fn v2_b_sale_resets_vault_for_buyer() {
     let mut c = setup();
@@ -2454,7 +2465,10 @@ fn v2_b_sale_resets_vault_for_buyer() {
     assert_eq!(vault.last_beat_ms, T0 + 10_000);
     assert_eq!(deleted_keys(), vec![pk(2)]);
     assert!(!c.key_index.contains_key(&pk(2)));
-    assert!(vault.balance > bal, "unspent key allowance refunded");
+    assert_eq!(
+        vault.balance, bal,
+        "no key allowance refund (second review F2)"
+    );
 }
 
 /// B: the bounty is capped (1 NEAR absolute, 10% of the balance at poke time) and may only be
@@ -2489,24 +2503,31 @@ fn v2_b_bounty_is_capped_and_only_set_while_alive() {
 fn v2_c_keeper_rotates_itself_on_locked_contract() {
     Ctx::new().set();
     let mut c = Contract::new(contract_id(), Some(acc("keeper.testnet")), None);
-    Ctx::new().by("dmw.testnet").set();
+    Ctx::new().by("dmw.testnet").dep(1).set();
     let m = panics(|| c.set_keeper(Some(acc("x.testnet"))));
     assert!(
         m.contains("only the contract owner or the current keeper"),
         "{m}"
     );
-    Ctx::new().by("mallory.testnet").set();
+    Ctx::new().by("mallory.testnet").dep(1).set();
     let m = panics(|| c.set_keeper(Some(acc("mallory.testnet"))));
     assert!(
         m.contains("only the contract owner or the current keeper"),
         "{m}"
     );
+    // a keeper function-call key (no deposit) cannot hand the role over
     Ctx::new().by("keeper.testnet").set();
+    let m = panics(|| c.set_keeper(Some(acc("keeper2.testnet"))));
+    assert!(
+        m.contains("Requires attached deposit of exactly 1 yoctoNEAR"),
+        "{m}"
+    );
+    Ctx::new().by("keeper.testnet").dep(1).set();
     let m = panics(|| c.set_keeper(None));
     assert!(m.contains("cannot be cleared on a locked contract"), "{m}");
     c.set_keeper(Some(acc("keeper2.testnet")));
     assert_eq!(c.get_config()["keeper"], "keeper2.testnet");
-    Ctx::new().by("keeper.testnet").set();
+    Ctx::new().by("keeper.testnet").dep(1).set();
     let m = panics(|| c.set_keeper(Some(acc("keeper.testnet"))));
     assert!(
         m.contains("only the contract owner or the current keeper"),
@@ -2755,8 +2776,11 @@ fn v2_l4_owner_unpause() {
         c.unpause(1.into());
     });
     assert!(m.contains("exactly 1 yoctoNEAR"), "{m}");
+    // A signed owner call is proof of life: the heartbeat clock restarts (second review), so the
+    // deadline is a full window from now, never the old (possibly passed) heartbeat deadline.
     Ctx::new().at(T0 + 6_000).dep(1).set();
-    assert_eq!(c.unpause(1.into()), T0 + 40_000);
+    assert_eq!(c.unpause(1.into()), T0 + 46_000);
+    assert_eq!(v(&c).last_beat_ms, T0 + 6_000);
     let view = c.get_vault(1.into()).unwrap();
     // The pause ended now and reads as spent (in the past, not 0) until the next heartbeat.
     assert_eq!(view.paused_until_ms, T0 + 6_000);
@@ -2916,10 +2940,10 @@ fn v2_callbacks_foreign_signed_needs_one_result() {
     assert_eq!(v(&c).foreign[0].status, ForeignStatus::Failed);
 }
 
-/// remove_key: the unspent part of the key's gas allowance goes back to the vault (it was kept
-/// by the contract before), less an estimate of what the key burned and a margin.
+/// remove_key: the key's gas allowance is the cost of the key and is not refunded (second review
+/// F2: key calls that panic burn allowance gas the contract never sees).
 #[test]
-fn v2_remove_key_refunds_unspent_allowance() {
+fn v2_remove_key_does_not_refund_allowance() {
     let mut c = setup();
     Ctx::new().dep(1).set();
     let _ = c.add_pulse_key(1.into(), pk(1));
@@ -2927,13 +2951,9 @@ fn v2_remove_key_refunds_unspent_allowance() {
     assert_eq!(v(&c).balance, 10 * NEAR1 - KEY_ALLOWANCE);
     Ctx::new().key(pk(1)).at(T0 + 1_000).set();
     c.heartbeat(1.into());
-    let burned = u128::from(env::prepaid_gas().as_gas() + KEY_CALL_OVERHEAD_GAS) * KEY_GAS_PRICE;
     Ctx::new().dep(1).at(T0 + 2_000).set();
     c.remove_key(1.into(), pk(1));
-    assert_eq!(
-        v(&c).balance,
-        10 * NEAR1 - KEY_ALLOWANCE + (KEY_ALLOWANCE - burned - KEY_REFUND_MARGIN)
-    );
+    assert_eq!(v(&c).balance, 10 * NEAR1 - KEY_ALLOWANCE);
     assert!(!c.key_index.contains_key(&pk(1)));
     assert_eq!(deleted_keys(), vec![pk(1)]);
     let e = v(&c).log().last().unwrap().clone();
@@ -3115,4 +3135,260 @@ fn v2_validate_heirs_rejects_duplicates_and_zero_shares() {
         assert!(m.contains(want), "create_vault: {want}: {m}");
     }
     assert_eq!(v(&c).heirs, heirs2());
+}
+
+// ---------------------------------------------------------------------------------------------
+// Second review (Nov 12 2026). The reviewer's own failing tests live in `audit_v2.rs`; these
+// cover the rest of each fix.
+// ---------------------------------------------------------------------------------------------
+
+fn step(c: &mut Contract) -> u8 {
+    match c.execute_step(1.into(), None) {
+        PromiseOrValue::Value(s) => s,
+        PromiseOrValue::Promise(_) => panic!("expected value"),
+    }
+}
+
+fn transfers() -> Vec<(AccountId, u128)> {
+    near_sdk::test_utils::get_created_receipts()
+        .into_iter()
+        .flat_map(|r| {
+            let to = r.receiver_id.clone();
+            r.actions.into_iter().filter_map(move |a| match a {
+                MockAction::Transfer { deposit, .. } => Some((to.clone(), deposit.as_yoctonear())),
+                _ => None,
+            })
+        })
+        .collect()
+}
+
+/// F1: a signed / broadcast Solana payout is re-signed only by a keeper; heirs and the vault owner
+/// get a clear refusal. EVM payouts (nonce pinned) stay re-signable by any operator.
+#[test]
+fn r2_f1_signed_solana_resign_is_keeper_only() {
+    let mut c = sol_signed();
+    let t = T0 + 41_000 + foreign::RESIGN_COOLDOWN_MS;
+    for who in ["sarah.testnet", "tom.testnet", "alice.testnet"] {
+        Ctx::new().by(who).at(t).set();
+        let m = panics(|| {
+            let _ = c.resign_foreign(1.into(), 0, sol_args());
+        });
+        assert!(
+            m.contains("only the keeper may re-sign a signed or broadcast solana payout"),
+            "{who}: {m}"
+        );
+    }
+    let vault = v(&c);
+    assert!(c.is_keeper(&vault, &acc("keeper.testnet")));
+    assert!(c.is_keeper(&vault, &acc("deployer.testnet")));
+    assert!(!c.is_keeper(&vault, &acc("sarah.testnet")));
+    assert!(!c.is_keeper(&vault, &owner()));
+    assert!(!c.is_keeper(&vault, &contract_id()));
+    Ctx::new().by("keeper.testnet").at(t).set();
+    let _ = c.resign_foreign(1.into(), 0, sol_args());
+    assert!(foreign::read_track(1, 0).inflight);
+}
+
+/// F1: the vault keeper counts as a keeper for the Solana re-sign.
+#[test]
+fn r2_f1_vault_keeper_may_resign_signed_solana() {
+    let mut c = setup();
+    Ctx::new().dep(1).set();
+    c.set_vault_keeper(1.into(), Some(acc("vault-bot.testnet")));
+    c.set_foreign_payouts(1.into(), vec![sol_payout(1_000_000)]);
+    trigger(&mut c);
+    Ctx::new().by("vault-bot.testnet").at(T0 + 41_000).set();
+    let _ = c.execute_step(1.into(), None);
+    let _ = c.execute_step(1.into(), None);
+    let _ = c.execute_step(1.into(), Some(sol_args()));
+    Ctx::new().by("dmw.testnet").at(T0 + 41_500).cb();
+    let _ = c.on_foreign_sol_key(
+        1,
+        0,
+        SOL_BH.into(),
+        None,
+        None,
+        Ok(format!("ed25519:{SOL_FROM}")),
+    );
+    assert_eq!(
+        c.on_foreign_signed(1, 0, None, Ok(mpc_ed_response(SOL_SIG))),
+        4
+    );
+    Ctx::new()
+        .by("vault-bot.testnet")
+        .at(T0 + 41_000 + foreign::RESIGN_COOLDOWN_MS)
+        .set();
+    let _ = c.resign_foreign(1.into(), 0, sol_args());
+    assert!(foreign::read_track(1, 0).inflight);
+}
+
+/// F1: an heir may still re-sign a signed EVM payout (same pinned nonce: a replacement, never a
+/// second payment), with the fee bump.
+#[test]
+fn r2_f1_heir_may_still_bump_signed_evm_payout() {
+    let mut c = evm_signed();
+    let t = T0 + 41_000 + foreign::RESIGN_COOLDOWN_MS;
+    Ctx::new().by("tom.testnet").at(t).set();
+    let _ = c.resign_foreign(1.into(), 0, evm(0, 1_650_000_000, 1_100_000, 21_000));
+    let track = foreign::read_track(1, 0);
+    assert!(track.inflight);
+    assert_eq!(track.max_fee_per_gas, 1_650_000_000);
+}
+
+/// F4: fees a non-keeper picks in step 3 are clamped (max fee 50% and priority 10% of the cap,
+/// gas limit = chain floor); a keeper signs what it asks for (within the cap).
+#[test]
+fn r2_f4_non_keeper_step3_fees_are_clamped() {
+    let cap = foreign::MAX_EVM_FEE_PER_GAS;
+    let mut c = at_step3(vec![base_payout()]);
+    Ctx::new().by("sarah.testnet").at(T0 + 41_000).set();
+    let _ = c.execute_step(1.into(), Some(evm(0, cap, cap, 100_000)));
+    let foreign::PendingTx::Evm(t) = pending_slot(0) else {
+        panic!("evm pending")
+    };
+    assert_eq!(t.max_fee_per_gas.0, cap / 2);
+    assert_eq!(t.max_priority_fee_per_gas.0, cap / 10);
+    assert_eq!(t.gas_limit.0, foreign::EVM_GAS_LIMIT_FLOOR);
+    assert_eq!(foreign::read_track(1, 0).max_fee_per_gas, cap / 2);
+    std::thread::spawn(move || {
+        let mut c = at_step3(vec![base_payout()]);
+        Ctx::new().by("keeper.testnet").at(T0 + 41_000).set();
+        let _ = c.execute_step(1.into(), Some(evm(0, cap, cap, 100_000)));
+        let foreign::PendingTx::Evm(t) = pending_slot(0) else {
+            panic!("evm pending")
+        };
+        assert_eq!(
+            (
+                t.max_fee_per_gas.0,
+                t.max_priority_fee_per_gas.0,
+                t.gas_limit.0
+            ),
+            (cap, cap, 100_000)
+        );
+    })
+    .join()
+    .unwrap();
+    // pure helpers
+    let a = foreign::limit_non_keeper_evm_args(
+        EvmArgs {
+            nonce: 0,
+            max_fee_per_gas: U128(2_000_000_000),
+            max_priority_fee_per_gas: U128(1_000_000),
+            gas_limit: U128(100_000),
+        },
+        ForeignChain::Monad,
+    );
+    assert_eq!(a.max_fee_per_gas.0, 2_000_000_000); // honest fees pass through
+    assert_eq!(a.gas_limit.0, foreign::EVM_GAS_LIMIT_FLOOR);
+    assert!(foreign::is_fee_bump(cap, cap, cap));
+    assert!(foreign::is_fee_bump(110, 100, cap));
+    assert!(!foreign::is_fee_bump(109, 100, cap));
+}
+
+/// F4: a keeper signature at the cap can be re-signed at the cap (e.g. a lower gas limit), and a
+/// heir's re-sign of it is clamped and so refused by the bump rule.
+#[test]
+fn r2_f4_cap_signature_can_be_resigned_at_the_cap() {
+    let cap = foreign::MAX_EVM_FEE_PER_GAS;
+    let mut c = at_step3(vec![base_payout()]);
+    Ctx::new().by("keeper.testnet").at(T0 + 41_000).set();
+    let _ = c.execute_step(1.into(), Some(evm(0, cap, cap, 100_000)));
+    let key = evm_key(0);
+    Ctx::new().by("dmw.testnet").at(T0 + 41_500).cb();
+    assert_eq!(c.on_foreign_signed(1, 0, key, Ok(mpc_secp_response())), 4);
+    assert_eq!(v(&c).foreign[0].status, ForeignStatus::Signed);
+    let t = T0 + 41_000 + foreign::RESIGN_COOLDOWN_MS;
+    Ctx::new().by("sarah.testnet").at(t).set();
+    let m = panics(|| {
+        let _ = c.resign_foreign(1.into(), 0, evm(0, cap, cap, 50_000));
+    });
+    assert!(m.contains("raise both fees"), "{m}");
+    Ctx::new().by("keeper.testnet").at(t).set();
+    let _ = c.resign_foreign(1.into(), 0, evm(0, cap, cap, 50_000));
+    assert!(foreign::read_track(1, 0).inflight);
+}
+
+/// F3: a deposit and an agent-spend refund that land after step 1 are split by bps at step 5,
+/// with the released storage deposit; a failed heir transfer stays claimable by the NFT owner.
+#[test]
+fn r2_f3_post_step1_credits_split_by_bps() {
+    let mut c = setup();
+    trigger(&mut c);
+    Ctx::new().by("keeper.testnet").at(T0 + 41_000).set();
+    assert_eq!(step(&mut c), 2);
+    let after_step1 = v(&c).balance;
+    Ctx::new()
+        .by("well.wisher.testnet")
+        .at(T0 + 41_100)
+        .dep(NEAR1)
+        .set();
+    c.deposit(1.into());
+    Ctx::new()
+        .by("dmw.testnet")
+        .at(T0 + 41_200)
+        .set_with_result(PromiseResult::Failed);
+    assert!(!c.on_transfer_done(
+        1,
+        acc("api.provider.testnet"),
+        U128(NEAR1 / 2),
+        "agent_pay".into()
+    ));
+    Ctx::new()
+        .by("dmw.testnet")
+        .at(T0 + 41_300)
+        .set_with_result(PromiseResult::Failed);
+    assert!(!c.on_transfer_done(1, acc("tom.testnet"), U128(NEAR1 / 4), "heir".into()));
+    assert_eq!(v(&c).unsplit, NEAR1 + NEAR1 / 2);
+    Ctx::new().by("keeper.testnet").at(T0 + 42_000).set();
+    assert_eq!(step(&mut c), 3);
+    assert_eq!(step(&mut c), 4);
+    assert_eq!(step(&mut c), 5);
+    let deposit = v(&c).storage_deposit;
+    assert_eq!(step(&mut c), 6);
+    let released = deposit - v(&c).storage_deposit;
+    let split = released + NEAR1 + NEAR1 / 2;
+    assert_eq!(
+        transfers(),
+        vec![
+            (acc("sarah.testnet"), split * 6 / 10),
+            (acc("tom.testnet"), split * 4 / 10)
+        ]
+    );
+    assert_eq!(v(&c).unsplit, 0);
+    assert_eq!(v(&c).balance, after_step1 + NEAR1 / 4);
+    // after settlement a deposit is the NFT owner's, not split
+    Ctx::new()
+        .by("well.wisher.testnet")
+        .at(T0 + 43_000)
+        .dep(NEAR1)
+        .set();
+    c.deposit(1.into());
+    assert_eq!(v(&c).unsplit, 0);
+    Ctx::new().by("sarah.testnet").at(T0 + 44_000).set();
+    assert_eq!(c.claim(1.into()).0, after_step1 + NEAR1 / 4 + NEAR1);
+}
+
+/// Info: set_keeper needs exactly 1 yoctoNEAR (a keeper function-call key can't hand it over).
+#[test]
+#[should_panic(expected = "Requires attached deposit of exactly 1 yoctoNEAR")]
+fn r2_set_keeper_needs_one_yocto() {
+    let mut c = setup();
+    Ctx::new().by("keeper.testnet").set();
+    c.set_keeper(Some(acc("keeper2.testnet")));
+}
+
+/// Info: an owner unpause is proof of life, so it never makes an overdue vault due at once.
+#[test]
+fn r2_unpause_restarts_the_heartbeat_clock() {
+    let mut c = with_guardian();
+    Ctx::new().by("gina.testnet").at(T0 + 30_000).dep(1).set();
+    c.pause(1.into());
+    // past the old heartbeat deadline (T0 + 40 s), still held by the pause
+    Ctx::new().at(T0 + 45_000).dep(1).set();
+    assert_eq!(c.unpause(1.into()), T0 + 85_000);
+    Ctx::new().by("bob.testnet").at(T0 + 45_001).set();
+    let m = panics(|| {
+        c.poke(1.into());
+    });
+    assert!(m.contains("not_due"), "{m}");
 }
