@@ -128,6 +128,8 @@ describe("simple calls", () => {
     expect(LIB).toMatch(/fn require_owner_mutable\(&self, v: &Vault\) \{\s+assert_one_yocto\(\);/);
     expect(LIB).toMatch(/pub fn pause\(&mut self, token_id: TokenRef\) -> u64 \{\s+(\/\/.*\s+)*assert_one_yocto\(\);/);
     for (const m of ["poke", "execute_step", "mark_broadcast", "claim"]) expect(LIB).not.toMatch(new RegExp(`#\\[payable\\]\\s+pub fn ${m}\\(`));
+    // second review: the contract keeper hand-over takes 1 yocto too (scripts/lib.sh register_keeper attaches it)
+    expect(LIB).toMatch(/#\[payable\]\s+pub fn set_keeper\([\s\S]{0,80}assert_one_yocto\(\)/);
     expect(C.setGuardianCall("4", null).deposit).toBe("1");
   });
   it("v2 (finding F): the owner's heartbeat attaches 1 yocto, a pulse key's does not", () => {

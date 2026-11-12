@@ -216,8 +216,10 @@ export const mockApi = {
     if (c.method === "unpause" && id === "1") {
       if (account !== MOCK_ACCOUNT) throw new Error("only the vault owner");
       if (!(pausedUntil > now)) throw new Error("not_paused");
-      // The pause ends now and stays on record as used; only the next heartbeat re-arms the guardian.
+      // The pause ends now and stays on record as used; only the next heartbeat re-arms the guardian. A signed owner call is
+      // proof of life, so the heartbeat clock restarts too (contract v2, second review).
       pausedUntil = now;
+      cycleStart = now;
       extraLog.push({ ms: now, event: "unpaused", detail: `trigger at ${now}` });
     } else if (c.method === "heartbeat" && id === "1") {
       cycleStart = now;

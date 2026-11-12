@@ -165,13 +165,8 @@ async function handleStale(deps: KeeperDeps, v: VaultView, index: number, chain:
     }
     let args = await stepArgsFor(deps, v, chain, index);
     if (chain !== 'solana' && args.evm && (p.status === 'signed' || p.status === 'broadcast')) {
-      const bumped = bumpedEvmArgs(args.evm, track, chain);
-      if (!bumped) {
-        park(RELAY_COOLDOWN.resignCap, 'fee-cap');
-        log.err('resign', `${label}: a 1.1x fee bump over the last request exceeds the chain's max-fee cap; cannot re-sign`);
-        return { kind: 'wait' };
-      }
-      args = { evm: bumped };
+      // max(fresh, 1.1 x last), held at the chain cap: the contract takes a fee at the cap as a bump (second review F4).
+      args = { evm: bumpedEvmArgs(args.evm, track, chain) };
     }
     deps.resigns.set(key, n + 1);
     log.warn('resign', `${label} signed tx is stale (${why}); resign_foreign${args.evm ? ` fees ${args.evm.max_fee_per_gas}/${args.evm.max_priority_fee_per_gas}` : ''}`);

@@ -56,15 +56,18 @@ ensure_keeper() {
 # separate account, or the current keeper (a hand-over). An owner that is the contract account itself cannot: that is
 # the locked design, where only the keeper can pass the role on.
 register_keeper() {
-  local c=$1 cur owner
-  cur=$(node scripts/near-admin.mjs view "$c" get_config '{}' 2>/dev/null | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{const j=JSON.parse(s);console.log((j.keeper||"")+" "+(j.owner_id||j.owner||""))}catch{console.log(" ")}})')
+  local c=$1 cur owner yocto
+  cur=$(node scripts/near-admin.mjs view "$c" get_config '{}' 2>/dev/null | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{const j=JSON.parse(s);console.log((j.keeper||"")+" "+(j.owner_id||j.owner||"")+" "+("step3_open_after_ms" in j?"1y":""))}catch{console.log("  ")}})')
+  # v2 (second review): set_keeper takes exactly 1 yoctoNEAR, so a keeper function-call key cannot hand the role over.
+  # A v1 contract (no step3_open_after_ms in get_config) rejects any deposit, so it gets none.
+  yocto=${cur##* }; cur=${cur% *}
   owner=${cur#* }; cur=${cur%% *}
   if [ "$cur" = "$KEEPER_ACCOUNT_ID" ]; then echo "  keeper is already $KEEPER_ACCOUNT_ID"; return 0; fi
   if [ -n "$owner" ] && [ "$owner" != "$c" ] && [ -f "keys/$owner.json" ]; then
-    node scripts/near-admin.mjs call "$owner" "$c" set_keeper "{\"account_id\":\"$KEEPER_ACCOUNT_ID\"}" 30 | grep -E '^tx ' || true
+    node scripts/near-admin.mjs call "$owner" "$c" set_keeper "{\"account_id\":\"$KEEPER_ACCOUNT_ID\"}" 30 $yocto | grep -E '^tx ' || true
   elif [ -n "$cur" ] && [ -f "keys/$cur.json" ]; then
     # hand-over by the current keeper
-    node scripts/near-admin.mjs call "$cur" "$c" set_keeper "{\"account_id\":\"$KEEPER_ACCOUNT_ID\"}" 30 | grep -E '^tx ' || true
+    node scripts/near-admin.mjs call "$cur" "$c" set_keeper "{\"account_id\":\"$KEEPER_ACCOUNT_ID\"}" 30 $yocto | grep -E '^tx ' || true
   else
     echo "  (cannot set the keeper from here: the current keeper ${cur:-<none>} or a separate contract owner must call set_keeper {\"account_id\":\"$KEEPER_ACCOUNT_ID\"})"
   fi

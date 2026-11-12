@@ -30,17 +30,19 @@ export function clampEvm(a: EvmStepArgs, chain?: string): EvmStepArgs {
 }
 
 /**
- * Args for re-signing an EVM payout that already has a signature: max(fresh, 1.1 x last) for BOTH fee fields.
- * Returns null when the bump would exceed the chain's fee cap (100 gwei Base, 1000 gwei Monad) (the contract would reject it).
+ * Args for re-signing an EVM payout that already has a signature: max(fresh, 1.1 x last) for BOTH fee fields, but never
+ * above the chain's fee cap (100 gwei Base, 1000 gwei Monad). Contract v2 (second review F4) accepts a fee AT the cap as
+ * a valid bump, so a payout signed at the cap stays re-signable.
  */
-export function bumpedEvmArgs(fresh: EvmStepArgs, last: Pick<SignTrack, 'max_fee_per_gas' | 'max_priority_fee_per_gas'>, chain?: string): EvmStepArgs | null {
+export function bumpedEvmArgs(fresh: EvmStepArgs, last: Pick<SignTrack, 'max_fee_per_gas' | 'max_priority_fee_per_gas'>, chain?: string): EvmStepArgs {
   const f = clampEvm(fresh, chain);
-  const bmax = bump(BigInt(last.max_fee_per_gas));
-  const bprio = bump(BigInt(last.max_priority_fee_per_gas));
+  const cap = maxFeeCap(chain);
+  const min = (a: bigint, b: bigint) => (a < b ? a : b);
+  const bmax = min(bump(BigInt(last.max_fee_per_gas)), cap);
+  const bprio = min(bump(BigInt(last.max_priority_fee_per_gas)), cap);
   let max = BigInt(f.max_fee_per_gas) > bmax ? BigInt(f.max_fee_per_gas) : bmax;
   const prio = BigInt(f.max_priority_fee_per_gas) > bprio ? BigInt(f.max_priority_fee_per_gas) : bprio;
   if (prio > max) max = prio;
-  if (max > maxFeeCap(chain)) return null;
   return { ...f, max_fee_per_gas: max.toString(), max_priority_fee_per_gas: prio.toString() };
 }
 

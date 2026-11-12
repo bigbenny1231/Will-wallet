@@ -328,14 +328,16 @@ export class MockBackend implements Backend {
       const cooled = !t || now >= t.resign_allowed_after_ms;
       if (p.chain === 'solana') {
         if (!cooled) throw new Error('resign cooldown: wait 5 min after the last request');
-        if (hasSig && !this.callerIsKeeper) throw new Error('only the contract owner or keeper may re-sign a signed solana payout');
+        if (hasSig && !this.callerIsKeeper) throw new Error('only the keeper may re-sign a signed or broadcast solana payout (no nonce: a new signature is a second payment)');
       } else {
         const e = args.evm;
         if (!e) throw new Error('args.evm is required for a base payout');
         if (BigInt(e.gas_limit) < 21000n || BigInt(e.gas_limit) > 100000n) throw new Error('gas_limit out of range');
         if (BigInt(e.max_fee_per_gas) > 100_000_000_000n) throw new Error('max_fee_per_gas above cap');
-        if (hasSig && t && (BigInt(e.max_fee_per_gas) * 100n < BigInt(t.max_fee_per_gas) * 110n || BigInt(e.max_priority_fee_per_gas) * 100n < BigInt(t.max_priority_fee_per_gas) * 110n))
-          throw new Error('re-sign of a signed evm payout must raise both fees by >= 10%');
+        // second review F4: a fee at the cap counts as a bump
+        const bumped = (n: string, last: string) => BigInt(n) >= 100_000_000_000n || BigInt(n) * 100n >= BigInt(last) * 110n;
+        if (hasSig && t && !(bumped(e.max_fee_per_gas, t.max_fee_per_gas) && bumped(e.max_priority_fee_per_gas, t.max_priority_fee_per_gas)))
+          throw new Error('re-sign of a signed evm payout must raise both fees by >= 10% (or to the chain cap)');
         if (p.status === 'broadcast' && !cooled) throw new Error('resign cooldown: wait 5 min after the last request');
       }
       p.status = 'signed';

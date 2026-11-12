@@ -280,7 +280,7 @@ export default function Create() {
         {step === 5 && (
           <>
             <div className="grid gap-10 sm:grid-cols-2">
-              <Field label="Initial deposit (NEAR)" hint="0.1 NEAR is kept for storage; the rest is the vault balance. Each pulse or agent key later reserves 1 NEAR of it as gas allowance.">
+              <Field label="Initial deposit (NEAR)" hint="0.1 NEAR is kept for storage; the rest is the vault balance. Each pulse or agent key later reserves 1 NEAR of it as gas allowance (not refunded when the key is removed).">
                 <input className="field num" value={deposit} onChange={(e) => setDeposit(e.target.value)} />
               </Field>
               <Field label="Keeper bounty (NEAR)" hint="Paid to whoever pokes the vault: at most 1 NEAR, and never more than 10% of the balance.">

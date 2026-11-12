@@ -102,7 +102,7 @@ export default function KeysPanel({ v, isOwner }: { v: VaultView; isOwner: boole
         </button>
         {!isOwner && <span className="text-[14px] text-text-2">Connect as the vault owner to add keys.</span>}
         {isOwner && !locked && lowBalance && (
-          <span className="text-[14px] text-text-2">Each key reserves 1 NEAR of gas allowance from the vault balance ({yoctoToNear(v.balance)} NEAR now). Deposit more first.</span>
+          <span className="text-[14px] text-text-2">Each key reserves 1 NEAR of gas allowance from the vault balance ({yoctoToNear(v.balance)} NEAR now). The allowance is the cost of the key: it is not refunded when the key is removed. Deposit more first.</span>
         )}
         {isOwner && locked && <span className="text-[14px] text-text-2">Keys are locked once the vault is triggered.</span>}
       </div>

@@ -71,7 +71,7 @@ export default function GuardianPanel({ v, now, accountId, isOwner, busy, send }
         <div className="border-l-2 border-warn pl-5">
           <div className="display text-[32px] text-warn">Paused until {fmtTime(v.paused_until_ms!)}.</div>
           <p className="mt-2 max-w-[60ch] text-[15px] leading-relaxed text-text-2">
-            Settlement cannot start for another <span className="num text-text">{fmtDuration(v.paused_until_ms! - now)}</span>. The agent is disarmed meanwhile. The owner can end the pause early with a heartbeat, or with Unpause, which does not give the guardian another pause this cycle.
+            Settlement cannot start for another <span className="num text-text">{fmtDuration(v.paused_until_ms! - now)}</span>. The agent is disarmed meanwhile. The owner can end the pause early with a heartbeat, or with Unpause, which also counts as a heartbeat (the clock restarts) but does not give the guardian another pause this cycle.
           </p>
         </div>
       )}

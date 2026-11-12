@@ -8,8 +8,9 @@
 # vault got the bond back as well, and claim paid 1 NEAR more than the vault held, out of other vaults' NEAR.
 # Pass: after step 4 the vault balance is the step-3 balance minus the 1 NEAR bond, the claim pays no more than the
 # vault's own balance after step 5, and the attacker's three accounts end below where they started. Contract v2
-# (finding L-9) releases the vault's unused storage deposit into its balance at step 5, so the step-5 balance may be
-# above the step-4 balance by at most the 0.1 NEAR storage fee taken at create_vault.
+# (finding L-9) releases the vault's unused storage deposit at step 5, so the step-5 balance may be above the step-4
+# balance by at most the 0.1 NEAR storage fee taken at create_vault. Since the second v2 review (F3) step 5 pays that
+# release straight to the heirs by bps instead, so b5 == b4 is the expected value; the bound still holds.
 # The attacker pokes and runs the steps (300 TGas each needs ~0.3 NEAR of balance); the heir only claims.
 # Keys for all three accounts must be in keys/<acct>.json (scripts/near-admin.mjs create).
 set -euo pipefail
@@ -64,7 +65,7 @@ A1=$(bal "$ATT"); H1=$(bal "$HEIR"); E1=$(bal "$EVIL"); C1=$(bal "$C")
 NET=$(python3 -c "print(($A1+$H1+$E1)-($A0+$H0+$E0))")
 echo
 echo "## result"
-echo "vault balance after step 3: $(near ${B[3]})  after step 4: $(near ${B[4]})  (bond 1 NEAR)  after step 5: $(near ${B[5]})  (storage released)"
+echo "vault balance after step 3: $(near ${B[3]})  after step 4: $(near ${B[4]})  (bond 1 NEAR)  after step 5: $(near ${B[5]})  (storage release goes to the heirs)"
 echo "claim paid: $(near ${PAID:-0}) NEAR"
 echo "attacker + heir + dao, net: $(near $NET) NEAR"
 echo "contract account: $(near $C0) -> $(near $C1) NEAR"

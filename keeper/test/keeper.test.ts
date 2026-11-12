@@ -355,11 +355,13 @@ describe('resign planning (hardened contract)', () => {
     expect(r2.max_fee_per_gas).toBe('9000000000');
     expect(BigInt(r.max_fee_per_gas) * 100n).toBeGreaterThanOrEqual(2_000_000_000n * 110n);
   });
-  it('clamps gas and fee caps, and refuses a bump over 100 gwei', () => {
+  it('clamps gas and fee caps, and holds a bump over the cap at the cap (contract v2 takes it, second review F4)', () => {
     expect(clampEvm({ ...fresh1, gas_limit: '500000', max_fee_per_gas: '900000000000' }).gas_limit).toBe('100000');
     expect(clampEvm({ ...fresh1, max_fee_per_gas: '900000000000' }).max_fee_per_gas).toBe('100000000000');
     expect(clampEvm({ ...fresh1, gas_limit: '1' }).gas_limit).toBe('21000');
-    expect(bumpedEvmArgs(fresh1, { max_fee_per_gas: '95000000000', max_priority_fee_per_gas: '1' })).toBeNull();
+    expect(bumpedEvmArgs(fresh1, { max_fee_per_gas: '95000000000', max_priority_fee_per_gas: '1' }).max_fee_per_gas).toBe('100000000000');
+    const atCap = bumpedEvmArgs(fresh1, { max_fee_per_gas: '100000000000', max_priority_fee_per_gas: '100000000000' });
+    expect([atCap.max_fee_per_gas, atCap.max_priority_fee_per_gas]).toEqual(['100000000000', '100000000000']);
   });
   it('waits until resign_allowed_after_ms', () => {
     expect(msUntilResign({ resign_allowed_after_ms: 10_000 }, 0)).toBe(13_000);
