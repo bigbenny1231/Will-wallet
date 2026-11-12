@@ -89,11 +89,18 @@ export interface PayRequest {
   memo?: string;
 }
 
+/** The exact call the wallet signed and sent, for the transcript. */
+export interface SignedCall {
+  contract: string;
+  method: 'agent_pay';
+  args: { token_id: string; receiver_id: string; amount: string; memo?: string };
+}
+
 export type Verdict =
   | { status: 'refused_locally'; reason: string; reasons: string[]; text: string }
-  | { status: 'allowed'; text: string; tx: TxResult; link: string; dailySpent?: string; balance?: string }
-  | { status: 'denied'; reason: string; text: string; tx: TxResult; link: string }
-  | { status: 'error'; text: string; tx?: TxResult; link?: string };
+  | { status: 'allowed'; text: string; tx: TxResult; link: string; dailySpent?: string; balance?: string; call?: SignedCall }
+  | { status: 'denied'; reason: string; text: string; tx: TxResult; link: string; call?: SignedCall }
+  | { status: 'error'; text: string; tx?: TxResult; link?: string; call?: SignedCall };
 
 export interface WalletOpts {
   chain: VaultChain;
@@ -163,29 +170,26 @@ export class Wallet {
 
     // Layer 2: sign agent_pay with the scoped key; report the contract's own verdict.
     let tx: TxResult;
+    const args = { token_id: this.tokenId, receiver_id: req.receiver, amount: amount.toString(), ...(req.memo ? { memo: req.memo.slice(0, 64) } : {}) };
+    const call: SignedCall = { contract: this.chain.contractId, method: 'agent_pay', args };
     try {
-      tx = await this.chain.agentPay({
-        token_id: this.tokenId,
-        receiver_id: req.receiver,
-        amount: amount.toString(),
-        ...(req.memo ? { memo: req.memo.slice(0, 64) } : {}),
-      });
+      tx = await this.chain.agentPay(args);
     } catch (e) {
       const link = (e as { context?: { transactionHash?: string } })?.context?.transactionHash;
-      return { status: 'error', text: `error: ${errMsg(e)}`, ...(link ? { link: nearTxLink(link) } : {}) };
+      return { status: 'error', text: `error: ${errMsg(e)}`, call, ...(link ? { link: nearTxLink(link) } : {}) };
     }
     const link = nearTxLink(tx.hash);
-    if (tx.failure) return { status: 'error', text: `error: transaction failed ${tx.failure.slice(0, 160)}`, tx, link };
+    if (tx.failure) return { status: 'error', text: `error: transaction failed ${tx.failure.slice(0, 160)}`, tx, link, call };
 
     const rv = tx.returnValue as { allowed?: boolean; reason?: string | null; daily_spent?: string; balance?: string } | null;
     const ev = parseEvents(tx.logs).find((e) => e.event === 'agent_pay_allowed' || e.event === 'agent_pay_denied');
     const allowed = rv && typeof rv.allowed === 'boolean' ? rv.allowed : ev ? ev.event === 'agent_pay_allowed' : undefined;
-    if (allowed === undefined) return { status: 'error', text: 'error: no agent_pay verdict in the receipt', tx, link };
+    if (allowed === undefined) return { status: 'error', text: 'error: no agent_pay verdict in the receipt', tx, link, call };
     if (allowed) {
       this.paid += amount;
-      return { status: 'allowed', text: 'allowed', tx, link, dailySpent: rv?.daily_spent, balance: rv?.balance };
+      return { status: 'allowed', text: 'allowed', tx, link, dailySpent: rv?.daily_spent, balance: rv?.balance, call };
     }
     const reason = String(rv?.reason ?? ev?.data.reason ?? 'unknown');
-    return { status: 'denied', reason, text: `denied: ${reason}`, tx, link };
+    return { status: 'denied', reason, text: `denied: ${reason}`, tx, link, call };
   }
 }

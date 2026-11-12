@@ -1,7 +1,7 @@
 // Typeset transcript: pure formatting functions plus a tiny collector that streams each block as it is added.
 import { fmtNear } from './util.js';
 import type { KeyAudit, Verdict } from './wallet.js';
-import type { Policy, VaultView } from './types.js';
+import type { DecisionMeta, Policy, VaultView } from './types.js';
 
 export class Transcript {
   readonly blocks: string[] = [];
@@ -40,6 +40,11 @@ const q = (s: string) => JSON.stringify(s);
 export interface RunMeta {
   scenario: string;
   brain: string;
+  /** Set when the brain that ran is not the one asked for (evidence mode without a model key). */
+  brainRequested?: string;
+  brainNote?: string;
+  /** Evidence mode: which phase of the run this transcript is. */
+  phase?: string;
   contract: string;
   tokenId: string;
   agentKey: string;
@@ -58,6 +63,9 @@ export function formatHeader(m: RunMeta, vault: VaultView, audit: KeyAudit): str
     '| | |',
     '|---|---|',
     `| Brain | ${esc(m.brain)} |`,
+    ...(m.brainRequested ? [`| Brain requested | ${esc(m.brainRequested)} |`] : []),
+    ...(m.brainNote ? [`| Note | **${esc(m.brainNote)}** |`] : []),
+    ...(m.phase ? [`| Evidence phase | ${esc(m.phase)} |`] : []),
     `| Vault | token ${inline(m.tokenId)} on ${code(m.contract)} (owner ${code(vault.owner_id)}, state **${inline(vault.state)}**) |`,
     `| Balance | ${fmtNear(vault.balance)} NEAR |`,
     `| On-chain policy | ${formatPolicy(vault.policy)} |`,
@@ -77,9 +85,24 @@ export function formatHeader(m: RunMeta, vault: VaultView, audit: KeyAudit): str
   return lines.join('\n');
 }
 
-export function formatStep(n: number, thought?: string): string {
+/** One line about an LLM decision: which model answered, why it stopped, tokens, latency, request id. */
+export function formatDecisionMeta(m: DecisionMeta): string {
+  const parts: string[] = [];
+  if (m.model) parts.push(`model ${code(m.model)}`);
+  if (m.stopReason) parts.push(`stop_reason ${code(m.stopReason)}`);
+  if (m.inputTokens !== undefined || m.outputTokens !== undefined) parts.push(`${m.inputTokens ?? '?'} in / ${m.outputTokens ?? '?'} out tokens`);
+  if (m.latencyMs !== undefined) parts.push(`${(m.latencyMs / 1000).toFixed(1)} s`);
+  if (m.requestId) parts.push(`request ${code(m.requestId)}`);
+  const lines = parts.length ? [`*decision:* ${parts.join(' · ')}`] : [];
+  for (const n of m.notes ?? []) lines.push(`*note:* ${inline(n)}`);
+  return lines.join('\n\n');
+}
+
+export function formatStep(n: number, thought?: string, o: { reasoning?: string; meta?: DecisionMeta } = {}): string {
   const t = thought?.trim();
-  return `### Step ${n}${t ? `\n\n> **thought:** ${inline(t)}` : ''}`;
+  const r = o.reasoning?.trim();
+  const meta = o.meta ? formatDecisionMeta(o.meta) : '';
+  return [`### Step ${n}`, ...(meta ? [meta] : []), ...(r ? [`> **reasoning summary:** ${inline(r)}`] : []), ...(t ? [`> **thought:** ${inline(t)}`] : [])].join('\n\n');
 }
 
 export function formatArgs(args: Record<string, unknown>): string {
@@ -111,7 +134,8 @@ export function formatVerdict(v: Verdict, amountNear: string, receiver: string, 
     } else if (v.status === 'denied') rows.push(['2. contract (on-chain)', `**${inline(v.text)}** · funds did not move · [tx](${v.link})`]);
     else rows.push(['2. contract (on-chain)', `**${esc(v.text)}**${v.link ? ` · [tx](${v.link})` : ''}`]);
   }
-  return [`**payment:** ${inline(amountNear)} NEAR → ${code(receiver)}`, '', '| layer | verdict |', '|---|---|', ...rows.map(([a, b]) => `| ${a} | ${b} |`)].join('\n');
+  const call = 'call' in v && v.call ? [`**contract call:** ${code(`${v.call.method}(${JSON.stringify(v.call.args)})`)} on ${code(v.call.contract)}`, ''] : [];
+  return [`**payment:** ${inline(amountNear)} NEAR → ${code(receiver)}`, '', ...call, '| layer | verdict |', '|---|---|', ...rows.map(([a, b]) => `| ${a} | ${b} |`)].join('\n');
 }
 
 export interface Summary {
@@ -144,7 +168,7 @@ export function formatFooter(s: Summary): string {
     '',
     '| | |',
     '|---|---|',
-    `| Steps | ${s.steps}${s.finished ? '' : ' (stopped at the step limit)'} |`,
+    `| Steps | ${s.steps}${s.finished ? '' : ' (stopped before the brain called done)'} |`,
     `| Payments allowed by the contract | ${s.paidAllowed} (${s.paidAmountNear} NEAR) |`,
     `| Payments denied by the contract | ${s.denied} |`,
     `| Payments refused by the wallet wrapper | ${s.refusedLocally} |`,

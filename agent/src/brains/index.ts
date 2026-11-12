@@ -1,5 +1,5 @@
 import type { Brain } from '../types.js';
-import { AnthropicBrain, NEARAI_BASE, NEARAI_DEFAULT_MODEL, OPENAI_BASE, OpenAICompatBrain, pickAnthropicModel, pickOpenAIModel } from './llm.js';
+import { ANTHROPIC_DEFAULT_MODEL, AnthropicBrain, NEARAI_BASE, NEARAI_DEFAULT_MODEL, OPENAI_BASE, OpenAICompatBrain, pickOpenAIModel, type FetchLike } from './llm.js';
 import { ScriptedBrain } from './scripted.js';
 
 export type BrainKind = 'scripted' | 'anthropic' | 'openai' | 'nearai';
@@ -13,10 +13,10 @@ export function autoBrain(env: Record<string, string | undefined>): BrainKind {
   return 'scripted';
 }
 
-export async function makeBrain(kind: BrainKind, env: Record<string, string | undefined>, o: { vigilant?: boolean; model?: string } = {}): Promise<Brain> {
+export async function makeBrain(kind: BrainKind, env: Record<string, string | undefined>, o: { vigilant?: boolean; model?: string; fetch?: FetchLike } = {}): Promise<Brain> {
   const need = (k: string) => {
     const v = env[k];
-    if (!v) throw new Error(`--brain ${kind} needs ${k}`);
+    if (!v) throw new Error(`--brain ${kind} needs ${k}: set it in the environment or in the repo-root .env (it is never printed)`);
     return v;
   };
   switch (kind) {
@@ -24,7 +24,7 @@ export async function makeBrain(kind: BrainKind, env: Record<string, string | un
       return new ScriptedBrain(!!o.vigilant);
     case 'anthropic': {
       const key = need('ANTHROPIC_API_KEY');
-      return new AnthropicBrain(key, o.model || env.ANTHROPIC_MODEL || (await pickAnthropicModel(key)));
+      return new AnthropicBrain(key, o.model || env.ANTHROPIC_MODEL || ANTHROPIC_DEFAULT_MODEL, o.fetch ? { fetch: o.fetch } : {});
     }
     case 'openai': {
       const key = need('OPENAI_API_KEY');

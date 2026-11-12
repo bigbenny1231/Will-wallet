@@ -27,6 +27,8 @@ npm run attacks                                          # offline: seven simula
 npm run agent -- --token <id> --key <agent key>          # testnet vault; brain = first API key found, else scripted
 npm run agent -- --token <id> --key <agent key> --brain anthropic|openai|nearai|scripted
 make agent TOKEN=<id> [BRAIN=...] [ARGS=...]             # from the repo root; key from DMW_AGENT_KEY in .env, else .demo/agent.key.json
+npm run attacks -- --onchain --token <id>                # the seven attacks against the LIVE vault: the deployed contract is layer 2
+npx tsx src/cli.ts evidence --token <id> --brain anthropic --out <dir>   # CI: LLM agent twice + on-chain suite, transcripts in <dir>
 ```
 
 `DMW_AGENT_KEY=... npm run agent -- --token <id>` keeps the key out of `ps`. The transcript is printed as it happens and saved to
@@ -35,13 +37,41 @@ make agent TOKEN=<id> [BRAIN=...] [ARGS=...]             # from the repo root; k
 | Option | |
 |---|---|
 | `--brain` | `scripted` (offline, deterministic), `anthropic`, `openai`, `nearai`. Default: `ANTHROPIC_API_KEY`, else `OPENAI_API_KEY`, else `NEAR_AI_API_KEY`, else scripted |
-| `--model` | override. Defaults: Anthropic = newest `claude-sonnet*` from `GET /v1/models` (fallback `claude-sonnet-4-5`); OpenAI = newest `gpt-5*` from `/v1/models` (fallback `gpt-4.1`); NEAR AI = `zai-org/GLM-5.1-FP8`. Env: `ANTHROPIC_MODEL`, `OPENAI_MODEL`, `NEAR_AI_MODEL` |
+| `--model` | override. Defaults: Anthropic = `claude-sonnet-5-5`; OpenAI = newest `gpt-5*` from `/v1/models` (fallback `gpt-4.1`); NEAR AI = `zai-org/GLM-5.1-FP8`. Env: `ANTHROPIC_MODEL`, `OPENAI_MODEL`, `NEAR_AI_MODEL` |
+| `--contract` | the vault contract. Default: `DMW_CONTRACT` |
 | `--scenario` | default `scenarios/api-bills.json` (two invoices + the injection). `scenarios/attack-only.json` is the injection alone. The other `scenarios/attack-*.json` files are the attack suite |
 | `--vigilant` | scripted brain refuses what the injection scanner flags (default: **naive**, it obeys the inbox, which is the attack demo). The scanner is a heuristic: it flags none of the messages in attacks 3 to 6 of the suite |
 | `--no-local-checks` | **demo only.** Skips layer 1 so you can watch the contract deny on its own. Printed in the transcript header |
 | `--sim` | in-memory vault that applies the contract's policy in the contract's order |
 
-NEAR AI is OpenAI-compatible (`https://cloud-api.near.ai/v1`, Bearer auth, per docs.near.ai/cloud/quickstart). The three LLM brains are unit-tested against recorded request/response shapes; they have not been run against the live APIs in this repo's CI.
+NEAR AI is OpenAI-compatible (`https://cloud-api.near.ai/v1`, Bearer auth, per docs.near.ai/cloud/quickstart).
+
+### The Anthropic brain
+
+`--brain anthropic` calls the Messages API (`POST https://api.anthropic.com/v1/messages`, `anthropic-version: 2023-06-01`) with `fetch`; the SDK is not a dependency. It needs `ANTHROPIC_API_KEY` (environment or the repo-root `.env`; it is never printed) and fails with that name if it is missing. Default model `claude-sonnet-5-5`. Each decision is one request: the three tools with `tool_choice: auto` and one call per turn, adaptive thinking with a readable summary, and the server-side refusal fallback on models that take it. Every assistant turn is sent back with its content blocks unchanged (thinking blocks are bound to the conversation) and the history is only ever appended to. A refusal (`stop_reason: refusal`) or a reply cut at `max_tokens` never runs a tool. Each request has a 180 s timeout; network errors, 408, 409, 429, 5xx and 529 are retried with backoff, honouring `retry-after`. A model call has no side effect, so a retry cannot pay twice; a signed payment is never retried. If the API rejects an optional field by name (the fallback, the thinking summary), the brain drops it, notes it in the transcript, and continues.
+
+The transcript records, per step: which model answered (the response's own `model` field), `stop_reason`, tokens, latency and request id; the reasoning summary and the model's text; the tool call; for a payment, the exact `agent_pay` call signed and on which contract; and the result: `refused_locally: <reason>` (nothing signed), or the contract's `allowed` / `denied: <reason>` with the transaction link. The tests run this brain against a mocked Messages API (`test/anthropic.test.ts`, `test/evidence.test.ts`). Whether a run against the real API has been committed is stated in the evidence files, not here.
+
+### Evidence for CI
+
+```
+cd agent && npm ci
+ANTHROPIC_API_KEY=... DMW_CONTRACT=<contract> DMW_AGENT_KEY=<agent key> \
+  npx tsx src/cli.ts evidence --token <id> --brain anthropic --out ../evidence/agent
+```
+
+It runs, against the live vault, and writes into `<dir>`:
+
+| File | What |
+|---|---|
+| `1-agent-<brain>-local-checks-on.md` | the agent with the brain, wallet pre-checks on: layers 0, 1 and 2 |
+| `2-agent-<brain>-contract-only.md` | the same with `--no-local-checks`: only the brain and the deployed contract stand |
+| `3-attack-suite-onchain.md` | the on-chain attack suite (below) |
+| `README.md` | index: contract, token, which brain ran, one line per phase, exit code |
+
+Without `ANTHROPIC_API_KEY`, phases 1 and 2 run the naive scripted brain, and every header says in bold that the anthropic brain did not run. Phase 3 never needs a model key. Exit code: 0 the policy held and every phase completed; 1 NEAR moved outside the policy (or an injected payment went through); 2 a phase did not complete (model API error, failed key audit, incomplete suite). `--model` overrides the model, `--scenario` the inbox (default `scenarios/api-bills.json`), `--no-key-probe` skips the layer 3 probe.
+
+Cost of one run on testnet: about 25 `agent_pay` transactions, paid as gas from the agent key's 1 NEAR allowance (a few evidence runs per key), and the bounded attack 3 pays real NEAR to the allowlisted provider, up to what is left of the daily cap.
 
 ## The scenario
 
@@ -80,7 +110,16 @@ The process loads nothing else: `src/env.ts` reads the repo-root `.env` through 
 
 ## Attack suite
 
-`npm run attacks` runs seven attacks and prints a scoreboard. It is a simulation: the in-memory vault from `src/sim.ts`, the scripted brain in naive mode (written to obey the injection), no LLM, no chain, no key. Each attack runs twice: wallet pre-checks on, where layer 1 decides, and pre-checks off, where layer 2 decides. Layer 2 here is the simulated contract. The recorded output is [`ATTACK_SUITE.md`](ATTACK_SUITE.md). The real testnet runs are in [`LIVE_TRANSCRIPT.md`](LIVE_TRANSCRIPT.md). They use the injected message of attack 1 only.
+`npm run attacks` runs seven attacks and prints a scoreboard. By default it is a simulation: the in-memory vault from `src/sim.ts`, the scripted brain in naive mode (written to obey the injection), no LLM, no chain, no key. Each attack runs twice: wallet pre-checks on, where layer 1 decides, and pre-checks off, where layer 2 decides. Layer 2 there is the simulated contract. The recorded output is [`ATTACK_SUITE.md`](ATTACK_SUITE.md).
+
+`npm run attacks -- --onchain --token <id>` runs the same seven scenario files against a live vault through `src/near.ts`, with the vault's agent function-call key (`DMW_CONTRACT`, `DMW_AGENT_KEY` or `.demo/agent.key.json`, `NEAR_RPC`, as for the agent). Layer 2 is the deployed contract, and every call is a linked testnet transaction. For each attempted call the report records the call, whether the contract allowed or refused it, the refusal reason and the transaction link. What differs from the simulator, all of it in the report:
+
+- **State carries over.** Passes and attacks run in order against one vault, so an allowed payment counts against the daily cap of everything after it. Each pass is audited against the vault as read when it began, storage deposit included.
+- **Attack 6 needs a vault in Warning.** On an Alive vault it is reported as not run, with the reason: there, the invoice is a valid payment and would be paid. On a vault that is in Warning it runs.
+- **Attack 5** never reaches the contract through the wallet (input checks). The suite then sends the same three requests straight to `agent_pay`, bypassing the wrapper, to show the contract's own guards (`--no-direct` to skip).
+- **Attack 7** has no tool. The key probe (`src/key-probe.ts`) signs the three exact requests (AddKey, `set_policy`, `nft_transfer` with 1 yoctoNEAR) with the agent key and records the node's rejection (`--no-key-probe` to skip).
+
+The report goes to `.demo/attack-suite-onchain.md` (`--out` to change). Exit code 1 if anything moved outside the policy, 2 if the key audit failed or a run was incomplete. The testnet agent runs in [`LIVE_TRANSCRIPT.md`](LIVE_TRANSCRIPT.md) predate this mode and use the injected message of attack 1 only.
 
 ```
 npm run attacks                 # scoreboard; full report in .demo/attack-suite.md; exit 1 if any attack moves NEAR outside the policy
@@ -104,10 +143,10 @@ Result of the recorded run: 7 attacks, 0 escaped policy, worst bounded loss 1 NE
 What the suite does not show:
 
 - **Attack 3 is bounded, not prevented.** The policy cannot tell a fake invoice from a real one. Four invoices pass every check and 1 NEAR, the whole daily cap, moves to the allowlisted provider. The cap is per 24 h window, so the same attack can take it again the next day while the vault is alive and the key is in place. Real invoices are refused for the rest of the window too.
-- **Layer 2 is simulated.** The simulator applies `localPolicyCheck`, the same function as layer 1, in the contract's order. The two passes show the agent side holding at two places. They are not evidence about the Rust contract. That evidence is the contract's unit tests (`contracts/dmw/src/tests.rs`, `agent_pay_denied_*`) and `LIVE_TRANSCRIPT.md`.
-- **No LLM is involved.** The suite does not measure how often a real model is fooled. The naive scripted brain was extended for it: it follows a request for "N payments of X NEAR", and when a message asks for a key, a policy change or an NFT transfer it calls `add_key`, `set_policy` or `nft_transfer`, tools that do not exist.
-- **Attack 7 shows only that there is no tool path.** Layer 3, the key, is not simulated. "The key and its limits" above says why the real key could not sign those calls. The testnet probe did not try these three exact calls.
-- **Gas is not modelled.** With pre-checks off, each denied call is a transaction and, on a real chain, costs gas from the key's allowance.
+- **In the simulated suite, layer 2 is simulated.** The simulator applies `localPolicyCheck`, the same function as layer 1, in the contract's order. Those two passes are not evidence about the Rust contract. That evidence is `--onchain`, the contract's unit tests (`contracts/dmw/src/tests.rs`, `agent_pay_denied_*`) and `LIVE_TRANSCRIPT.md`.
+- **No LLM is involved in either mode.** The suite does not measure how often a real model is fooled; phases 1 and 2 of the evidence command run the LLM brain on the same vault. The naive scripted brain was extended for it: it follows a request for "N payments of X NEAR", and when a message asks for a key, a policy change or an NFT transfer it calls `add_key`, `set_policy` or `nft_transfer`, tools that do not exist.
+- **In the simulated suite, attack 7 shows only that there is no tool path.** Layer 3, the key, is not simulated. "The key and its limits" above says why the real key could not sign those calls; `--onchain` signs these three exact calls and records the node's answer.
+- **Gas is not modelled in the simulator.** With pre-checks off, each denied call is a transaction and, on a real chain, costs gas from the key's allowance.
 
 "Escaped" is decided by `auditPolicy` in `src/attack-suite.ts`. It reads the simulated vault's ledger and does not call the policy code under test: every receiver on the allowlist, every payment within the per-payment cap, the total within the daily cap, the vault Alive, and the balance change equal to the ledger. A test swaps in a contract that allows everything and checks that the suite then reports an escape and a non-zero exit code.
 
@@ -117,17 +156,21 @@ What the suite does not show:
 |---|---|
 | `src/agent.ts` | the loop: brain step, tool execution, history, transcript, summary |
 | `src/wallet.ts` | wrapper: `localPolicyCheck`, `auditKey`, `Wallet.pay` (the only methods: `pay`, `snapshot`, `audit`) |
-| `src/near.ts` | NEAR chain port, built from the agent key alone; `agent_pay` only, 60 TGas, never retried |
+| `src/near.ts` | NEAR chain port, built from the agent key alone; `agent_pay` only, 60 TGas, never retried; a contract panic comes back with its transaction hash |
 | `src/brains/` | `scripted.ts` (offline), `llm.ts` (Anthropic Messages, OpenAI-compatible), `index.ts` (selection) |
+| `src/session.ts` | one agent run from chain to saved transcript; where the live contract and key come from |
+| `src/evidence.ts` | the `evidence` command: agent with pre-checks on, then off, then the on-chain attack suite |
+| `src/attack-onchain.ts` | the attack suite against a live vault, its escape check and report |
+| `src/key-probe.ts` | signs the non-payment requests of attack 7 with the agent key, for the on-chain suite |
 | `src/inbox.ts` | scenario loader, injection scanner, text parsers for the scripted brain |
 | `src/transcript.ts` | typeset Markdown: header with key audit, one block per step, a two-layer verdict table per payment |
 | `src/sim.ts` | in-memory vault for `--sim`, the attack suite and tests; keeps a ledger of the payments it allowed |
 | `src/attack-suite.ts` | attack suite: runs each attack scenario in the simulator with pre-checks on and off, `auditPolicy` (the escape check), the report renderer |
-| `src/attacks.ts` | `npm run attacks`: prints the scoreboard, writes `.demo/attack-suite.md`, `--record` rewrites `ATTACK_SUITE.md` |
+| `src/attacks.ts` | `npm run attacks`: prints the scoreboard, writes `.demo/attack-suite.md`, `--record` rewrites `ATTACK_SUITE.md`; `--onchain` runs against the live vault |
 | `src/probe.ts` | forbidden-transaction probe |
 | `scenarios/` | `api-bills.json`, and seven attack scenarios: `attack-only.json`, `attack-split-payments.json`, `attack-salami-invoices.json`, `attack-lookalike-receiver.json`, `attack-malformed-request.json`, `attack-warning-state.json`, `attack-not-a-payment.json`. A scenario with an `attack` block is part of the suite. Placeholders: `{{PROVIDER}}` (first allowlist entry), `{{PROVIDER_LOOKALIKE}}` (a typosquat of it), `{{CONTRACT}}` (the vault contract) |
 | `ATTACK_SUITE.md` | recorded output of `npm run attacks -- --record`: simulated, scripted brain, deterministic |
 | `LIVE_TRANSCRIPT.md` | real testnet runs with transaction links, and the key probe |
 | `test/` | vitest suites; `attacks.test.ts` has one test per attack scenario and checks that `ATTACK_SUITE.md` equals a fresh render |
 
-`npm test` runs the vitest suite offline: every refusal reason, input refusals, fail-closed read, daily-spend tracking, the contract-denial path with layer 1 off, key audit, the scripted brain's protocol and determinism, injection detection, transcript formatting, the LLM request/response mapping, the env allow-list, and the attack suite (one test per scenario, the escape check, the recorded report). `npm run typecheck` runs `tsc`.
+`npm test` runs the vitest suite offline: every refusal reason, input refusals, fail-closed read, daily-spend tracking, the contract-denial path with layer 1 off, key audit, the scripted brain's protocol and determinism, injection detection, transcript formatting, the LLM request/response mapping, the env allow-list, the attack suite (one test per scenario, the escape check, the recorded report), the Anthropic brain against a mocked Messages API (request shape, thinking-block replay, refusals, retries, timeouts), the on-chain suite's orchestration with the chain mocked, and the evidence command end to end with both mocked. No test sends a transaction or calls a model. `npm run typecheck` runs `tsc`.

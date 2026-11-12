@@ -11,6 +11,7 @@ export function parseNear(s: string): bigint {
 /** yoctoNEAR -> exact decimal string, trailing zeros trimmed ("0.12", "1", "2.9"). */
 export function fmtNear(y: string | bigint): string {
   const v = BigInt(y);
+  if (v < 0n) return `-${fmtNear(-v)}`;
   const w = v / YOCTO;
   const f = (v % YOCTO).toString().padStart(24, '0').replace(/0+$/, '');
   return f ? `${w}.${f}` : `${w}`;
