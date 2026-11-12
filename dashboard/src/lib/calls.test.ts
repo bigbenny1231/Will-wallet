@@ -122,13 +122,34 @@ describe("simple calls", () => {
       expectMatchesContract(call);
     });
   }
-  it("1 yocto exactly where lib.rs asserts it (review 2 M-6): owner mutators and pause, not heartbeat/claim", () => {
-    const owner = ["add_pulse_key", "add_agent_key", "remove_key", "set_heirs", "set_policy", "set_foreign_payouts", "set_dao", "set_timing", "set_guardian", "pause"];
+  it("1 yocto exactly where lib.rs asserts it (review 2 M-6): owner mutators and pause, not poke/claim", () => {
+    const owner = ["add_pulse_key", "add_agent_key", "remove_key", "set_heirs", "set_policy", "set_foreign_payouts", "set_dao", "set_timing", "set_guardian", "pause", "unpause", "set_bounty", "set_vault_keeper"];
     for (const m of owner) expect(LIB).toMatch(new RegExp(`#\\[payable\\]\\s+pub fn ${m}\\(`));
     expect(LIB).toMatch(/fn require_owner_mutable\(&self, v: &Vault\) \{\s+assert_one_yocto\(\);/);
     expect(LIB).toMatch(/pub fn pause\(&mut self, token_id: TokenRef\) -> u64 \{\s+(\/\/.*\s+)*assert_one_yocto\(\);/);
-    for (const m of ["heartbeat", "poke", "execute_step", "mark_broadcast", "claim"]) expect(LIB).not.toMatch(new RegExp(`#\\[payable\\]\\s+pub fn ${m}\\(`));
+    for (const m of ["poke", "execute_step", "mark_broadcast", "claim"]) expect(LIB).not.toMatch(new RegExp(`#\\[payable\\]\\s+pub fn ${m}\\(`));
     expect(C.setGuardianCall("4", null).deposit).toBe("1");
+  });
+  it("v2 (finding F): the owner's heartbeat attaches 1 yocto, a pulse key's does not", () => {
+    // lib.rs: heartbeat is payable and asserts one yocto unless the signer is one of the vault's pulse keys.
+    expect(LIB).toMatch(/#\[payable\]\s+pub fn heartbeat\(/);
+    expect(LIB).toMatch(/if !via_key \{\s+assert_one_yocto\(\);\s+\}/);
+    const v2 = { token_id: "4", derivation_paths: { base: "base-4-aa", monad: "monad-4-aa", solana: "sol-4-aa" } };
+    expect(C.ownerHeartbeatCall(v2)).toEqual({ method: "heartbeat", args: { token_id: "4" }, gas: gas(10), deposit: "1" });
+    // a v1 contract (no derivation_paths in its view) has a non-payable heartbeat that would refuse the yocto
+    expect(C.ownerHeartbeatCall({ token_id: "4" }).deposit).toBeUndefined();
+    expect(C.heartbeatCall("4").deposit).toBeUndefined();
+  });
+  it("v2 owner calls: unpause, set_bounty, set_vault_keeper (1 yocto, arg names from lib.rs)", () => {
+    for (const c of [C.unpauseCall("4"), C.setBountyCall("4", "10"), C.setVaultKeeperCall("4", "k.testnet"), C.setVaultKeeperCall("4", null)]) {
+      expect(c.deposit).toBe("1");
+      expect(c.gas).toBe(gas(30));
+      expectMatchesContract(c);
+    }
+    expect(LIB).toContain("pub const MAX_BOUNTY: u128 = near(1000)");
+    expect(C.MAX_BOUNTY_YOCTO).toBe(NEAR);
+    expect(LIB).toContain("pub const MIN_DEPOSIT: u128 = near(10)");
+    expect(C.MIN_DEPOSIT_YOCTO).toBe(NEAR / 100n);
   });
   it("set_dao null clears the DAO", () => {
     expect(C.setDaoCall("4", null).args).toEqual({ token_id: "4", dao_id: null });

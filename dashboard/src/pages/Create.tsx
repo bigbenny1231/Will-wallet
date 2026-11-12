@@ -1,11 +1,11 @@
 import { CHAINS, CHAIN_ORDER, chainMeta } from "../lib/chainmeta";
 import type { ForeignChain } from "../types";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../lib/near";
 import { useWallet } from "../lib/wallet";
-import { deriveFor, type DerivedAddresses } from "../lib/derive";
-import { createVaultCall, type CreateDraft, type ForeignDraft } from "../lib/calls";
+import { missingHeirsNote, useMissingAccounts } from "../lib/accounts";
+import { MAX_BOUNTY_YOCTO, createVaultCall, type CreateDraft, type ForeignDraft } from "../lib/calls";
 import { PENDING_KEY, type Pending } from "../components/PendingCreate";
 import { bpsToPct, fmtInterval, nearToYocto, toSmallest, unitsFor } from "../lib/format";
 import { CONTRACT, MOCK } from "../config";
@@ -45,27 +45,14 @@ export default function Create() {
   const [allow, setAllow] = useState("");
   // foreign
   const [foreign, setForeign] = useState<ForeignRow[]>([]);
-  const [expectedId, setExpectedId] = useState<string | null>(null);
-  const [derived, setDerived] = useState<DerivedAddresses | null>(null);
-  const [, setDeriveErr] = useState<string | null>(null);
   // dao + deposit
   const [dao, setDao] = useState("");
   const [bounty, setBounty] = useState("0.05");
   const [deposit, setDeposit] = useState("5");
 
-  useEffect(() => {
-    api.nextTokenId().then(setExpectedId).catch(() => setExpectedId(null));
-  }, []);
-  useEffect(() => {
-    if (!expectedId) return;
-    try {
-      setDerived(deriveFor(expectedId));
-      setDeriveErr(null);
-    } catch (e) {
-      setDerived(null);
-      setDeriveErr(e instanceof Error ? e.message : String(e));
-    }
-  }, [expectedId]);
+  // Heirs whose account does not exist yet: a warning, not a block (see lib/accounts.ts).
+  const missingHeirs = useMissingAccounts(heirs.map((h) => h.account_id));
+  const missingNote = missingHeirsNote(missingHeirs);
 
   const intervalS = Math.round(Number(intervalN) * UNITS[unit]);
   const graceN = Number(grace);
@@ -90,7 +77,7 @@ export default function Create() {
     if (dao.trim() && !/^[a-z0-9._-]+\.[a-z0-9._-]+$/.test(dao.trim())) p[4].push("DAO id should look like estate.sputnik-v2.testnet.");
     try {
       if (BigInt(nearToYocto(deposit)) < BigInt(nearToYocto("0.1"))) p[5].push("Deposit must be at least 0.1 NEAR (storage).");
-      nearToYocto(bounty);
+      if (BigInt(nearToYocto(bounty)) > MAX_BOUNTY_YOCTO) p[5].push("The keeper bounty is capped at 1 NEAR.");
     } catch { p[5].push("Deposit and bounty must be NEAR amounts."); }
     return p;
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -108,7 +95,10 @@ export default function Create() {
         chain: f.chain,
         to: f.to.trim(),
         amount: toSmallest(f.chain, f.amount),
-        from_address: derived?.[f.chain] ?? "",
+        // The source address only exists once the vault does (v2 salts the derivation path at create_vault).
+        // PendingCreate fills it in from the new vault's view before set_foreign_payouts; the contract itself always
+        // signs for the derived address and overwrites from_address at signing.
+        from_address: "",
       }));
       const draft: CreateDraft = {
         heartbeat_interval_s: intervalS,
@@ -233,6 +223,7 @@ export default function Create() {
               <span className={`num text-[17px] ${bpsSum === 10000 ? "text-text" : "text-warn"}`}>Total {bpsToPct(bpsSum)}</span>
             </div>
             <p className="text-[15px] text-text-2">The heir with the largest share also receives the Will NFT.</p>
+            {missingNote && <p className="border-l border-warn pl-4 text-[15px] text-warn">{missingNote}</p>}
           </>
         )}
 
@@ -267,7 +258,7 @@ export default function Create() {
                   </div>
                   <div className="text-[14px] text-text-2">
                     Funded from the {m.name} address derived for{" "}
-                    <span className="mono !text-[13px] text-text">{m.path("<your vault id>")}</span>. It appears once the vault is created. Do not send anything before then.
+                    <span className="mono !text-[13px] text-text">{m.pathShape}</span>. The salt is drawn when the vault is created, so the address appears only then. Do not send anything before then.
                   </div>
                   <button className="tl !text-[14px]" onClick={() => setForeign(foreign.filter((_, j) => j !== i))}>Remove</button>
                 </div>
@@ -275,7 +266,7 @@ export default function Create() {
             })}
             <button className="tl" onClick={() => setForeign([...foreign, { chain: "base", to: "", amount: "" }])}>Add foreign payout</button>
             <p className="max-w-[62ch] text-[14px] text-text-2">
-              The source address depends on the vault id, which is only fixed once the vault is created. Another vault can take the next id first, so the address is shown after creation, never before. Fund it then, while you are alive; nobody holds its key.
+              The source address depends on the vault id and a random salt the contract draws when it creates the vault, so nobody can know it, fund it or sign for it before the vault exists. It is shown on the vault page after creation. Fund it then, while you are alive; nobody holds its key.
             </p>
           </>
         )}
@@ -292,7 +283,7 @@ export default function Create() {
               <Field label="Initial deposit (NEAR)" hint="0.1 NEAR is kept for storage; the rest is the vault balance. Each pulse or agent key later reserves 1 NEAR of it as gas allowance.">
                 <input className="field num" value={deposit} onChange={(e) => setDeposit(e.target.value)} />
               </Field>
-              <Field label="Keeper bounty (NEAR)" hint="Paid to whoever pokes the vault.">
+              <Field label="Keeper bounty (NEAR)" hint="Paid to whoever pokes the vault: at most 1 NEAR, and never more than 10% of the balance.">
                 <input className="field num" value={bounty} onChange={(e) => setBounty(e.target.value)} />
               </Field>
             </div>
@@ -300,7 +291,7 @@ export default function Create() {
               rows={[
                 ["Contract", CONTRACT],
                 ["Heartbeat", `${fmtInterval(intervalS || 0)}, ${graceN} missed allowed`],
-                ["Heirs", heirs.map((h, i) => `${h.account_id || "?"} ${bpsToPct(bpsRows[i] || 0)}`).join(", ")],
+                ["Heirs", heirs.map((h, i) => `${h.account_id || "?"} ${bpsToPct(bpsRows[i] || 0)}`).join(", ") + (missingHeirs.length ? ` (not found: ${missingHeirs.join(", ")})` : "")],
                 ["Agent caps", `${perTx} NEAR per tx, ${daily} NEAR per day`],
                 ["Foreign", foreign.length ? foreign.map((f) => `${unitsFor(f.chain, safeSmallest(f))} on ${chainMeta(f.chain).short}`).join(", ") : "none"],
                 ["DAO", dao.trim() || "none"],

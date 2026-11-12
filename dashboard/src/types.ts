@@ -30,6 +30,8 @@ export interface LogEntry {
   ms: number;
   event: string;
   detail?: string | null;
+  /** v2: write order across the routine and key-event rings. */
+  seq?: number;
 }
 
 export interface VaultView {
@@ -48,8 +50,12 @@ export interface VaultView {
   pulse_keys: string[];
   agent_keys: string[];
   policy: Policy;
+  /** Agent spend counted against the daily cap when the view was read (v2: rolling 24 h window). */
   daily_spent: string;
+  /** v1: start of the fixed window. v2: oldest spend still counted (0 when none). */
   daily_window_start_ms: number;
+  /** v2: the agent spends inside the rolling 24 h window. */
+  spends?: { ms: number; amount: string }[];
   dao_id: string | null;
   /** Guardian who may pause the trigger once per heartbeat cycle (SPEC 2.8). Absent on older deployments. */
   guardian_id?: string | null;
@@ -62,6 +68,19 @@ export interface VaultView {
   foreign_inflight?: boolean;
   created_ms?: number;
   log: LogEntry[];
+  /** v2: salted MPC derivation paths of the vault's foreign source addresses. Derive from these, never from the id. */
+  derivation_paths?: DerivationPaths;
+  /** v2: per-vault keeper the owner named (null when none). */
+  keeper_id?: string | null;
+  /** v2: measured storage of this vault and the NEAR held for it. */
+  storage_bytes?: number;
+  storage_deposit?: string;
+}
+
+export interface DerivationPaths {
+  base: string;
+  monad: string;
+  solana: string;
 }
 
 export interface NftToken {

@@ -128,8 +128,11 @@ export default function Try() {
       /* 3. keys and payouts, one transaction */
       show(2, { state: "doing" });
       if (!s.armed) {
-        const { deriveFor } = await import("../lib/derive");
-        const from = deriveFor(token);
+        // The source addresses come from the vault's own (salted) derivation paths in its view.
+        const { deriveForVault } = await import("../lib/derive");
+        const view = await api.getVault(token);
+        if (!view) throw new Error(`Vault ${token} could not be read back to derive its source addresses.`);
+        const from = deriveForVault(view);
         const payouts = toPayouts([
           { chain: "base", to: EXAMPLE_TO.base, amount: "100000000000000", from_address: from.base },
           { chain: "solana", to: EXAMPLE_TO.solana, amount: "1000000", from_address: from.solana },

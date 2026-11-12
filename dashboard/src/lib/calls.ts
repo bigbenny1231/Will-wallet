@@ -38,10 +38,11 @@ export const GAS = {
 
 /** add_pulse_key / add_agent_key reserve this much of the vault balance as the key's gas allowance. */
 export const KEY_ALLOWANCE_YOCTO = 10n ** 24n;
-/** create_vault keeps this flat fee out of the deposit for storage. */
+/** create_vault keeps this flat fee out of the deposit for storage. v2 measures each vault's storage afterwards, tops
+ *  the deposit up from the vault balance when the vault grows, and releases the excess at settlement (finding L-9). */
 export const STORAGE_FEE_YOCTO = 10n ** 23n;
 
-/** Owner mutators, `pause` and `nft_transfer` require exactly 1 yoctoNEAR (SPEC §2.3, review 2 M-6): a
+/** Owner mutators, the owner's heartbeat (v2), `pause`, `unpause` and `nft_transfer` require exactly 1 yoctoNEAR (SPEC §2.3, review 2 M-6): a
  *  function-call access key cannot attach a deposit, so these always go through a wallet prompt. */
 const ONE_YOCTO = "1";
 
@@ -64,7 +65,14 @@ export const depositCall = (tokenId: string, yocto: string): CallArgs => ({
   gas: GAS.other,
 });
 
+/** Pulse-key heartbeat. A function-call access key cannot attach a deposit, so this one carries none. */
 export const heartbeatCall = (tokenId: string): CallArgs => ({ method: "heartbeat", args: { token_id: tokenId }, gas: GAS.heartbeat });
+
+/** The owner's own heartbeat from the wallet. Contract v2 (finding F) requires exactly 1 yoctoNEAR on this path, so a
+ *  function-call key of the owner's account cannot beat for them. A v1 contract's heartbeat is not payable and would
+ *  refuse the yocto; a v1 view has no `derivation_paths`, which is how the two are told apart. */
+export const ownerHeartbeatCall = (v: { token_id: string; derivation_paths?: unknown }): CallArgs =>
+  v.derivation_paths ? { ...heartbeatCall(v.token_id), deposit: ONE_YOCTO } : heartbeatCall(v.token_id);
 
 export const addPulseKeyCall = (tokenId: string, publicKey: string): CallArgs => ({
   method: "add_pulse_key",
@@ -131,6 +139,20 @@ export const setGuardianCall = (tokenId: string, guardianId: string | null, maxP
   deposit: ONE_YOCTO,
 });
 
+/** Owner (v2, finding L-4): end a running pause. It does not re-arm the guardian; only the next heartbeat does. */
+export const unpauseCall = (tokenId: string): CallArgs => ({ method: "unpause", args: { token_id: tokenId }, deposit: ONE_YOCTO, gas: GAS.other });
+
+/** Owner, while Alive (v2, finding B): change the poke bounty, at most MAX_BOUNTY_YOCTO. */
+export const setBountyCall = (tokenId: string, bountyYocto: string): CallArgs => ({ method: "set_bounty", args: { token_id: tokenId, bounty: bountyYocto }, deposit: ONE_YOCTO, gas: GAS.other });
+
+/** Owner, while the vault is live (v2, finding C): name a keeper for this vault (null clears it). */
+export const setVaultKeeperCall = (tokenId: string, keeperId: string | null): CallArgs => ({ method: "set_vault_keeper", args: { token_id: tokenId, keeper_id: keeperId }, deposit: ONE_YOCTO, gas: GAS.other });
+
+/** Contract caps (lib.rs MAX_BOUNTY, MIN_DEPOSIT). The payout of a poke is also capped at 10% of the balance. */
+export const MAX_BOUNTY_YOCTO = 10n ** 24n;
+/** Deposits from anyone but the vault owner must be at least this much (v2, finding D). */
+export const MIN_DEPOSIT_YOCTO = 10n ** 22n;
+
 /** Guardian or owner: hold off the trigger until now + max_pause_s. */
 export const pauseCall = (tokenId: string): CallArgs => ({ method: "pause", args: { token_id: tokenId }, deposit: ONE_YOCTO, gas: GAS.other });
 
@@ -153,6 +175,7 @@ export const executeStepCall = (tokenId: string, args?: StepArgs): CallArgs => (
   gas: GAS.executeStep,
 });
 
+/** v2 (finding E): only an operator (contract keeper, vault keeper, vault owner, heir) may record a hash. */
 export const markBroadcastCall = (tokenId: string, index: number, txHash: string): CallArgs => ({
   method: "mark_broadcast",
   args: { token_id: tokenId, index, tx_hash: txHash },
@@ -161,7 +184,8 @@ export const markBroadcastCall = (tokenId: string, index: number, txHash: string
 
 export const claimCall = (tokenId: string): CallArgs => ({ method: "claim", args: { token_id: tokenId }, gas: GAS.other });
 
-/** NEP-171 transfer of the Will NFT (= the vault). Needs exactly 1 yoctoNEAR; owner only, while Alive/Warning. */
+/** NEP-171 transfer of the Will NFT (= the vault). Needs exactly 1 yoctoNEAR; owner only, and (v2, finding B) only
+ *  while the vault is Alive: not overdue, not paused. The buyer gets a reset vault (no heirs, keys, payouts or DAO). */
 export const nftTransferCall = (receiverId: string, tokenId: string, memo?: string): CallArgs => ({
   method: "nft_transfer",
   args: memo ? { receiver_id: receiverId, token_id: tokenId, memo } : { receiver_id: receiverId, token_id: tokenId },

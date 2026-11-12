@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { PAUSE_RANGE_S, pauseCall, setGuardianCall } from "../lib/calls";
+import { PAUSE_RANGE_S, pauseCall, setGuardianCall, unpauseCall } from "../lib/calls";
 import { fmtDuration, fmtInterval, fmtTime } from "../lib/format";
 import type { CallArgs, VaultView } from "../types";
 import { Figure, Tip } from "./ui";
@@ -11,6 +11,9 @@ type Unit = keyof typeof UNITS;
 export function isPaused(v: VaultView, now: number): boolean {
   return !!v.paused_until_ms && now < v.paused_until_ms;
 }
+
+/** unpause exists from contract v2 on (finding L-4); a v2 view carries derivation_paths. */
+const supportsUnpause = (v: VaultView) => !!v.derivation_paths;
 
 function split(s: number): [string, Unit] {
   if (s >= 86400 && s % 86400 === 0) return [String(s / 86400), "days"];
@@ -24,7 +27,8 @@ export default function GuardianPanel({ v, now, accountId, isOwner, busy, send }
   const maxS = v.max_pause_s ?? 0;
   const live = v.state === "Alive" || v.state === "Warning";
   const paused = isPaused(v, now);
-  // paused_until_ms stays set after the pause runs out, until the next heartbeat: the one pause of this cycle is spent.
+  // paused_until_ms stays set after the pause runs out (or the owner ends it with unpause), until the next heartbeat:
+  // the one pause of this cycle is spent.
   const spent = !!v.paused_until_ms && !paused;
   const due = now >= v.trigger_at_ms;
   const isGuardian = !!accountId && accountId === guardian;
@@ -67,7 +71,7 @@ export default function GuardianPanel({ v, now, accountId, isOwner, busy, send }
         <div className="border-l-2 border-warn pl-5">
           <div className="display text-[32px] text-warn">Paused until {fmtTime(v.paused_until_ms!)}.</div>
           <p className="mt-2 max-w-[60ch] text-[15px] leading-relaxed text-text-2">
-            Settlement cannot start for another <span className="num text-text">{fmtDuration(v.paused_until_ms! - now)}</span>. The agent is disarmed meanwhile. A heartbeat from the owner ends the pause.
+            Settlement cannot start for another <span className="num text-text">{fmtDuration(v.paused_until_ms! - now)}</span>. The agent is disarmed meanwhile. The owner can end the pause early with a heartbeat, or with Unpause, which does not give the guardian another pause this cycle.
           </p>
         </div>
       )}
@@ -90,6 +94,11 @@ export default function GuardianPanel({ v, now, accountId, isOwner, busy, send }
               Pause for {guardian ? fmtInterval(maxS) : "…"}
             </button>
           </Tip>
+        )}
+        {isOwner && paused && supportsUnpause(v) && (
+          <button className="tl" disabled={busy} onClick={() => send("Unpause", () => unpauseCall(v.token_id))}>
+            End the pause now
+          </button>
         )}
         {isGuardian && <span className="text-[14px] text-text-2">You are this vault’s guardian.</span>}
         {!isOwner && !isGuardian && guardian && <span className="text-[14px] text-text-2">Connect as {guardian} or the owner to pause.</span>}

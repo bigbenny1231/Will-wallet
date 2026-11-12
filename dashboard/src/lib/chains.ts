@@ -2,7 +2,7 @@
 // Mirrors keeper/src/chains/{evm,solana}.ts. Public RPCs, called straight from the browser.
 import { BASE_RPC, MONAD_RPC, SOLANA_RPC } from "../config";
 import type { EvmStepArgs, ForeignChain, ForeignPayout, StepArgs, VaultView } from "../types";
-import { deriveFor } from "./derive";
+import { sourceAddressFor } from "./derive";
 import { api } from "./near";
 
 const EVM_RPC: Partial<Record<ForeignChain, string>> = { base: BASE_RPC, monad: MONAD_RPC };
@@ -61,13 +61,14 @@ export async function stepArgsFor(v: VaultView, fromAddressFallback?: string): P
   const p = currentForeign(v);
   if (!p) return undefined;
   if (p.chain === "base" || p.chain === "monad") {
-    // Some stored payouts have an empty from_address (e.g. created without the derived addresses): derive it
-    // in the browser from the contract id and token id, exactly as the MPC path does.
-    // `from_address` is free text the owner wrote; the contract never signs with it. Only a well-formed EVM address
-    // goes to the RPC: anything else would make eth_getTransactionCount fail and stop settlement at step 3
-    // (the keeper has the same rule, SECURITY_REVIEW_3 K-1).
+    // The nonce must come from the address the MPC actually signs for: derive it in the browser from the contract id
+    // and the vault's derivation path (v2: salted, read from the view). `from_address` is free text the owner wrote
+    // until the contract overwrites it at signing; it is only a fallback when derivation fails, and only if it is a
+    // well-formed EVM address (anything else would make eth_getTransactionCount fail and stop settlement at step 3;
+    // the keeper has the same rule, SECURITY_REVIEW_3 K-1).
     const stored = p.from_address ?? "";
-    const from = /^0x[0-9a-fA-F]{40}$/.test(stored) ? stored : fromAddressFallback || deriveFor(v.token_id)[p.chain];
+    const derived = sourceAddressFor(v, p.chain);
+    const from = derived || fromAddressFallback || (/^0x[0-9a-fA-F]{40}$/.test(stored) ? stored : "");
     if (!from) throw new Error(`No source address recorded for this ${p.chain === "base" ? "Base" : "Monad"} payout`);
     return { evm: await getEvmStepArgs(from, p.chain) };
   }

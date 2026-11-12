@@ -15,7 +15,7 @@ export default function AgentPanel({ v, alias = () => null }: { v: VaultView; al
     <div>
       <dl className="grid grid-cols-1 gap-8 sm:grid-cols-3">
         <Figure label="Per payment, at most" value={`${yoctoToNear(p.per_tx_max)} NEAR`} />
-        <Figure label="Per day, at most" value={`${yoctoToNear(p.daily_max)} NEAR`} sub={`${yoctoToNear(v.daily_spent)} NEAR spent in the current 24 h window`} />
+        <Figure label="Per day, at most" value={`${yoctoToNear(p.daily_max)} NEAR`} sub={`${yoctoToNear(v.daily_spent)} NEAR spent in the last 24 h (each payment counts for 24 h)`} />
         <Figure label="Allowed receivers" value={p.allowlist.length ? <span title={p.allowlist.join(", ")}>{p.allowlist.map(name).join(", ")}</span> : "Any receiver"} mono={p.allowlist.length > 0} />
       </dl>
 

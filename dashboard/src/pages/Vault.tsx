@@ -6,9 +6,10 @@ import { api } from "../lib/near";
 import { useWallet } from "../lib/wallet";
 import { usePoll, useNow } from "../lib/usePoll";
 import { bpsToPct, expectedShare, fmtDuration, fmtInterval, fmtTime, nearToYocto, shortAccount, yoctoToNear } from "../lib/format";
-import { claimCall, depositCall, executeStepCall, heartbeatCall, markBroadcastCall, nftTransferCall, pokeCall } from "../lib/calls";
+import { MIN_DEPOSIT_YOCTO, claimCall, depositCall, executeStepCall, markBroadcastCall, nftTransferCall, ownerHeartbeatCall, pokeCall } from "../lib/calls";
+import { missingHeirsNote, useMissingAccounts } from "../lib/accounts";
 import { broadcastForeign, currentForeign, stepArgsFor } from "../lib/chains";
-import { deriveFor } from "../lib/derive";
+import { sourceAddressFor } from "../lib/derive";
 import { guestAvailable } from "../lib/guest";
 import { lastEvent, step1AmountFor } from "../lib/logparse";
 import type { CallArgs, VaultView } from "../types";
@@ -35,6 +36,8 @@ export default function Vault() {
   const [txHash, setTxHash] = useState<string | null>(null);
 
   const v = vault.data;
+  // Heirs whose account does not exist yet (RPC view_account): a warning while the vault is live.
+  const missingHeirs = useMissingAccounts(v && (v.state === "Alive" || v.state === "Warning") ? v.heirs.map((h) => h.account_id) : []);
   if (!vault.loaded) return <p className="wrap py-24 text-text-2">Loading vault {id}…</p>;
   // `undefined` means no read has succeeded yet (the RPC is rate limited or down); only `null` means the contract
   // answered that there is no such vault. The poll keeps retrying, so this clears by itself. SECURITY_REVIEW_3 D-4.
@@ -63,9 +66,13 @@ export default function Vault() {
   // A guest run: this browser made the vault (lib/guest.ts). The guide drives it; the page below is the real console.
   const guided = isGuest && !!guest && guest.token === v.token_id ? guest : null;
   const showcase = !MOCK && SHOWCASE_VAULT === v.token_id;
-  // Older vaults stored no source address for some payouts; it is a pure function of the contract and vault id.
-  const derived = v.foreign.some((f) => !f.from_address) ? safeDerive(v.token_id) : null;
-  const sourceOf = (f: VaultView["foreign"][number]) => f.from_address || derived?.[f.chain] || "";
+  // The source address is what the MPC signs for: derived from the contract id and the vault's derivation path (v2:
+  // salted, from the view). The stored from_address is owner-typed text until the contract overwrites it at signing,
+  // so it is never shown as the source.
+  const sourceOf = (f: VaultView["foreign"][number]) => sourceAddressFor(v, f.chain);
+  // Operators (v2, findings C/E): the vault owner, an heir or the vault keeper may record a broadcast and, during the
+  // first hour of each step-3 payout, sign it. The contract keeper also is one; the page does not know it.
+  const isOperator = !!accountId && (isOwner || v.heirs.some((h) => h.account_id === accountId) || v.keeper_id === accountId);
   const who = (id: string) => {
     const a = alias(id);
     return a && a !== "You" ? a : null;
@@ -204,7 +211,7 @@ export default function Vault() {
               <>
                 {live && (
                   <Tip why={heartbeatWhy}>
-                    <button className={btn("heartbeat")} disabled={!canHeartbeat || busy} onClick={() => send("Heartbeat", () => heartbeatCall(v.token_id))}>
+                    <button className={btn("heartbeat")} disabled={!canHeartbeat || busy} onClick={() => send("Heartbeat", () => ownerHeartbeatCall(v))}>
                       Send heartbeat
                     </button>
                   </Tip>
@@ -269,6 +276,7 @@ export default function Vault() {
             </li>
           ))}
         </ul>
+        {missingHeirsNote(missingHeirs) && <p className="mt-4 border-l border-warn pl-4 text-[15px] text-warn">{missingHeirsNote(missingHeirs)}</p>}
         {v.foreign.length > 0 && (
           <p className="mt-4 text-[15px] text-text-2">
             Also {v.foreign.length} foreign payout{v.foreign.length === 1 ? "" : "s"}, listed under settlement. Source addresses:{" "}
@@ -283,8 +291,8 @@ export default function Vault() {
         )}
       </Section>
 
-      <Section label="Settlement" note="Five steps, in order. Anyone can execute the next one once the vault is triggered.">
-        <Timeline v={v} contract={CONTRACT} onRelay={accountId ? relay : undefined} relayBusy={busy} />
+      <Section label="Settlement" note="Five steps, in order. Anyone can execute the next one once the vault is triggered; for the first hour of each foreign payout only the keeper, the owner or an heir may sign it.">
+        <Timeline v={v} contract={CONTRACT} onRelay={isOperator ? relay : undefined} relayBusy={busy} />
       </Section>
 
       <Section label="Agent" note="An AI agent may spend from this vault within these limits, only while the owner is alive.">
@@ -371,14 +379,6 @@ function figures(v: VaultView, now: number, nftOwner: string | null, trigMs?: nu
   ];
 }
 
-function safeDerive(tokenId: string) {
-  try {
-    return deriveFor(tokenId);
-  } catch {
-    return null;
-  }
-}
-
 function ExtLinkMono({ href, children, title }: { href: string; children: ReactNode; title?: string }) {
   return (
     <a href={href} title={title} target="_blank" rel="noreferrer" className="mono !text-[15px] text-text decoration-rule underline-offset-4 hover:underline">
@@ -401,11 +401,15 @@ function FundTransfer({ v, isOwner, connected, busy, onDeposit, onTransfer }: { 
   const [amt, setAmt] = useState("1");
   const [to, setTo] = useState("");
   const [bad, setBad] = useState<string | null>(null);
-  const live = v.state === "Alive" || v.state === "Warning";
+  // v2 (finding B): the Will NFT moves only while the vault is Alive (not overdue, not paused), and the buyer gets a
+  // reset vault. v1 allowed Warning too; the contract decides either way.
+  const alive = v.state === "Alive";
   const deposit = () => {
     try {
       const y = nearToYocto(amt);
       if (BigInt(y) <= 0n) throw new Error("Amount must be above 0");
+      // v2 (finding D): anyone but the owner must send at least 0.01 NEAR, so dust cannot flood the vault record.
+      if (!isOwner && v.derivation_paths && BigInt(y) < MIN_DEPOSIT_YOCTO) throw new Error("Deposits from anyone but the owner must be at least 0.01 NEAR");
       setBad(null);
       onDeposit(y);
     } catch (e) {
@@ -431,8 +435,8 @@ function FundTransfer({ v, isOwner, connected, busy, onDeposit, onTransfer }: { 
         <label className="sc block" htmlFor="xfer">Transfer the Will NFT, owner only, while alive</label>
         <div className="mt-2 flex items-end gap-6">
           <input id="xfer" className="field mono flex-1" placeholder="new-owner.testnet" value={to} onChange={(e) => setTo(e.target.value)} />
-          <Tip why={!isOwner ? "Only the vault owner can transfer it" : !live ? "The Will NFT is locked once the vault is triggered" : !to.trim() ? "Enter the receiving account" : ""}>
-            <button className="tl" disabled={!isOwner || !live || !to.trim() || busy} onClick={() => confirm(`Transfer vault #${v.token_id} to ${to.trim()}? They become the owner.`) && onTransfer(to.trim())}>
+          <Tip why={!isOwner ? "Only the vault owner can transfer it" : !alive ? "The Will NFT moves only while the vault is Alive: not overdue, not paused, not triggered" : !to.trim() ? "Enter the receiving account" : ""}>
+            <button className="tl" disabled={!isOwner || !alive || !to.trim() || busy} onClick={() => confirm(`Transfer vault #${v.token_id} to ${to.trim()}? They become the owner, and the vault is reset for them: no heirs, keys, foreign payouts, DAO or guardian.`) && onTransfer(to.trim())}>
               Transfer
             </button>
           </Tip>

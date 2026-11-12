@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../lib/near";
-import { deriveFor } from "../lib/derive";
+import { deriveForVault } from "../lib/derive";
 import { followUpCalls, toPayouts, type ForeignDraft } from "../lib/calls";
 import { useWallet } from "../lib/wallet";
 import { ErrorNote } from "./ui";
@@ -60,13 +60,16 @@ export default function PendingCreate() {
         localStorage.removeItem(PENDING_KEY);
         setPending(null);
         const id = fresh.token_id;
+        // The source addresses exist only now: v2 salts each vault's derivation paths at create_vault and publishes
+        // them in the view. If derivation fails, from_address stays empty; the contract signs for the derived address
+        // regardless and writes it into the payout at signing.
         let payouts = toPayouts(pending.foreign);
         if (pending.foreign.length) {
           try {
-            const d = deriveFor(id);
+            const d = deriveForVault(fresh);
             payouts = toPayouts(pending.foreign, pending.foreign.map((f) => d[f.chain]));
           } catch {
-            /* keep the previewed addresses */
+            /* leave from_address empty */
           }
         }
         const calls = followUpCalls(id, payouts, pending.dao_id);

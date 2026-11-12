@@ -10,6 +10,9 @@ async function view<T>(method: string, args: Record<string, unknown> = {}, contr
 }
 
 const PAGE = 50;
+
+/** NEAR implicit accounts (ed25519: 64 hex; eth-implicit: 0x + 40 hex) exist as soon as something is sent to them. */
+export const isImplicitAccount = (a: string) => /^[0-9a-f]{64}$/.test(a) || /^0x[0-9a-f]{40}$/.test(a);
 const MAX_VAULTS = 1000;
 
 export const api = {
@@ -59,6 +62,21 @@ export const api = {
       return e?.max_fee_per_gas ? BigInt(e.max_fee_per_gas) : fallback;
     } catch {
       return fallback;
+    }
+  },
+  /**
+   * Whether a NEAR account exists (RPC view_account). true/false when the node answered, null when it could not be
+   * asked. Implicit accounts (64 hex, or 0x + 40 hex) are created by the first transfer, so they count as existing.
+   */
+  async accountExists(account: string): Promise<boolean | null> {
+    if (isImplicitAccount(account)) return true;
+    if (MOCK) return !account.startsWith("missing");
+    try {
+      await provider.viewAccount(account, { finality: "final" });
+      return true;
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      return /does not exist|UNKNOWN_ACCOUNT|AccountDoesNotExist/i.test(msg) ? false : null;
     }
   },
   async getHeirVaults(account: string): Promise<VaultView[]> {

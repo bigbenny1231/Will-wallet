@@ -103,16 +103,27 @@ function cycleVault(now = Date.now()): VaultView {
     policy: { per_tx_max: (NEAR).toString(), daily_max: (5n * NEAR).toString(), allowlist: ["api.provider.testnet"] },
     daily_spent: (NEAR / 5n).toString(),
     daily_window_start_ms: last,
+    spends: [{ ms: last, amount: (NEAR / 5n).toString() }],
+    derivation_paths: mockPaths("1"),
+    keeper_id: null,
+    storage_bytes: 1800,
+    storage_deposit: (18n * NEAR / 1000n).toString(),
     dao_id: "estate-1.sputnik-v2.testnet",
     guardian_id: guardian.id,
     max_pause_s: guardian.max,
-    paused_until_ms: paused ? pausedUntil : 0,
+    paused_until_ms: paused || pauseUsed ? pausedUntil : 0,
     dao_proposal_id: step >= 5 || settled ? 7 : null,
     step,
     foreign_index: step > 3 ? foreign.length : step === 3 ? 1 : 0,
     log,
   };
 }
+
+/** Contract v2 salts each vault's derivation paths; the mock uses a fixed salt per vault id. */
+export const mockPaths = (id: string) => {
+  const salt = (0xa1n + BigInt(id)).toString(16).padStart(16, "0");
+  return { base: `base-${id}-${salt}`, monad: `monad-${id}-${salt}`, solana: `sol-${id}-${salt}` };
+};
 
 function staticVault(id: string, owner: string, state: VaultState, heirs: { account_id: string; bps: number }[]): VaultView {
   const now = Date.now();
@@ -198,7 +209,17 @@ export const mockApi = {
     const id = String(c.args.token_id ?? "1");
     const now = Date.now();
     console.info("[mock] call", c.method, c.args);
-    if (c.method === "heartbeat" && id === "1") {
+    if (c.method === "heartbeat" && account === MOCK_ACCOUNT && c.deposit !== "1") {
+      // Contract v2 (finding F): the owner's own heartbeat needs exactly 1 yoctoNEAR; a pulse key attaches none.
+      throw new Error("Smart contract panicked: Requires attached deposit of exactly 1 yoctoNEAR");
+    }
+    if (c.method === "unpause" && id === "1") {
+      if (account !== MOCK_ACCOUNT) throw new Error("only the vault owner");
+      if (!(pausedUntil > now)) throw new Error("not_paused");
+      // The pause ends now and stays on record as used; only the next heartbeat re-arms the guardian.
+      pausedUntil = now;
+      extraLog.push({ ms: now, event: "unpaused", detail: `trigger at ${now}` });
+    } else if (c.method === "heartbeat" && id === "1") {
       cycleStart = now;
       pausedUntil = 0;
       pauseUsed = false;
@@ -224,9 +245,14 @@ export const mockApi = {
     } else if (c.method === "create_vault") {
       const a = c.args as unknown as { heartbeat_interval_s: number; grace_missed: number; heirs: { account_id: string; bps: number }[] };
       const base = cycleVault(now);
+      const newId = String(nextId++);
       ownerExtras.push({
         ...base,
-        token_id: String(nextId++),
+        token_id: newId,
+        derivation_paths: mockPaths(newId),
+        spends: [],
+        daily_spent: "0",
+        daily_window_start_ms: 0,
         owner_id: account,
         state: "Alive",
         heartbeat_interval_s: a.heartbeat_interval_s,

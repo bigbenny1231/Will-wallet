@@ -16,14 +16,14 @@ export interface ChainMeta {
   tx: (hash: string) => string;
   address: (a: string) => string;
   faucet: string;
-  /** MPC derivation path for vault `id`. */
-  path: (id: string) => string;
+  /** Shape of the MPC derivation path (contract v2: salted per vault; the real path is in the vault view). */
+  pathShape: string;
 }
 
 export const CHAINS: Record<ForeignChain, ChainMeta> = {
-  base: { chain: "base", name: "Base Sepolia", short: "Base", unit: "ETH", decimals: 18, evm: true, explorer: "basescan", tx: links.baseTx, address: links.baseAddress, faucet: links.baseFaucet, path: (id) => `base-${id}` },
-  monad: { chain: "monad", name: "Monad testnet", short: "Monad", unit: "MON", decimals: 18, evm: true, explorer: "monad explorer", tx: links.monadTx, address: links.monadAddress, faucet: links.monadFaucet, path: (id) => `monad-${id}` },
-  solana: { chain: "solana", name: "Solana devnet", short: "Solana", unit: "SOL", decimals: 9, evm: false, explorer: "solana", tx: links.solTx, address: links.solAddress, faucet: links.solFaucet, path: (id) => `sol-${id}` },
+  base: { chain: "base", name: "Base Sepolia", short: "Base", unit: "ETH", decimals: 18, evm: true, explorer: "basescan", tx: links.baseTx, address: links.baseAddress, faucet: links.baseFaucet, pathShape: "base-<vault id>-<salt>" },
+  monad: { chain: "monad", name: "Monad testnet", short: "Monad", unit: "MON", decimals: 18, evm: true, explorer: "monad explorer", tx: links.monadTx, address: links.monadAddress, faucet: links.monadFaucet, pathShape: "monad-<vault id>-<salt>" },
+  solana: { chain: "solana", name: "Solana devnet", short: "Solana", unit: "SOL", decimals: 9, evm: false, explorer: "solana", tx: links.solTx, address: links.solAddress, faucet: links.solFaucet, pathShape: "sol-<vault id>-<salt>" },
 };
 
 /** Picker order. */

@@ -1,4 +1,5 @@
 import { chainMeta } from "../lib/chainmeta";
+import { sourceAddressFor } from "../lib/derive";
 import { links } from "../config";
 import { fmtTime, shortAccount } from "../lib/format";
 import { lastEvent } from "../lib/logparse";
@@ -23,7 +24,8 @@ function stepLinks(v: VaultView, n: number, contract: string): [string, string][
   if (n === 3)
     return v.foreign.map((p) => {
       const m = chainMeta(p.chain);
-      const href = p.tx_hash ? m.tx(p.tx_hash) : p.from_address ? m.address(p.from_address) : "";
+      const src = p.tx_hash ? "" : sourceAddressFor(v, p.chain);
+      const href = p.tx_hash ? m.tx(p.tx_hash) : src ? m.address(src) : "";
       return [m.explorer, href] as [string, string];
     }).filter(([, h]) => h);
   if (n === 4) return v.dao_id ? [["sputnik", links.dao(v.dao_id)]] : [];
