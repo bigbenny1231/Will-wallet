@@ -127,7 +127,9 @@ back, even though the key never served the vault. It is now credited back.
 
 The key exists for a block or two before the callback deletes it, and a few TGas of the allowance
 could be spent in that window. The pool absorbs that tiny difference, and nobody gains from it.
-Test: `l11_revoked_key_add_refunds_allowance`.
+Test: `l11_revoked_key_add_refunds_allowance`. (Contract v2, second review F2: narrowed. A key that existed is
+deleted without a refund, since it could burn allowance gas until the delete landed; only a failed AddKey refunds.
+The test is now `l11_revoked_key_add_keeps_allowance_once_the_key_existed`. See `SECURITY_FIXES_V2.md`.)
 
 ### L-12: key cap bypass with concurrent requests (fixed)
 

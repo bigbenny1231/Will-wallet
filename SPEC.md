@@ -129,19 +129,19 @@ for them exists anywhere; the contract requests signatures at settlement time.
 | `heartbeat({token_id})` | owner, or pulse key (predecessor == contract && signer_pk ∈ pulse_keys) | owner: exactly 1 yocto (v2); pulse key: — | `last_beat = now`; event. A pulse-key beat clears only a pause that has run out; the owner's beat also ends a running pause |
 | `add_pulse_key({token_id, public_key})` | owner | exactly 1 yocto | stores pk; `Promise::new(current).add_access_key_allowance(pk, 1 NEAR, current, "heartbeat")` (see §2.7) |
 | `add_agent_key({token_id, public_key})` | owner | exactly 1 yocto | stores pk; FC key scoped to `agent_pay` |
-| `remove_key({token_id, public_key})` | owner | exactly 1 yocto | removes from vault + `delete_key` |
+| `remove_key({token_id, public_key})` | owner | exactly 1 yocto | removes from vault + `delete_key`; the 1 NEAR allowance is not refunded (v2 second review) |
 | `agent_pay({token_id, receiver_id, amount, memo?})` | agent key only | — | policy check; on allow: `balance -= amount`, `Promise::new(receiver).transfer(amount)`; event `agent_pay_allowed` / `agent_pay_denied` with `reason` in {`over_per_tx_max`, `over_daily_max`, `receiver_not_allowlisted`, `vault_not_alive`, `insufficient_balance`}. Denied calls **do not panic** (so the log entry persists) |
 | `set_heirs`, `set_policy`, `set_foreign_payouts`, `set_dao({token_id, dao_id})`, `set_timing({token_id, heartbeat_interval_s, grace_missed})` | owner, while not Triggered | exactly 1 yocto | update |
 | `set_guardian({token_id, guardian_id, max_pause_s})` | owner, while not Triggered | exactly 1 yocto | appoint (`guardian_id: null` clears) the guardian; `max_pause_s` 10 s..90 d (§2.8) |
 | `pause({token_id})` → `trigger_at_ms` | guardian or owner, while Live and before the deadline | exactly 1 yocto (from either) | `paused_until = now + max_pause_s`, once per heartbeat cycle; event `paused` (§2.8) |
-| `unpause({token_id})` → `trigger_at_ms` (v2) | owner, while a pause runs | exactly 1 yocto | ends the pause (`paused_until = now`); the guardian is not re-armed until the next heartbeat; event `unpaused` |
+| `unpause({token_id})` → `trigger_at_ms` (v2) | owner, while a pause runs | exactly 1 yocto | ends the pause (`paused_until = now`) and counts as proof of life (`last_beat = now`, second review); the guardian is not re-armed until the next heartbeat; event `unpaused` |
 | `set_bounty({token_id, bounty})` (v2) | owner, while Alive | exactly 1 yocto | `bounty ≤ 1 NEAR` |
 | `set_vault_keeper({token_id, keeper_id})` (v2) | owner, while Live | exactly 1 yocto | per-vault keeper (`null` clears); an operator for this vault |
-| `set_keeper({account_id})` | contract owner (when not the contract itself) or the current keeper (hand-over) | — | contract keeper; cannot be cleared on a locked contract (v2) |
+| `set_keeper({account_id})` | contract owner (when not the contract itself) or the current keeper (hand-over) | exactly 1 yocto (v2 second review) | contract keeper; cannot be cleared on a locked contract (v2) |
 | `poke({token_id})` | anyone | — | if deadline passed: state=Triggered, step=1, pay `min(bounty, 1 NEAR, 10% of balance)` to predecessor from balance, event `triggered`. Else panic `not_due` |
 | `execute_step({token_id, args?})` | anyone; v2: a step-3 payout during its first hour only by an operator (contract keeper, vault keeper, vault owner, heir) | — | runs the current step (see §2.4), advances `step`; idempotent on re-entry; panics if not Triggered or already Settled |
 | `mark_broadcast({token_id, index, tx_hash})` | v2: operator (or the vault's DAO for `dao-ratified`) | — | sets foreign[index].status=broadcast, tx_hash (must equal the stored signed tx's id; §2.7) |
-| `resign_foreign({token_id, index, args})` | v2: operator, ≥ 5 min after the last request | — | §2.7 |
+| `resign_foreign({token_id, index, args})` | v2: operator, ≥ 5 min after the last request; a `signed`/`broadcast` Solana payout only by a keeper (second review) | — | §2.7 |
 | `claim({token_id})` | current NFT owner, only when Settled | — (deliberately) | transfers remaining balance to caller |
 | `get_vault({token_id})` → VaultView | view | | |
 | `get_vaults({from_index, limit})` → [VaultView] | view | | for keeper polling |
@@ -161,8 +161,8 @@ key, and `poke` / `execute_step` / `mark_broadcast` / `resign_foreign` from a ke
 `heartbeat` needs exactly 1 yocto, so a dApp key on the owner's account cannot beat (and end a guardian pause) silently;
 `unpause`, `set_bounty` and `set_vault_keeper` need it too. `claim` stays free so an heir who signed
 in to the dashboard with a function-call key can still collect; it only moves the remaining balance to the NFT owner
-after Settled, which a function-call key holder cannot redirect. `set_keeper` (contract owner, not a vault owner)
-is unchanged.
+after Settled, which a function-call key holder cannot redirect. `set_keeper` needs exactly 1 yocto since the second
+v2 review, so a function-call key of the keeper account cannot hand the global keeper role to someone else.
 
 Events are NEP-297: `EVENT_JSON:{"standard":"dmw","version":"1.0.0","event":"<name>","data":{...}}`.
 
@@ -176,7 +176,7 @@ Each call does **one** unit of work and returns the new `step`. Gas budget per c
 | 2 | For each pulse + agent key: `Promise::new(current).delete_key(pk)` batched; clear lists | step=3, foreign_index=0 |
 | 3 | If `foreign_index < foreign.len()`: build the tx for `foreign[foreign_index]` with `omni-transaction` using `args`, hash it, call `v1.signer-prod.testnet.sign` (1 yocto, 250 TGas) with `{request:{payload_v2:{Ecdsa:hex}|{Eddsa:hex}, path, domain_id}}`; in callback store signature + `signed_tx` (fully serialized raw tx) and status=`signed`, `foreign_index += 1`. If the MPC call fails: status=`failed`, `foreign_index += 1` (never block settlement). When `foreign_index == foreign.len()`: step=4 | per call: one payout |
 | 4 | If `dao_id` set: `add_proposal` on it with 1 NEAR bond from balance, kind `Vote`-style text proposal (fallback: `FunctionCall` to `dmw.mark_broadcast` no-op) describing the settlement and the heir list; store returned id. Else skip | step=5 |
-| 5 | `nft_transfer` Will NFT to heir with highest bps (owner_id = heir); v2: release the storage deposit above the measured bytes + 2,000 bytes to the balance; state=Settled; event `settled` | step=6 |
+| 5 | `nft_transfer` Will NFT to heir with highest bps (owner_id = heir); v2: release the storage deposit above the measured bytes + 2,000 bytes; second review: pay that release plus the post-step-1 credits (`unsplit`) to the heirs by bps; state=Settled; event `settled` | step=6 |
 
 Foreign tx construction (chainsig conventions to verify against the live signer on day 1):
 - **EVM** (Base and Monad, one shared path): EIP-1559 `TransactionBuilder::new::<EVM>()` with `to`, `value`, `chain_id` from the registry (84532 / 10143), `nonce`, fees, `gas_limit`, empty input. `build_for_signing()` → keccak256 → `payload_v2: {Ecdsa: hex}`, `domain_id: 0`. Callback: signature `{big_r:{affine_point}, s:{scalar}, recovery_id}` → `build_with_signature(...)` → raw RLP hex stored in `signed_tx`.
@@ -221,10 +221,12 @@ These are the places where the shipped contract (`contracts/dmw`, deployed at `d
   - **EVM fee and gas caps.** `gas_limit` must be 21000..=100000 (callers may send 21000; the contract raises the EVM gas it signs with to the 50,000 floor, final audit H-5), `max_fee_per_gas` 1..=100 gwei on Base and 1..=1000 gwei on Monad (per-chain cap, published in `get_config().chains[].max_fee_per_gas`), and `max_priority_fee_per_gas` ≤ `max_fee_per_gas`.
   - **`resign_foreign` rules:**
     - One re-sign per payout in flight (a request counts as lost after 10 min).
-    - EVM `signed`/`broadcast`: both fees must be ≥ 110% of the last request.
+    - EVM `signed`/`broadcast`: both fees must be ≥ 110% of the last request, or at the chain cap (v2 second review, F4).
     - EVM `broadcast`: also only ≥ 5 min after the last request.
     - Solana: always ≥ 5 min after the last request. `signed`/`broadcast` Solana payouts may only be re-signed by the contract `owner_id` or the keeper set with `set_keeper({account_id})`, after checking that the old signature never landed.
     - **v2:** every re-sign (all chains, all statuses) is operator-only and waits ≥ 5 min after the last request; an EVM re-sign goes through the derived-key lookup and the ecrecover check like step 3.
+    - **v2 second review (F1):** a `signed`/`broadcast` Solana payout may only be re-signed by a keeper (`is_keeper`: the contract owner while it is not the contract itself, the contract keeper, the vault keeper). A Solana transfer has no nonce, so a new signature over a fresh blockhash is a second valid payment. Heirs and the vault owner may re-sign a `failed` Solana payout, and any EVM payout (the nonce is pinned, so a re-sign only replaces).
+    - **v2 second review (F4):** EVM fees from a non-keeper (heir, vault owner, or anyone once step 3 is open) are clamped, in step 3 and in `resign_foreign`: `max_fee_per_gas` ≤ 50% of the chain cap, `max_priority_fee_per_gas` ≤ 10% of the cap, gas limit = the chain floor (50 000). A keeper's fees are only bounded by the cap.
     - The view `get_sign_track({token_id, index})` shows the last request time, the last fees and `resign_allowed_after_ms`.
   - **Keys follow the NFT owner.** Changing the Will NFT owner while Alive/Warning revokes every pulse and agent key (v2: only while Alive, and the whole vault is reset, §2.9). A key whose AddKey lands after an owner change is deleted.
   - **Key auth checks the signer account.** Key auth also requires `signer_account_id == contract`.
@@ -287,19 +289,29 @@ Details, rationale and test names: [`docs/SECURITY_FIXES_V2.md`](docs/SECURITY_F
 - **Operators** (`is_operator`): the contract keeper, the vault keeper (`set_vault_keeper`), the vault owner and any heir;
   never the contract itself. Only operators may `mark_broadcast`, `resign_foreign`, and sign a step-3 payout during the
   first hour after it becomes current (`get_config().step3_open_after_ms`); after that anyone may, so settlement cannot stall.
-- **Keeper rotation:** the current keeper may hand over with `set_keeper` (works on a locked contract; cannot clear there).
+- **Keepers** (`is_keeper`, second review): the contract owner while it is not the contract itself, the contract keeper and
+  the vault keeper. Only a keeper may re-sign a `signed`/`broadcast` Solana payout, and only a keeper's EVM fees escape the
+  non-keeper clamp (§2.7).
+- **Keeper rotation:** the current keeper may hand over with `set_keeper`, exactly 1 yocto (works on a locked contract;
+  cannot clear there).
 - **Will NFT transfer** only while Alive. A transfer while Live resets the vault for the new owner: `last_beat = now`, the
   new owner as sole heir, no foreign payouts, DAO, guardian, pause, spends or vault keeper, default policy and bounty, every
-  pulse/agent key revoked with its unspent allowance refunded.
+  pulse/agent key revoked (its allowance is not refunded).
 - **Bounty:** ≤ 1 NEAR (`create_vault`, `set_bounty`); `poke` pays at most 10% of the balance.
 - **Deposits:** ≥ 0.01 NEAR from anyone but the owner.
 - **Log:** routine events and key events in two rings of 40; `vault_created` pinned; `LogEntry.seq` orders the merged view.
-- **Heartbeat:** owner path needs 1 yocto; a pulse-key beat cannot end a running pause. `unpause` for the owner.
+- **Heartbeat:** owner path needs 1 yocto; a pulse-key beat cannot end a running pause. `unpause` for the owner; it also
+  restarts the heartbeat clock (a signed owner call is proof of life), so it can never make the vault due at once.
 - **Storage:** measured per call; the deposit is topped up from the vault balance (owner changes fail if the balance
   cannot cover them); excess released at step 5. `storage_bytes` / `storage_deposit` in the view.
+- **Heir split after step 1** (second review, F3): step 5 pays the released storage deposit, plus every deposit and every
+  refunded agent spend or bounty that landed after step 1 (`Vault::unsplit`), to the heirs by bps, like step 1. What the
+  NFT owner claims is the unspent reserve, a failed heir transfer, and anything credited after settlement.
 - **Callbacks:** each requires exactly one promise result; anything else is a failure (never a credit).
-- **Keys:** `remove_key`, a sale and step 2 refund each key's unspent allowance (estimate: (prepaid + 5 TGas) × 10⁸ yocto
-  per call, less 0.01 NEAR).
+- **Keys:** the 1 NEAR gas allowance is the cost of a key and is never refunded (`remove_key`, a sale, step 2, or a key
+  revoked by `on_key_added` after it existed), as in v1. Only a failed AddKey returns it.
+  A refund estimate could not see the gas of key calls that panicked, so it paid vaults out of other vaults' NEAR
+  (second review, F2).
 - **Agent window:** rolling 24 h over `spends` (≤ 24 entries, merged conservatively).
 - **Derivation:** salted per vault (§1); EVM signatures are ecrecovered against the derived key (§2.4).
 - `get_config()` adds `mpc_signer`, `keeper`, `max_bounty`, `min_deposit`, `step3_open_after_ms`, `resign_cooldown_ms`.
