@@ -10,6 +10,9 @@ name: testnet
 #   task=record   only the demo video, on `contract`
 #   task=finish   the C-2 attack check and the demo video, on `contract` (an `all` run that stopped after the smoke test)
 #   task=edit     re-edit the video from the raw footage of an earlier record run (`raw_run`), no chain access
+#   task=release  reproducible build (`cargo near build reproducible-wasm` in the Docker image pinned in
+#                 contracts/dmw/Cargo.toml) of the dispatched commit, committed to the same branch as
+#                 contracts/release/dmw.wasm; no chain access. Run it before `all` so the deploy uses that build.
 #
 # Keys. No key leaves the runner: every account here is a throwaway testnet faucet account whose key lives only in
 # this job's keys/ folder and is masked in the log the moment it exists (scripts/ci/mask.sh). The contract account
@@ -20,7 +23,7 @@ on:
   workflow_dispatch:
     inputs:
       task:
-        description: all | verify | record | finish | edit
+        description: all | verify | record | finish | edit | release
         required: true
         default: all
       contract:
@@ -61,6 +64,22 @@ jobs:
           (cd keeper && npm ci --no-audit --no-fund --loglevel=error)
           (cd agent && npm ci --no-audit --no-fund --loglevel=error)
           mkdir -p "$OUT"
+
+      # ---------------- release build ----------------
+      - name: Reproducible release build, committed to this branch
+        if: inputs.task == 'release'
+        run: |
+          set -o pipefail
+          case "$GITHUB_REF" in refs/heads/*) ;; *) echo "dispatch release on a branch"; exit 1;; esac
+          SRC=$(git rev-parse HEAD)
+          cargo install cargo-near --version 0.23.0 --locked 2>&1 | tail -n 2
+          (cd contracts/dmw && cargo near build reproducible-wasm) 2>&1 | tee >(eval "$SAVE" > "$OUT/release-build.log")
+          cp contracts/dmw/target/near/dmw.wasm contracts/release/dmw.wasm
+          H=$(node -e 'const b=require("crypto").createHash("sha256").update(require("fs").readFileSync(process.argv[1])).digest();const A="123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";let n=BigInt("0x"+b.toString("hex")),s="";while(n>0n){s=A[Number(n%58n)]+s;n/=58n}for(const x of b){if(x!==0)break;s="1"+s}console.log(s)' contracts/release/dmw.wasm)
+          echo "source $SRC  code hash $H  $(wc -c < contracts/release/dmw.wasm) bytes" | tee -a "$OUT/release-build.log"
+          git config user.name "github-actions[bot]"; git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add contracts/release/dmw.wasm
+          git commit -qm "release: reproducible build of $SRC (code hash $H)" && git push -q origin "HEAD:$GITHUB_REF_NAME"
 
       - name: Contract from the input
         if: inputs.task == 'verify' || inputs.task == 'record' || inputs.task == 'finish'
