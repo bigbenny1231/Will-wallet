@@ -1387,8 +1387,9 @@ fn c1_evm_nonce_is_pinned_per_payout_not_caller_chosen() {
 fn c1_evm_resign_reuses_nonce_and_requires_fee_bump() {
     let mut c = evm_signed();
     let t = T0 + 41_000 + foreign::RESIGN_COOLDOWN_MS;
-    // same fees: rejected (no downgrade/same-fee resign of a signed payout)
-    Ctx::new().by("keeper.testnet").at(t).set();
+    // same fees from a non-keeper: rejected (no downgrade/same-fee resign of a signed payout). A
+    // keeper may re-sign at any fee since the second review (G1), see r2_g1_*.
+    Ctx::new().by("sarah.testnet").at(t).set();
     let m = panics(|| {
         let _ = c.resign_foreign(1.into(), 0, base_args());
     });
@@ -3235,8 +3236,9 @@ fn r2_f1_heir_may_still_bump_signed_evm_payout() {
     assert_eq!(track.max_fee_per_gas, 1_650_000_000);
 }
 
-/// F4: fees a non-keeper picks in step 3 are clamped (max fee 50% and priority 10% of the cap,
-/// gas limit = chain floor); a keeper signs what it asks for (within the cap).
+/// F4 / G1: fees a non-keeper picks in step 3 are clamped (max fee and priority fee to the chain's
+/// `non_keeper_max_fee_per_gas`: Base 10% of the cap, Monad 20%; gas limit = chain floor); a keeper
+/// signs what it asks for (within the cap).
 #[test]
 fn r2_f4_non_keeper_step3_fees_are_clamped() {
     let cap = foreign::MAX_EVM_FEE_PER_GAS;
@@ -3246,10 +3248,18 @@ fn r2_f4_non_keeper_step3_fees_are_clamped() {
     let foreign::PendingTx::Evm(t) = pending_slot(0) else {
         panic!("evm pending")
     };
-    assert_eq!(t.max_fee_per_gas.0, cap / 2);
+    assert_eq!(t.max_fee_per_gas.0, cap / 10);
     assert_eq!(t.max_priority_fee_per_gas.0, cap / 10);
     assert_eq!(t.gas_limit.0, foreign::EVM_GAS_LIMIT_FLOOR);
-    assert_eq!(foreign::read_track(1, 0).max_fee_per_gas, cap / 2);
+    assert_eq!(foreign::read_track(1, 0).max_fee_per_gas, cap / 10);
+    assert_eq!(
+        foreign::BASE_SEPOLIA.non_keeper_max_fee_per_gas,
+        10_000_000_000
+    );
+    assert_eq!(
+        foreign::MONAD_TESTNET.non_keeper_max_fee_per_gas,
+        200_000_000_000
+    );
     std::thread::spawn(move || {
         let mut c = at_step3(vec![base_payout()]);
         Ctx::new().by("keeper.testnet").at(T0 + 41_000).set();
@@ -3391,4 +3401,36 @@ fn r2_unpause_restarts_the_heartbeat_clock() {
         c.poke(1.into());
     });
     assert!(m.contains("not_due"), "{m}");
+}
+
+/// G1: an heir signs first at the (clamped) non-keeper fee; the keeper can re-sign LOWER, at an
+/// honest fee and with a higher gas limit (the nonce is pinned, so it only replaces the tx), and
+/// a later non-keeper re-sign still has to bump from the keeper's fees.
+#[test]
+fn r2_g1_keeper_may_resign_evm_at_any_fee_and_gas() {
+    let cap = foreign::MAX_EVM_FEE_PER_GAS;
+    let mut c = at_step3(vec![base_payout()]);
+    Ctx::new().by("tom.testnet").at(T0 + 41_000).set();
+    let _ = c.execute_step(1.into(), Some(evm(0, cap, cap, 100_000)));
+    let key = evm_key(0);
+    Ctx::new().by("dmw.testnet").at(T0 + 41_500).cb();
+    assert_eq!(c.on_foreign_signed(1, 0, key, Ok(mpc_secp_response())), 4);
+    let t = T0 + 41_500 + foreign::RESIGN_COOLDOWN_MS;
+    // a non-keeper may not lower it
+    Ctx::new().by("sarah.testnet").at(t).set();
+    let m = panics(|| {
+        let _ = c.resign_foreign(1.into(), 0, evm(0, 1_500_000_000, 1_000_000, 21_000));
+    });
+    assert!(m.contains("raise both fees"), "{m}");
+    // the keeper may: lower fees, higher gas limit
+    Ctx::new().by("keeper.testnet").at(t).set();
+    let _ = c.resign_foreign(1.into(), 0, evm(0, 1_500_000_000, 1_000_000, 90_000));
+    let track = foreign::read_track(1, 0);
+    assert_eq!(
+        (track.max_fee_per_gas, track.max_priority_fee_per_gas),
+        (1_500_000_000, 1_000_000)
+    );
+    let calls = created_calls("on_foreign_evm_key");
+    assert_eq!(calls[0]["pending"]["Evm"]["gas_limit"], "90000");
+    assert_eq!(calls[0]["pending"]["Evm"]["nonce"], 0);
 }

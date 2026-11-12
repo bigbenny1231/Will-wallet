@@ -84,17 +84,10 @@ pub const MAX_EVM_GAS_LIMIT: u128 = 100_000;
 /// wallet `receive` (~26-30k) and a fresh WETH deposit (~45k). Base bills gas used, so a
 /// transfer to an EOA still costs 21 000; Monad bills the limit (50 000 x 202 gwei ~ 0.01 MON).
 pub const EVM_GAS_LIMIT_FLOOR: u128 = 50_000;
-/// Re-signing a `signed`/`broadcast` EVM payout needs both fee fields >= 110% of the last
-/// request, or at the chain's cap (second review F4: a signature at the cap stays re-signable,
-/// e.g. with a lower gas limit, instead of needing a fee above the cap).
+/// A non-keeper's re-sign of a `signed`/`broadcast` EVM payout needs both fee fields >= 110% of
+/// the last request, or at the chain's cap (second review F4). A keeper may re-sign at any fee and
+/// gas limit within the caps (G1): the nonce is pinned, so a re-sign only ever replaces the tx.
 pub const EVM_FEE_BUMP_PCT: u128 = 110;
-/// EVM fees a non-keeper (heir, vault owner, or anyone once the step-3 window is open) may pick,
-/// as a share of the chain's cap: max fee <= 50% of the cap, priority fee <= 10% of the cap, and
-/// the gas limit is the chain floor (second review F4). Larger values are clamped, not rejected,
-/// so settlement never stalls on them. Only a keeper (`Contract::is_keeper`) signs beyond these.
-/// Honest fees sit far below: Base ~0.001 gwei of a 100 gwei cap; Monad ~202 gwei of 1000.
-pub const NON_KEEPER_MAX_FEE_PCT: u128 = 50;
-pub const NON_KEEPER_PRIORITY_FEE_PCT: u128 = 10;
 /// Minimum age of the last signature request before any payout may be re-signed (Solana: the
 /// old blockhash is long expired; EVM: rate limit on fee ratchets and status flips).
 pub const RESIGN_COOLDOWN_MS: u64 = 5 * 60 * 1000;
@@ -126,6 +119,11 @@ pub struct EvmChain {
     pub explorer_tx: &'static str,
     /// Upper bound on caller-supplied `max_fee_per_gas` (wei).
     pub max_fee_per_gas: u128,
+    /// Upper bound on the `max_fee_per_gas` (and priority fee) of a non-keeper's signature: an heir,
+    /// the vault owner, or anyone once step 3 is open (second review F4, G1). Larger values are
+    /// clamped, not rejected, so settlement never stalls on them. Chosen so that the balance a node
+    /// demands at the chain's gas floor stays near an honest buffer.
+    pub non_keeper_max_fee_per_gas: u128,
     /// Most payouts of this chain one vault may hold (they all leave one derived address).
     /// Monad: 1. Its reserve-balance rule reverts a value transfer that leaves an EOA below
     /// 10 MON unless it is an "emptying" tx (no other tx from the sender in the last 3
@@ -144,6 +142,9 @@ pub const BASE_SEPOLIA: EvmChain = EvmChain {
     rpc: "https://sepolia.base.org",
     explorer_tx: "https://sepolia.basescan.org/tx/",
     max_fee_per_gas: MAX_EVM_FEE_PER_GAS,
+    // 10 gwei = 10% of the cap: 50 000 gas x 10 gwei = 0.0005 ETH on top of the value. Honest Base
+    // Sepolia fees are ~0.001-0.01 gwei.
+    non_keeper_max_fee_per_gas: MAX_EVM_FEE_PER_GAS / 10,
     max_payouts: crate::MAX_FOREIGN,
     min_gas_limit: EVM_GAS_LIMIT_FLOOR,
 };
@@ -154,6 +155,10 @@ pub const MONAD_TESTNET: EvmChain = EvmChain {
     rpc: "https://testnet-rpc.monad.xyz",
     explorer_tx: "https://testnet.monadexplorer.com/tx/",
     max_fee_per_gas: MAX_MONAD_FEE_PER_GAS,
+    // 200 gwei = 20% of the cap. 10% (100 gwei) would equal Monad's base-fee floor and leave no
+    // headroom at all; 200 gwei x the 50 000 gas floor = 0.01 MON, the honest buffer (an honest
+    // keeper signs 2 x base fee + priority, about 202 gwei).
+    non_keeper_max_fee_per_gas: MAX_MONAD_FEE_PER_GAS / 5,
     max_payouts: 1,
     min_gas_limit: EVM_GAS_LIMIT_FLOOR,
 };
@@ -195,6 +200,7 @@ pub fn chain_registry() -> Vec<serde_json::Value> {
                 "path": format!("{}-<token_id>-<salt>", e.path_prefix), "domain_id": DOMAIN_ECDSA,
                 "rpc": e.rpc, "explorer_tx": e.explorer_tx,
                 "max_fee_per_gas": U128(e.max_fee_per_gas),
+                "non_keeper_max_fee_per_gas": U128(e.non_keeper_max_fee_per_gas),
                 "max_payouts": e.max_payouts,
                 "min_gas_limit": U128(e.min_gas_limit),
             }),
@@ -406,21 +412,18 @@ pub fn effective_evm_args(mut a: EvmArgs, foreign: &[ForeignPayout], index: usiz
     a
 }
 
-/// Clamp validated EVM args into what a non-keeper may choose (see `NON_KEEPER_MAX_FEE_PCT`).
+/// Clamp validated EVM args into what a non-keeper may choose: max fee and priority fee at most
+/// `EvmChain::non_keeper_max_fee_per_gas` (priority <= max fee), gas limit = the chain floor
+/// (50 000: covers a Safe / smart-wallet `receive` and a WETH-like deposit, final audit H-5; a
+/// higher non-keeper limit would raise the balance a node demands above the honest buffer on
+/// Monad, which bills the full limit). A keeper can re-sign with a higher limit (G1).
 pub fn limit_non_keeper_evm_args(mut a: EvmArgs, chain: ForeignChain) -> EvmArgs {
     let c = chain
         .evm()
         .unwrap_or_else(|| env::panic_str("not an evm chain"));
-    // cap <= 1e12 wei: these products cannot overflow.
-    let max_fee = c.max_fee_per_gas * NON_KEEPER_MAX_FEE_PCT / 100;
-    let max_prio = c.max_fee_per_gas * NON_KEEPER_PRIORITY_FEE_PCT / 100;
+    let max_fee = c.non_keeper_max_fee_per_gas;
     a.max_fee_per_gas = U128(a.max_fee_per_gas.0.min(max_fee));
-    a.max_priority_fee_per_gas = U128(
-        a.max_priority_fee_per_gas
-            .0
-            .min(max_prio)
-            .min(a.max_fee_per_gas.0),
-    );
+    a.max_priority_fee_per_gas = U128(a.max_priority_fee_per_gas.0.min(a.max_fee_per_gas.0));
     a.gas_limit = U128(c.min_gas_limit);
     a
 }
@@ -913,8 +916,9 @@ impl Contract {
     /// v2 rules (findings C and E): only an operator (contract keeper, vault keeper, vault owner,
     /// heir) may re-sign; every re-sign waits `RESIGN_COOLDOWN_MS` after the last request (a fee
     /// ratchet or status flipping can't be spammed, and an old Solana blockhash has expired); an
-    /// EVM payout that has a signature needs both fees >= 110% of the last request (or at the
-    /// chain cap) and within the cap; the EVM nonce stays pinned per payout. One re-sign per
+    /// EVM payout that has a signature needs, from a non-keeper, both fees >= 110% of the last
+    /// request (or at the chain cap); a keeper may pick any fees and gas limit within the caps
+    /// (G1); the EVM nonce stays pinned per payout, so a re-sign only replaces. One re-sign per
     /// payout in flight.
     ///
     /// Second review: a Solana transfer has no nonce, so a fresh signature over a new blockhash is
@@ -974,7 +978,9 @@ impl Contract {
                 if !keeper {
                     a = limit_non_keeper_evm_args(a, payout.chain);
                 }
-                if has_sig {
+                // A keeper may lower fees (second review G1): an heir or a stranger who signed first
+                // must not be able to lock the payout above an honest fee. Only non-keepers ratchet.
+                if has_sig && !keeper {
                     // Fees are capped per chain (validated above), so real products are small;
                     // saturating math keeps an absurd stored value from overflowing.
                     let cap = payout

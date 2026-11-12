@@ -16,6 +16,8 @@ pub mod types;
 #[cfg(test)]
 mod audit_v2;
 #[cfg(test)]
+mod audit_v2b;
+#[cfg(test)]
 mod tests;
 
 pub use foreign::{EvmArgs, ForeignChain, ForeignPayout, ForeignStatus, SolanaArgs, StepArgs};
