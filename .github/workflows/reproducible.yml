@@ -1,0 +1,24 @@
+name: reproducible
+# Checks on every push that touches the contract that `cargo near build reproducible-wasm` (the Docker image pinned in
+# contracts/dmw/Cargo.toml) builds, and prints the code hash. The testnet workflow (task=all) makes the same build,
+# commits it as contracts/release/dmw.wasm and deploys it.
+on:
+  push:
+    paths: ['contracts/dmw/**', '.github/workflows/reproducible.yml', '.github/workflows/testnet.yml']
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: cargo-near 0.23.0
+        run: |
+          curl --proto '=https' --tlsv1.2 -LsSf https://github.com/near/cargo-near/releases/download/cargo-near-v0.23.0/cargo-near-installer.sh | sh
+          cargo near --version
+      - name: Reproducible build
+        working-directory: contracts/dmw
+        run: |
+          cargo near build reproducible-wasm
+          ls -l target/near/dmw.wasm
+          node -e 'const b=require("crypto").createHash("sha256").update(require("fs").readFileSync(process.argv[1])).digest();const A="123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";let n=BigInt("0x"+b.toString("hex")),s="";while(n>0n){s=A[Number(n%58n)]+s;n/=58n}for(const x of b){if(x!==0)break;s="1"+s}console.log("code hash",s)' target/near/dmw.wasm

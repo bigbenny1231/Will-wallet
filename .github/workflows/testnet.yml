@@ -74,7 +74,8 @@ jobs:
           set -o pipefail
           case "$GITHUB_REF" in refs/heads/*) ;; *) echo "dispatch release on a branch"; exit 1;; esac
           SRC=$(git rev-parse HEAD)
-          cargo install cargo-near --version 0.23.0 --locked 2>&1 | tail -n 2
+          curl --proto '=https' --tlsv1.2 -LsSf https://github.com/near/cargo-near/releases/download/cargo-near-v0.23.0/cargo-near-installer.sh | sh
+          cargo near --version
           (cd contracts/dmw && cargo near build reproducible-wasm) 2>&1 | tee >(eval "$SAVE" > "$OUT/release-build.log")
           cp contracts/dmw/target/near/dmw.wasm contracts/release/dmw.wasm
           H=$(node -e 'const b=require("crypto").createHash("sha256").update(require("fs").readFileSync(process.argv[1])).digest();const A="123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";let n=BigInt("0x"+b.toString("hex")),s="";while(n>0n){s=A[Number(n%58n)]+s;n/=58n}for(const x of b){if(x!==0)break;s="1"+s}console.log(s)' contracts/release/dmw.wasm)
