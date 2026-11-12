@@ -75,7 +75,7 @@ No `.env`, keys or near-cli credentials are needed beforehand. `make deploy` cre
 git clone https://github.com/bigbenny1231/will-wallet deadmans-wallet && cd deadmans-wallet
 make check     # verify toolchain   -> "All good." (optional tools only warn)
 make build     # build the contract -> contracts/dmw/target/near/dmw.wasm and its code hash (about 1 min)
-make test      # unit tests         -> contract "134 passed", keeper "91 passed", dashboard "108 passed", agent "62 passed" (runs npm ci first)
+make test      # unit tests         -> contract "174 passed", keeper "140 passed", dashboard "130 passed", agent "103 passed" (runs npm ci first)
 make attacks   # offline attacks    -> "7 attacks, 0 escaped policy, worst bounded loss 1 NEAR" (no keys, no chain)
 make deploy    # faucet accounts    -> creates dmw-<rand>.testnet + dmw-keeper-<rand>.testnet, deploys and inits in one
                #                       transaction (keeper passed to new), writes .env, prints "deployed dmw-xxxxxx.testnet", ends with "next: make demo"
