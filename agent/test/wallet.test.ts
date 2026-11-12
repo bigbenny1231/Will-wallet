@@ -46,10 +46,27 @@ describe('wallet wrapper: layer 1 refuses to sign', () => {
     expect(localPolicyCheck(v, API, 1n, now)).toContain('vault_not_alive');
   });
 
-  it('resets the daily window after 24 h like the contract', () => {
+  it('v1 view: resets the fixed daily window after 24 h like the v1 contract', () => {
     const now = Date.now();
-    const v = simVault(now - DAY_MS - 1, { daily_spent: N.toString(), daily_window_start_ms: now - DAY_MS - 1, warning_at_ms: now + 1000 });
+    const v = simVault(now - DAY_MS - 1, { daily_spent: N.toString(), daily_window_start_ms: now - DAY_MS - 1, warning_at_ms: now + 1000, spends: undefined });
     expect(localPolicyCheck(v, API, N / 2n, now)).toEqual([]);
+  });
+
+  it('v2 view: the daily cap is a rolling 24 h window over spends', () => {
+    const now = Date.now();
+    const p6 = (N * 6n / 10n).toString();
+    // 0.6 NEAR spent 25 h ago and 0.6 NEAR spent 23 h ago: only the second still counts.
+    const spends = [
+      { ms: now - 25 * 3_600_000, amount: p6 },
+      { ms: now - 23 * 3_600_000, amount: p6 },
+    ];
+    // A stale view-time daily_spent must not matter: the spends are authoritative.
+    const v = simVault(now, { spends, daily_spent: N.toString(), warning_at_ms: now + 10 * 3_600_000 });
+    expect(localPolicyCheck(v, API, N * 4n / 10n, now)).toEqual([]);
+    expect(localPolicyCheck(v, API, N * 4n / 10n + 1n, now)).toEqual(['over_daily_max']);
+    // A fixed window opened 25 h ago would have reset; the rolling window still counts the 23 h old spend.
+    // An hour and a bit later it has aged out too.
+    expect(localPolicyCheck(v, API, N / 2n, now + 3_600_001)).toEqual([]);
   });
 
   it('fails closed when the vault cannot be read', async () => {

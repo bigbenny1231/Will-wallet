@@ -17,8 +17,14 @@ export interface VaultView {
   trigger_at_ms?: number;
   balance: string;
   policy: Policy;
+  /** Spent in the agent window when the view was read. v2: a rolling 24 h sum of `spends`. */
   daily_spent: string;
+  /** v1: start of the fixed window. v2: oldest spend still counted (0 when none). */
   daily_window_start_ms: number;
+  /** v2 only: the agent spends inside the rolling 24 h window. */
+  spends?: { ms: number; amount: string }[];
+  /** v2 only: the salted MPC derivation paths of this vault's foreign source addresses. */
+  derivation_paths?: { base: string; monad: string; solana: string; salt: string };
   agent_keys: string[];
   log: { ms: number; event: string; detail: string }[];
 }

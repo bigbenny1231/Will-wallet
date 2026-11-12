@@ -35,21 +35,26 @@ export class SimChain implements VaultChain {
     // The contract's two require! guards run before the policy. They panic, so the transaction fails and no state changes.
     if (amount <= 0n) return { hash, logs: [], returnValue: null, failure: simPanic('amount must be > 0') };
     if (a.receiver_id === this.contractId) return { hash, logs: [], returnValue: null, failure: simPanic('receiver cannot be the dmw contract') };
-    if (now >= v.daily_window_start_ms + DAY_MS) {
-      v.daily_window_start_ms = now;
-      v.daily_spent = '0';
-    }
+    rollWindow(v, now);
     const reason = localPolicyCheck(v, a.receiver_id, amount, now)[0];
     if (reason) {
       const data = { token_id: v.token_id, receiver_id: a.receiver_id, amount: a.amount, reason };
       return { hash, logs: [`EVENT_JSON:${JSON.stringify({ standard: 'dmw', version: '1.0.0', event: 'agent_pay_denied', data })}`], returnValue: { allowed: false, reason, receiver_id: a.receiver_id, amount: a.amount, daily_spent: v.daily_spent, balance: v.balance } };
     }
     v.balance = (BigInt(v.balance) - amount).toString();
-    v.daily_spent = (BigInt(v.daily_spent) + amount).toString();
+    v.spends!.push({ ms: now, amount: a.amount });
+    rollWindow(v, now);
     this.transfers.push({ receiver_id: a.receiver_id, amount: a.amount });
     const data = { token_id: v.token_id, receiver_id: a.receiver_id, amount: a.amount, daily_spent: v.daily_spent };
     return { hash, logs: [`EVENT_JSON:${JSON.stringify({ standard: 'dmw', version: '1.0.0', event: 'agent_pay_allowed', data })}`], returnValue: { allowed: true, reason: null, receiver_id: a.receiver_id, amount: a.amount, daily_spent: v.daily_spent, balance: v.balance } };
   }
+}
+
+/** Contract v2's rolling 24 h agent window: drop spends older than a day and refresh the derived view fields. */
+function rollWindow(v: VaultView, now: number) {
+  v.spends = (v.spends ?? []).filter((s) => s.ms + DAY_MS > now);
+  v.daily_spent = v.spends.reduce((a, s) => a + BigInt(s.amount), 0n).toString();
+  v.daily_window_start_ms = v.spends.length ? Math.min(...v.spends.map((s) => s.ms)) : 0;
 }
 
 /** Same shape as a failed receipt from the node (near.ts toTxResult): the JSON of status.Failure. */
@@ -78,7 +83,9 @@ export function simVault(now = Date.now(), over: Partial<VaultView> = {}): Vault
     balance: (3n * N).toString(),
     policy: { per_tx_max: (N / 2n).toString(), daily_max: N.toString(), allowlist: ['dmw-api-sim.testnet'] },
     daily_spent: '0',
-    daily_window_start_ms: now,
+    daily_window_start_ms: 0,
+    spends: [],
+    derivation_paths: { base: 'base-1-00000000000000a1', monad: 'monad-1-00000000000000a1', solana: 'solana-1-00000000000000a1', salt: '00000000000000a1' },
     agent_keys: ['ed25519:SIMULATEDAGENTKEY'],
     log: [],
     ...over,

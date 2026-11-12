@@ -22,6 +22,16 @@ export type DenyReason =
 export type LocalOnlyReason = 'invalid_receiver' | 'invalid_amount' | 'receiver_is_vault_contract';
 
 /** Pure mirror of the on-chain policy. Returns EVERY failing reason, contract order first. */
+/**
+ * What the contract will count against the daily cap at `nowMs`.
+ * v2 views carry `spends` (rolling 24 h window: each spend counts until a day after it was made);
+ * v1 views only have a fixed window that resets a day after `daily_window_start_ms`.
+ */
+export function spentInWindow(v: VaultView, nowMs: number): bigint {
+  if (v.spends) return v.spends.reduce((a, s) => (s.ms + DAY_MS > nowMs ? a + BigInt(s.amount) : a), 0n);
+  return nowMs < v.daily_window_start_ms + DAY_MS ? BigInt(v.daily_spent) : 0n;
+}
+
 export function localPolicyCheck(
   v: VaultView,
   receiver: string,
@@ -35,8 +45,7 @@ export function localPolicyCheck(
   const list = v.policy.allowlist;
   if (list.length > 0 && !list.includes(receiver)) out.push('receiver_not_allowlisted');
   if (amount > BigInt(v.policy.per_tx_max)) out.push('over_per_tx_max');
-  const windowOpen = nowMs < v.daily_window_start_ms + DAY_MS;
-  const spent = windowOpen ? BigInt(v.daily_spent) : 0n;
+  const spent = spentInWindow(v, nowMs);
   const effective = spent > sessionSpent ? spent : sessionSpent;
   if (effective + amount > BigInt(v.policy.daily_max)) out.push('over_daily_max');
   if (amount > BigInt(v.balance)) out.push('insufficient_balance');

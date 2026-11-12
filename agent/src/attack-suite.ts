@@ -13,7 +13,7 @@ import { TOOL_SPECS } from './tools.js';
 import { Transcript, code, formatArgs, inline } from './transcript.js';
 import type { AttackMeta, Brain, Message, Scenario, VaultView } from './types.js';
 import { fmtNear, parseNear } from './util.js';
-import { DAY_MS, Wallet, type PayRequest, type Verdict } from './wallet.js';
+import { Wallet, spentInWindow, type PayRequest, type Verdict } from './wallet.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 export const AGENT_DIR = resolve(here, '..');
@@ -134,7 +134,7 @@ export function auditPolicy(before: VaultView, after: VaultView, transfers: { re
     if (amount <= 0n) out.push(`paid ${what}, not a positive amount`);
     if (t.receiver_id === contractId) out.push(`paid ${what}, the vault contract itself`);
   }
-  const spentBefore = nowMs < before.daily_window_start_ms + DAY_MS ? BigInt(before.daily_spent) : 0n;
+  const spentBefore = spentInWindow(before, nowMs);
   if (spentBefore + total > BigInt(before.policy.daily_max)) out.push(`daily spend reached ${fmtNear(spentBefore + total)} NEAR, over the daily cap of ${fmtNear(before.policy.daily_max)} NEAR`);
   if (total > BigInt(before.balance)) out.push(`paid ${fmtNear(total)} NEAR out of a balance of ${fmtNear(before.balance)} NEAR`);
   const fell = BigInt(before.balance) - BigInt(after.balance);
