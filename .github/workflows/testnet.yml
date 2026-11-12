@@ -60,8 +60,8 @@ jobs:
       # saved logs never keep workflow-command lines (a mask line carries the key it masks)
       SAVE: grep --line-buffered -v '^::'
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with: { node-version: 22 }
       - name: Install keeper and agent dependencies
         run: |
@@ -87,7 +87,10 @@ jobs:
           set -o pipefail
           case "$GITHUB_REF" in refs/heads/*) ;; *) echo "dispatch release on a branch"; exit 1;; esac
           SRC=$(git rev-parse HEAD)
-          curl --proto '=https' --tlsv1.2 -LsSf https://github.com/near/cargo-near/releases/download/cargo-near-v0.23.0/cargo-near-installer.sh | sh
+          # cargo-near 0.23.0 installer, pinned by its sha256 (the installer in turn checks the binary's sha256)
+          curl --proto '=https' --tlsv1.2 -LsSf -o /tmp/cargo-near-installer.sh https://github.com/near/cargo-near/releases/download/cargo-near-v0.23.0/cargo-near-installer.sh
+          echo "76ae71bc6a99864a09cc67c1c0bf82a2b7812d8ab4c93034b680235df6d22028  /tmp/cargo-near-installer.sh" | sha256sum -c -
+          sh /tmp/cargo-near-installer.sh
           cargo near --version
           (cd contracts/dmw && cargo near build reproducible-wasm) 2>&1 | tee >(eval "$SAVE" > "$OUT/release-build.log")
           cp contracts/dmw/target/near/dmw.wasm contracts/release/dmw.wasm
@@ -138,8 +141,13 @@ jobs:
         if: inputs.task == 'all'
         run: |
           set -o pipefail
-          C=$(sed -n 's/^DMW_CONTRACT=//p' .env)
-          node scripts/near-admin.mjs lock "$C" 2>&1 | tee >(eval "$SAVE" > "$OUT/lock.log")
+          C=$(sed -n 's/^DMW_CONTRACT=//p' .env); K=$(sed -n 's/^KEEPER_ACCOUNT_ID=//p' .env)
+          # The lock is irreversible, so first check the contract keeper is the long-lived account (review H-2)
+          CK=$(node scripts/near-admin.mjs view "$C" get_config '{}' | node -e 'console.log(JSON.parse(require("fs").readFileSync(0,"utf8")).keeper||"")')
+          echo "contract keeper: $CK (expected $K)" | tee >(eval "$SAVE" > "$OUT/lock.log")
+          [ -n "$K" ] && [ "$CK" = "$K" ] || { echo "::error::contract keeper is not the long-lived keeper; not locking"; exit 1; }
+          node scripts/near-admin.mjs keys "$K" | grep -q '"public_key"' || { echo "::error::$K has no access key; not locking"; exit 1; }
+          node scripts/near-admin.mjs lock "$C" 2>&1 | tee >(eval "$SAVE" >> "$OUT/lock.log")
           node scripts/near-admin.mjs keys "$C" | tee >(eval "$SAVE" >> "$OUT/lock.log")
           rm -f "keys/$C.json"
 
@@ -180,7 +188,7 @@ jobs:
           cd "$GITHUB_WORKSPACE/dashboard" && npm ci --no-audit --no-fund --loglevel=error
       - name: Raw footage from the record run
         if: inputs.task == 'edit'
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with: { name: dmw-raw, path: /tmp/v4, run-id: '${{ inputs.raw_run }}', github-token: '${{ github.token }}' }
       - name: Record the demo run
         if: ${{ !cancelled() && (inputs.task == 'all' || inputs.task == 'record' || inputs.task == 'finish') }}
@@ -193,7 +201,7 @@ jobs:
           ./docs/video/tools/v4/record.sh 2>&1 | tee >(eval "$SAVE" > "$OUT/record.log")
           kill $W || true
       - if: (inputs.task == 'all' || inputs.task == 'record' || inputs.task == 'finish') && always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with: { name: dmw-raw, path: /tmp/v4/raw-pack, retention-days: 30, if-no-files-found: ignore }
       - name: Edit
         if: ${{ !cancelled() && (inputs.task == 'all' || inputs.task == 'record' || inputs.task == 'finish' || inputs.task == 'edit') }}
@@ -202,7 +210,7 @@ jobs:
           [ -d /tmp/v4/raw-pack ] && cp -a /tmp/v4/raw-pack/. /tmp/v4/ || true
           ./docs/video/tools/v4/edit.sh "$OUT" 2>&1 | tee >(eval "$SAVE" > "$OUT/edit.log")
       - if: (inputs.task == 'all' || inputs.task == 'record' || inputs.task == 'finish' || inputs.task == 'edit') && always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with: { name: dmw-video, path: '${{ env.OUT }}/*.mp4', retention-days: 30, if-no-files-found: ignore }
 
       # ---------------- results ----------------

@@ -165,6 +165,17 @@ try {
     const full = left.keys.filter((k) => k.access_key.permission === 'FullAccess');
     console.log(`full-access keys left on ${a[0]}: ${full.length}`);
     if (full.length) process.exitCode = 1;
+    // v3 (review L-1): a function-call key on the contract account acts as the contract, so one that reaches a
+    // #[private] callback could move a Will NFT. Only the vault keys the contract itself adds are allowed: receiver =
+    // the contract and a method list of exactly ["heartbeat"] (pulse) or ["agent_pay"] (agent).
+    const bad = left.keys.filter((k) => {
+      const fc = k.access_key.permission?.FunctionCall; if (!fc) return false;
+      const m = fc.method_names || [];
+      return fc.receiver_id !== a[0] || m.length !== 1 || !['heartbeat', 'agent_pay'].includes(m[0]);
+    });
+    console.log(`other keys left on ${a[0]}: ${left.keys.length - full.length} (unsafe: ${bad.length})`);
+    for (const k of bad) console.error(`unsafe function-call key ${k.public_key}: ${JSON.stringify(k.access_key.permission)}`);
+    if (bad.length) process.exitCode = 1;
   } else if (cmd === 'keys') {
     console.log(JSON.stringify(await provider.viewAccessKeyList(a[0]), null, 2));
   } else if (cmd === 'derive-keeper' || cmd === 'derive-account') {

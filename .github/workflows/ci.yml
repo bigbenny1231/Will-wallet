@@ -1,21 +1,23 @@
 name: ci
 on: [push, pull_request]
+permissions:
+  contents: read
 jobs:
   secrets:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with: { fetch-depth: 0 }
-      - uses: gitleaks/gitleaks-action@v2
+      - uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2
         env: { GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}" }
   contract:
     runs-on: ubuntu-latest
     defaults: { run: { working-directory: contracts/dmw } }
     steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-        with: { targets: wasm32-unknown-unknown, components: "rustfmt, clippy" }
-      - uses: Swatinem/rust-cache@v2
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+        with: { toolchain: stable, targets: wasm32-unknown-unknown, components: "rustfmt, clippy" }
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
         with: { workspaces: contracts/dmw }
       - run: cargo fmt --check
       # near-sdk 5.x refuses to compile contract code for the host; lint the wasm build.
@@ -27,8 +29,8 @@ jobs:
     runs-on: ubuntu-latest
     defaults: { run: { working-directory: keeper } }
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with: { node-version: 22, cache: npm, cache-dependency-path: keeper/package-lock.json }
       - run: npm ci
       - run: npm run typecheck
@@ -37,8 +39,8 @@ jobs:
     runs-on: ubuntu-latest
     defaults: { run: { working-directory: dashboard } }
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with: { node-version: 22, cache: npm, cache-dependency-path: dashboard/package-lock.json }
       - run: npm ci
       - run: npm test
@@ -47,8 +49,8 @@ jobs:
     runs-on: ubuntu-latest
     defaults: { run: { working-directory: agent } }
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with: { node-version: 22, cache: npm, cache-dependency-path: agent/package-lock.json }
       - run: npm ci
       - run: npm run typecheck
