@@ -35,9 +35,17 @@ S=$(cat $SUFFIX_FILE)
 HEIR1=dmw-demo-sarah-$S.testnet; HEIR2=dmw-demo-ben-$S.testnet; API=dmw-demo-api-$S.testnet
 OWNER=dmw-demo-owner-$(openssl rand -hex 3).testnet
 say "accounts"
-for a in $HEIR1 $HEIR2 $API; do
-  if [ -f keys/$a.json ]; then echo "have $a"; else $ADMIN create $a; fi
-done
+# Faucet calls are rationed (about 10 per IP per 12 h), so only the owner and one funder come from the faucet; the
+# heirs and the api account are top-level names paid for by the funder through the testnet registrar. If the registrar
+# path fails for any reason, fall back to the faucet.
+FUNDER=dmw-demo-funder-$S.testnet
+mk() { # mk <account> <near>
+  if [ -f keys/$1.json ]; then echo "have $1"; return 0; fi
+  if [ ! -f keys/$FUNDER.json ]; then $ADMIN create $FUNDER || true; fi
+  if [ -f keys/$FUNDER.json ] && $ADMIN fund $FUNDER $1 $2; then return 0; fi
+  echo "  (registrar path failed for $1, using the faucet)"; $ADMIN create $1
+}
+for a in $HEIR1 $HEIR2 $API; do mk $a 0.5; done
 $ADMIN create $OWNER
 
 # 3. vault: 60 s interval, grace 1 (poke becomes legal 120 s after the last beat)
@@ -47,6 +55,15 @@ echo "$OUT" | grep -E '^tx |result'
 TOKEN=$(echo "$OUT" | sed -n 's/.*result: "\([0-9]*\)".*/\1/p' | tail -1)
 [ -n "$TOKEN" ] || { echo "$OUT"; die "create_vault did not return a token id"; }
 echo $TOKEN > $D/vault_id
+
+# 3b. keeper for this vault. Step 3 is operator-only for its first hour (contract keeper or the vault's own keeper).
+# When the contract keeper is some other account (a locked contract keeps the keeper it was deployed with), the owner
+# names this demo's keeper as the vault keeper so the run does not wait out the hour.
+CK=$($ADMIN view $C get_config '{}' 2>/dev/null | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{console.log(JSON.parse(s).keeper||"")}catch{console.log("")}})')
+if [ "$CK" != "$KEEPER_ACCOUNT_ID" ]; then
+  say "vault keeper $KEEPER_ACCOUNT_ID (contract keeper is ${CK:-none})"
+  $TX call $OWNER $C set_vault_keeper "{\"token_id\":\"$TOKEN\",\"keeper_id\":\"$KEEPER_ACCOUNT_ID\"}" 50 1y | grep -E '^tx |result|rror' || true
+fi
 
 # 4. keys (secrets stay in .demo/, which is gitignored)
 say "keys"

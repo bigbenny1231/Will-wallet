@@ -21,7 +21,11 @@ B=$(j base); M=$(j monad); SO=$(j solana)
 $TX call "$O" "$C" set_foreign_payouts "{\"token_id\":\"$T\",\"payouts\":[{\"chain\":\"base\",\"to\":\"0xcA024adC7cac111339Fe077C739F8085aE705F2F\",\"amount\":\"500000000000000\",\"from_address\":\"$B\"},{\"chain\":\"monad\",\"to\":\"0x360d02320ebff8439fe0d804e68dfc6976230e13\",\"amount\":\"10000000000000000\",\"from_address\":\"$M\"},{\"chain\":\"solana\",\"to\":\"CFdWXa1ean7bBoewSv2SZESrDpWSxeoN1hfLrqaqZQUr\",\"amount\":\"10000000\",\"from_address\":\"$SO\"}]}" 50 1y | tee -a "$S/setup.out"
 echo "  base $B  monad $M  solana $SO" | tee -a "$S/setup.out"
 G=dmw-demo-guardian-$SFX.testnet
-[ -f "keys/$G.json" ] || node scripts/near-admin.mjs create "$G"
+FUNDER=$(ls keys/dmw-demo-funder-*.testnet.json 2>/dev/null | head -1 | xargs -r basename | sed 's/\.json$//')
+if [ ! -f "keys/$G.json" ]; then
+  # paid for by the demo funder through the testnet registrar (no faucet call); faucet only as a fallback
+  { [ -n "$FUNDER" ] && node scripts/near-admin.mjs fund "$FUNDER" "$G" 0.3; } || node scripts/near-admin.mjs create "$G"
+fi
 [ -n "${GITHUB_ACTIONS:-}" ] && ./scripts/ci/mask.sh
 $TX call "$O" "$C" set_guardian "{\"token_id\":\"$T\",\"guardian_id\":\"$G\",\"max_pause_s\":600}" 50 1y | tee -a "$S/setup.out"
 ( umask 077; echo "http://localhost:5173/pulse#c=$C&t=$T&k=$SEC" > "$S/pairing.url" )

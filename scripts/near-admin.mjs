@@ -10,6 +10,8 @@
 //   node scripts/near-admin.mjs send <from> <to> <near>
 //   node scripts/near-admin.mjs keys <acct>
 //   node scripts/near-admin.mjs sub <parent> <prefix> [near]       -> creates <prefix>.<parent> funded by the parent (no faucet)
+//   node scripts/near-admin.mjs fund <payer> <name>.testnet [near]  -> creates a top-level .testnet account paid by <payer>
+//                                                                    through the `testnet` registrar (no faucet)
 //   node scripts/near-admin.mjs lock <acct>                      -> deletes the account's own full-access key (irreversible)
 import { createRequire } from 'node:module';
 import { readFileSync, writeFileSync, mkdirSync, existsSync, chmodSync } from 'node:fs';
@@ -95,6 +97,22 @@ try {
     writeFileSync(file, JSON.stringify({ account_id: name, public_key: kp.getPublicKey().toString(), private_key: kp.toString() }, null, 2), { mode: 0o600 });
     chmodSync(file, 0o600);
     console.log(`created ${name} (${amount || 1} NEAR from ${parent})  key saved to keys/${name}.json`);
+  } else if (cmd === 'fund') {
+    // Top-level <name>.testnet paid for by an existing account, through the `testnet` registrar's create_account (the
+    // same call near-cli's "fund-myself" makes). Keeps demo names unchanged while saving faucet calls. The registrar
+    // returns false (and refunds) when the name is taken, so the key is saved only on a true result.
+    const [payer, name, amount] = a;
+    if (!/^[a-z0-9_-]+\.testnet$/.test(name || '')) throw new Error(`fund: ${name} is not a top-level .testnet name`);
+    const kp = KeyPair.fromRandom('ed25519');
+    const r = await account(payer).callFunctionRaw({ contractId: 'testnet', methodName: 'create_account', args: { new_account_id: name, new_public_key: kp.getPublicKey().toString() }, gas: tgas(100), deposit: toYocto(amount || '0.5') });
+    show(r);
+    let ok = false; try { ok = Buffer.from(r?.status?.SuccessValue || '', 'base64').toString() === 'true'; } catch {}
+    if (!ok) throw new Error(`fund: the registrar did not create ${name}`);
+    mkdirSync(KEYS, { recursive: true, mode: 0o700 }); chmodSync(KEYS, 0o700);
+    const file = join(KEYS, `${name}.json`);
+    writeFileSync(file, JSON.stringify({ account_id: name, public_key: kp.getPublicKey().toString(), private_key: kp.toString() }, null, 2), { mode: 0o600 });
+    chmodSync(file, 0o600);
+    console.log(`created ${name} (${amount || 0.5} NEAR from ${payer})  key saved to keys/${name}.json`);
   } else if (cmd === 'lock') {
     // Delete the account's own full-access key (the one in keys/<acct>.json). Afterwards nobody can deploy new code to
     // the account or call owner-only methods as it; function-call keys stay. Irreversible: a fix means a fresh account.
