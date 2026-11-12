@@ -9,7 +9,7 @@ import { createVaultCall, type CreateDraft, type ForeignDraft } from "../lib/cal
 import { PENDING_KEY, type Pending } from "../components/PendingCreate";
 import { bpsToPct, fmtInterval, nearToYocto, toSmallest, unitsFor } from "../lib/format";
 import { CONTRACT, MOCK } from "../config";
-import { ErrorNote, ExtLink, Field, Label, ROMAN } from "../components/ui";
+import { ErrorNote, Field, Label, ROMAN } from "../components/ui";
 
 const STEPS = ["Timing", "Heirs", "Agent policy", "Foreign payouts", "DAO", "Deposit"] as const;
 const INTRO = [
@@ -47,7 +47,7 @@ export default function Create() {
   const [foreign, setForeign] = useState<ForeignRow[]>([]);
   const [expectedId, setExpectedId] = useState<string | null>(null);
   const [derived, setDerived] = useState<DerivedAddresses | null>(null);
-  const [deriveErr, setDeriveErr] = useState<string | null>(null);
+  const [, setDeriveErr] = useState<string | null>(null);
   // dao + deposit
   const [dao, setDao] = useState("");
   const [bounty, setBounty] = useState("0.05");
@@ -252,7 +252,6 @@ export default function Create() {
           <>
             {foreign.length === 0 && <p className="text-[15px] text-text-2">No foreign payouts. Add one to send Base Sepolia ETH, Monad testnet MON or Solana devnet SOL at settlement.</p>}
             {foreign.map((f, i) => {
-              const src = derived?.[f.chain];
               const m = chainMeta(f.chain);
               return (
                 <div key={i} className="space-y-4 border-t border-rule pt-5">
@@ -268,14 +267,7 @@ export default function Create() {
                   </div>
                   <div className="text-[14px] text-text-2">
                     Funded from the {m.name} address derived for{" "}
-                    <span className="mono !text-[13px] text-text">{expectedId ? m.path(expectedId) : m.path("<id>")}</span>:{" "}
-                    {src ? <span className="mono !text-[13px] text-text">{src}</span> : <span>{deriveErr ? "derivation failed, run `npm run derive`" : "computing…"}</span>}
-                    {src && (
-                      <span className="ml-3">
-                        <ExtLink href={m.address(src)}>{m.explorer}</ExtLink>
-                        <span className="ml-3"><ExtLink href={m.faucet}>faucet</ExtLink></span>
-                      </span>
-                    )}
+                    <span className="mono !text-[13px] text-text">{m.path("<your vault id>")}</span>. It appears once the vault is created. Do not send anything before then.
                   </div>
                   <button className="tl !text-[14px]" onClick={() => setForeign(foreign.filter((_, j) => j !== i))}>Remove</button>
                 </div>
@@ -283,7 +275,7 @@ export default function Create() {
             })}
             <button className="tl" onClick={() => setForeign([...foreign, { chain: "base", to: "", amount: "" }])}>Add foreign payout</button>
             <p className="max-w-[62ch] text-[14px] text-text-2">
-              The source address depends on the vault id. It is shown for the next expected id and recomputed with the real id after creation. Fund it while you are alive; nobody holds its key.
+              The source address depends on the vault id, which is only fixed once the vault is created. Another vault can take the next id first, so the address is shown after creation, never before. Fund it then, while you are alive; nobody holds its key.
             </p>
           </>
         )}

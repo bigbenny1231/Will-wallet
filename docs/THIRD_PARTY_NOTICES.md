@@ -27,10 +27,18 @@ text travel with the font files (they do) and the fonts are not sold on their ow
 ## Rust crates linked into the contracts
 
 - `near-sdk`, `near-contract-standards`: MIT OR Apache-2.0.
-- `omni-transaction` 0.5.0: Apache-2.0 (permissive, compatible with an MIT project; keep its licence text when
-  redistributing a built `.wasm` together with its sources).
+- `omni-transaction` 0.5.0: Apache-2.0 (permissive, compatible with an MIT project). It is linked into the
+  committed `contracts/release/dmw.wasm`; its licence text ships next to it as
+  `contracts/release/LICENSE-APACHE-omni-transaction.txt`.
 - `wee_alloc` and `memory_units` (pulled in by `near-sdk`): MPL-2.0, file-level copyleft. Used unmodified as
   crates, so no obligation beyond making those crates' sources available, which crates.io already does.
+
+## Generated audio (not covered by the MIT licence)
+
+The mp3 files under `docs/video/tools/teaser/vo/` and `docs/video/tools/teaser/el/` were generated with
+ElevenLabs (text to speech, music and sound effects; https://elevenlabs.io). They are not covered by this
+repository's MIT licence and remain subject to the ElevenLabs Terms of Service. `docs/video/tools/teaser/build.py`
+can regenerate them with your own ElevenLabs account.
 
 ## npm packages worth knowing about (dashboard)
 

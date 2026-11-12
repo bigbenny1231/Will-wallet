@@ -64,9 +64,12 @@ jobs:
 
       - name: Contract from the input
         if: inputs.task == 'verify' || inputs.task == 'record' || inputs.task == 'finish'
+        env:
+          CONTRACT_INPUT: ${{ inputs.contract }}
         run: |
-          case "${{ inputs.contract }}" in *.testnet) ;; *) echo "contract input must be a .testnet account"; exit 1;; esac
-          printf 'NEAR_NETWORK=testnet\nDMW_CONTRACT=%s\n' "${{ inputs.contract }}" > .env; chmod 600 .env
+          case "$CONTRACT_INPUT" in *.testnet) ;; *) echo "contract input must be a .testnet account"; exit 1;; esac
+          case "$CONTRACT_INPUT" in *[!a-z0-9._-]*) echo "contract input has invalid characters"; exit 1;; esac
+          printf 'NEAR_NETWORK=testnet\nDMW_CONTRACT=%s\n' "$CONTRACT_INPUT" > .env; chmod 600 .env
 
       # ---------------- deploy ----------------
       - name: Deploy the release build to a fresh account
@@ -154,6 +157,8 @@ jobs:
       # ---------------- results ----------------
       - name: Push the non-secret results to ci/testnet-results
         if: always()
+        env:
+          TASK_INPUT: ${{ inputs.task }}
         run: |
           ./scripts/ci/mask.sh
           # last line of defence: refuse to publish anything that looks like a private key
@@ -164,6 +169,6 @@ jobs:
           git rm -rq --cached . 2>/dev/null || true
           find . -mindepth 1 -maxdepth 1 ! -name .git ! -name results -exec rm -rf {} +
           mkdir -p results && rm -rf "results/${{ github.run_id }}" && mv /tmp/results-out "results/${{ github.run_id }}"
-          echo "${{ inputs.task }} $(date -u +%FT%TZ) ${{ github.sha }}" > "results/${{ github.run_id }}/RUN.txt"
+          echo "$TASK_INPUT $(date -u +%FT%TZ) ${{ github.sha }}" > "results/${{ github.run_id }}/RUN.txt"
           git add -f results
-          git commit -qm "results: ${{ inputs.task }} run ${{ github.run_id }}" && git push -q origin ci/testnet-results
+          git commit -qm "results: $TASK_INPUT run ${{ github.run_id }}" && git push -q origin ci/testnet-results
