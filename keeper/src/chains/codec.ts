@@ -78,3 +78,97 @@ export function evmAddressFromPubkey64(pk: Uint8Array): string {
   if (pk.length !== 64) throw new Error(`expected 64-byte key, got ${pk.length}`);
   return toChecksumAddress('0x' + toHex(keccak256(pk).slice(12)));
 }
+
+export function base58Encode(b: Uint8Array): string {
+  let n = 0n;
+  for (const x of b) n = (n << 8n) | BigInt(x);
+  let s = '';
+  while (n > 0n) { s = B58[Number(n % 58n)] + s; n /= 58n; }
+  for (const x of b) { if (x !== 0) break; s = '1' + s; }
+  return s;
+}
+
+// ------------------------------------------------------------------ RLP (Ethereum recursive length prefix)
+
+export type RlpItem = Uint8Array | RlpItem[];
+
+/** Minimal big-endian bytes of a non-negative integer (0 -> empty, as RLP wants it). */
+export function bigToBytes(n: bigint): Uint8Array {
+  if (n < 0n) throw new Error('negative integer in RLP');
+  if (n === 0n) return new Uint8Array();
+  let h = n.toString(16);
+  if (h.length % 2) h = '0' + h;
+  return fromHex(h);
+}
+export const bytesToBig = (b: Uint8Array): bigint => (b.length === 0 ? 0n : BigInt('0x' + toHex(b)));
+
+function rlpLength(len: number, offset: number): Uint8Array {
+  if (len < 56) return Uint8Array.of(offset + len);
+  const l = bigToBytes(BigInt(len));
+  return Uint8Array.from([offset + 55 + l.length, ...l]);
+}
+const concat = (parts: Uint8Array[]): Uint8Array => {
+  const out = new Uint8Array(parts.reduce((a, p) => a + p.length, 0));
+  let o = 0;
+  for (const p of parts) { out.set(p, o); o += p.length; }
+  return out;
+};
+
+export function rlpEncode(item: RlpItem): Uint8Array {
+  if (item instanceof Uint8Array) {
+    if (item.length === 1 && item[0] < 0x80) return item;
+    return concat([rlpLength(item.length, 0x80), item]);
+  }
+  const body = concat(item.map(rlpEncode));
+  return concat([rlpLength(body.length, 0xc0), body]);
+}
+
+/** Decode one RLP item that must span all of `data`. */
+export function rlpDecode(data: Uint8Array): RlpItem {
+  const [item, end] = rlpDecodeAt(data, 0);
+  if (end !== data.length) throw new Error('RLP: trailing bytes');
+  return item;
+}
+
+function rlpDecodeAt(d: Uint8Array, pos: number): [RlpItem, number] {
+  if (pos >= d.length) throw new Error('RLP: truncated');
+  const b = d[pos];
+  const readLen = (n: number, at: number) => {
+    if (at + n > d.length) throw new Error('RLP: truncated');
+    return Number(bytesToBig(d.subarray(at, at + n)));
+  };
+  if (b < 0x80) return [d.subarray(pos, pos + 1), pos + 1];
+  if (b < 0xb8) {
+    const len = b - 0x80;
+    if (pos + 1 + len > d.length) throw new Error('RLP: truncated');
+    return [d.subarray(pos + 1, pos + 1 + len), pos + 1 + len];
+  }
+  if (b < 0xc0) {
+    const ll = b - 0xb7;
+    const len = readLen(ll, pos + 1);
+    const start = pos + 1 + ll;
+    if (start + len > d.length) throw new Error('RLP: truncated');
+    return [d.subarray(start, start + len), start + len];
+  }
+  let start: number;
+  let len: number;
+  if (b < 0xf8) {
+    len = b - 0xc0;
+    start = pos + 1;
+  } else {
+    const ll = b - 0xf7;
+    len = readLen(ll, pos + 1);
+    start = pos + 1 + ll;
+  }
+  const end = start + len;
+  if (end > d.length) throw new Error('RLP: truncated');
+  const items: RlpItem[] = [];
+  let p = start;
+  while (p < end) {
+    const [it, np] = rlpDecodeAt(d, p);
+    items.push(it);
+    p = np;
+  }
+  if (p !== end) throw new Error('RLP: bad list length');
+  return [items, end];
+}

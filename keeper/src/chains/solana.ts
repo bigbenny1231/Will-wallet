@@ -1,5 +1,5 @@
 // Solana devnet helpers for step 3: recent blockhash for execute_step, and relay.
-import { base58Decode } from './codec.js';
+import { base58Decode, base58Encode } from './codec.js';
 
 export const SOLANA_DEVNET_RPC = 'https://api.devnet.solana.com';
 export const solscanTx = (sig: string) => `https://explorer.solana.com/tx/${sig}?cluster=devnet`;
@@ -8,7 +8,7 @@ export const solanaExplorerAddress = (a: string) => `https://explorer.solana.com
 /** No RPC call may hold a bounded run (`--max-seconds`) open: every request gives up after this long. */
 const RPC_TIMEOUT_MS = 15_000;
 
-async function rpc<T>(url: string, method: string, params: unknown[]): Promise<T> {
+export async function rpc<T>(url: string, method: string, params: unknown[]): Promise<T> {
   const r = await fetch(url, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -76,12 +76,4 @@ export async function getSolanaBalance(address: string, solanaRpc: string = SOLA
   return (await rpc<{ value: number }>(solanaRpc, 'getBalance', [address])).value;
 }
 
-const B58 = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
-function base58Encode(b: Uint8Array): string {
-  let n = 0n;
-  for (const x of b) n = (n << 8n) | BigInt(x);
-  let s = '';
-  while (n > 0n) { s = B58[Number(n % 58n)] + s; n /= 58n; }
-  for (const x of b) { if (x !== 0) break; s = '1' + s; }
-  return s;
-}
+

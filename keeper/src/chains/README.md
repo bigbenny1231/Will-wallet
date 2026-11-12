@@ -1,6 +1,6 @@
 # keeper/src/chains: foreign-chain helpers (owned by the chainsig agent)
 
-Pure, dependency-free functions (global `fetch` only) that the keeper imports via `src/chainsApi.ts`.
+Pure functions (global `fetch` only) that the keeper imports via `src/chainsApi.ts`. The funder modules (`evmTx.ts`, `solanaTx.ts`, `funderKeys.ts`) also use `@noble/curves` (already in the lock file through near-api-js; now listed in package.json) for secp256k1 and ed25519 signing.
 
 | Module | Export | Returns |
 | --- | --- | --- |
@@ -15,6 +15,11 @@ Pure, dependency-free functions (global `fetch` only) that the keeper imports vi
 | `solana.ts` | `getSolanaStepArgs(solanaRpc?)` | `{ recent_blockhash }` (StepArgs.solana) |
 | | `broadcastSolana(rawBase64, solanaRpc?)` | signature (tx id) |
 | | `isBlockhashExpired(err)`, `solanaTxSignature(raw)`, `solscanTx(sig)` | helpers |
+| `codec.ts` | `rlpEncode` / `rlpDecode`, `base58Encode` / `base58Decode`, `keccak256` | encoders |
+| `evmTx.ts` | `signEip1559(fields, key)`, `decodeEip1559(raw)`, `evmTxMaxCost(tx)` | type-2 native transfer: raw 0x hex + hash; decoded fields + recovered sender; value + gasLimit x maxFee |
+| `solanaTx.ts` | `transferMessage(t)`, `signSolTransfer(t, seed)`, `parseSolTransfer(raw)` | one SystemProgram transfer (legacy message), signed base64 + signature; parsed and verified |
+| `funderKeys.ts` | `deriveFunderKeys(seed)` | the funder's EVM key/address and Solana seed/address from `KEEPER_SEED` (HKDF-SHA256, salt `dmw-keeper`, info `evm funder key v1` / `solana funder key v1`) |
+| `funderRpc.ts` | `realFundingRpc(opts)` | the balance, nonce, fee, send, receipt and status calls the funder makes (`FundingRpc`, replaced by a fake in tests) |
 
 `opts` for `deriveAddresses` may be the keeper `Config` (its `rpcUrl` is used). The signer defaults to
 `v1.signer-prod.testnet` (`MPC_SIGNER` env overrides).
@@ -50,7 +55,9 @@ stale, call `dmw.resign_foreign({ token_id, index, args })` with fresh args (300
 - EVM fees: `max_fee = 2 * baseFee + priority`, `gas_limit = 21000` (native transfer). Monad testnet's
   base fee floor is 100 gwei, so its contract cap is 1000 gwei (Base: 100 gwei). Monad bills `gas_limit`,
   not gas used, so keep 21000 for native transfers.
-- The derived source addresses must be funded by the owner. Faucets need a human login
-  (Base Sepolia: Coinbase CDP / Alchemy; Solana devnet: faucet.solana.com; the RPC `requestAirdrop` is closed).
+- The derived source addresses hold no funds of their own. `dmw fund-sources --token <id>` (or `dmw keeper
+  --fund-sources`) tops them up from the funder wallet derived from `KEEPER_SEED`; see "Funding payout sources" in
+  `keeper/README.md`. The funder itself is filled once by hand from the faucets (Base Sepolia: Coinbase CDP / Alchemy;
+  Monad: faucet.monad.xyz; Solana devnet: faucet.solana.com).
 
 Self-check: `npx tsx src/chains/selfcheck.ts` (add `--offline` to skip network).

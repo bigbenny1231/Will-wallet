@@ -7,6 +7,8 @@ import type { ChainName, StepArgs, TxResult, VaultView } from './types.js';
 import { MAX_RESIGNS, RELAY_COOLDOWN, classifyRelayError } from './relay.js';
 import { bumpedEvmArgs, clampEvm, msUntilResign, payoutTxId } from './resign.js';
 import { vaultPaths } from './chains/derive.js';
+import type { Funder, SourceSet, TopUp } from './funder.js';
+import { STEP3_MARGIN_MS, STEP3_UNKNOWN_PARK_MS, STEP3_WINDOW_PANIC, isOperator, step3OpensAt } from './step3.js';
 import { errMsg, foreignTxLink, logErr, logInfo, logOk, logWarn, nearTxLink, sleep } from './util.js';
 
 export interface Logger {
@@ -43,10 +45,19 @@ export interface KeeperDeps {
   notifier?: Notifier;
   /** Checked before every action; true means "start nothing new" (time limit reached, or the process is stopping). */
   shouldStop?: () => boolean;
+  /**
+   * `--fund-sources`: tops up a vault's foreign source addresses right before each step-III signature, and once more
+   * when a relay reports the source unfunded (then the relay is retried at once). Caps live in the funder.
+   */
+  funder?: Pick<Funder, 'fundVault'>;
+  /** token -> time before which step III is not attempted (this account is not an operator inside the window). */
+  step3Park: Map<string, number>;
+  /** "token:index:txid" of unfunded relays already topped up once (a second unfunded result parks as before). */
+  fundAttempts: Set<string>;
 }
 
 export function makeDeps(p: Pick<KeeperDeps, 'backend' | 'chains' | 'contractId'> & Partial<KeeperDeps>): KeeperDeps {
-  return { now: Date.now, log: consoleLogger, relayed: new Map(), lastState: new Map(), relayBlock: new Map(), resigns: new Map(), landed: new Set(), landedCheckAt: new Map(), ...p };
+  return { now: Date.now, log: consoleLogger, relayed: new Map(), lastState: new Map(), relayBlock: new Map(), resigns: new Map(), landed: new Set(), landedCheckAt: new Map(), step3Park: new Map(), fundAttempts: new Set(), ...p };
 }
 
 export interface ActionRecord {
@@ -226,6 +237,54 @@ async function resignFailedPayouts(deps: KeeperDeps, v: VaultView, out: ActionRe
   }
 }
 
+/**
+ * Step III window (report item 4A): a keeper that is not an operator of this vault may not sign a payout during the
+ * first `step3_open_after_ms` after step 3 (or the previous payout) began; the contract panics. Park the vault until
+ * the window opens instead of failing every poll, and say once when it will be retried. True = parked, skip it.
+ */
+export async function step3Parked(deps: KeeperDeps, v: VaultView): Promise<boolean> {
+  const id = v.token_id;
+  const until = deps.step3Park.get(id);
+  if (until !== undefined) {
+    if (until > deps.now()) return true;
+    deps.step3Park.delete(id);
+  }
+  const { backend } = deps;
+  if (!backend.accountId || !backend.getConfig) return false;
+  const cfg = await backend.getConfig().catch(() => null);
+  if (!cfg || !(Number(cfg.step3_open_after_ms) > 0)) return false; // unknown or no window: the contract decides
+  if (isOperator(backend.accountId, v, cfg, deps.contractId)) return false;
+  const opens = step3OpensAt(v, cfg);
+  if (opens === null || deps.now() >= opens + STEP3_MARGIN_MS) return false;
+  parkStep3(deps, v, opens + STEP3_MARGIN_MS);
+  return true;
+}
+
+function parkStep3(deps: KeeperDeps, v: VaultView, until: number): void {
+  deps.step3Park.set(v.token_id, until);
+  const mins = Math.ceil((until - deps.now()) / 60_000);
+  deps.log.info(
+    'step',
+    `vault ${v.token_id} step III: ${deps.backend.accountId ?? 'this account'} is not an operator of this vault (contract keeper, vault keeper, owner or heir), so it may not sign a payout yet; the contract opens signing to anyone at ${new Date(until).toISOString().slice(0, 19)}Z, retrying then (in ${mins} min)`,
+  );
+}
+
+/** Source addresses of a vault (from its own derivation paths). */
+async function sourcesOf(deps: KeeperDeps, v: VaultView): Promise<SourceSet> {
+  return deps.chains.deriveAddresses(deps.contractId, vaultPaths(v));
+}
+
+/** `--fund-sources`: top up the vault's sources; never throws. */
+async function fundSources(deps: KeeperDeps, v: VaultView, only?: Set<number>): Promise<TopUp[]> {
+  if (!deps.funder) return [];
+  try {
+    return await deps.funder.fundVault(v, await sourcesOf(deps, v), only);
+  } catch (e) {
+    deps.log.err('fund', `vault ${v.token_id}: ${errMsg(e)}`);
+    return [];
+  }
+}
+
 const MAX_ACTIONS_PER_VAULT = 25;
 
 /** Perform every action currently due for one vault. Never throws. */
@@ -296,10 +355,31 @@ export async function driveVaultView(deps: KeeperDeps, initial: VaultView): Prom
         log.ok('poke', `vault ${id} → Triggered  ${nearTxLink(tx.hash)}`);
       } else if (action.kind === 'step') {
         let args: StepArgs | undefined;
-        if (action.chain && action.index !== undefined) args = await stepArgsFor(deps, v, action.chain, action.index);
-        let tx = await backend.executeStep(id, args);
-        out.push({ kind: 'step', tokenId: id, hash: tx.hash, ok: !failed(tx), detail: `step ${action.step}` });
+        if (action.chain && action.index !== undefined) {
+          if (await step3Parked(deps, v)) break;
+          // Fund before the signature exists: a Solana signature goes stale in ~60-90 s, and a late top-up would need
+          // a resign_foreign (keeper only, 5 min cooldown).
+          await fundSources(deps, v);
+          args = await stepArgsFor(deps, v, action.chain, action.index);
+        }
+        let tx: TxResult;
+        try {
+          tx = await backend.executeStep(id, args);
+        } catch (e) {
+          if (action.chain && STEP3_WINDOW_PANIC.test(errMsg(e))) tx = { hash: 'unknown', logs: [], returnValue: null, failure: errMsg(e) };
+          else throw e;
+        }
         const label = action.chain ? `step ${action.step}/5 (${action.chain} #${action.index})` : `step ${action.step}/5`;
+        if (failed(tx) && action.chain && STEP3_WINDOW_PANIC.test(tx.failure!)) {
+          // The contract says the window is still closed for this account (the local check could not tell).
+          const cfg = backend.getConfig ? await backend.getConfig().catch(() => null) : null;
+          const opens = cfg ? step3OpensAt(v, cfg) : null;
+          const until = opens !== null && opens + STEP3_MARGIN_MS > deps.now() ? opens + STEP3_MARGIN_MS : deps.now() + STEP3_UNKNOWN_PARK_MS;
+          out.push({ kind: 'step', tokenId: id, hash: tx.hash, ok: false, detail: 'step3_window' });
+          parkStep3(deps, v, until);
+          break;
+        }
+        out.push({ kind: 'step', tokenId: id, hash: tx.hash, ok: !failed(tx), detail: `step ${action.step}` });
         if (failed(tx)) {
           log.err('step', `vault ${id} ${label} failed: ${tx.failure}  ${nearTxLink(tx.hash)}`);
           break;
@@ -341,6 +421,17 @@ export async function driveVaultView(deps: KeeperDeps, initial: VaultView): Prom
                 continue;
               }
             } else if (kind === 'unfunded') {
+              // --fund-sources: top the source up once for this signed tx and relay again right away.
+              const attempt = `${key}:${payoutTxId(p) ?? p.signed_tx}`;
+              if (deps.funder && !deps.fundAttempts.has(attempt)) {
+                deps.fundAttempts.add(attempt);
+                log.warn('relay', `${label} source is unfunded (${errMsg(e)}); topping it up`);
+                const r = await fundSources(deps, v);
+                if (r.some((t) => t.chain === action.chain && t.indexes.includes(action.index) && (t.status === 'funded' || t.status === 'enough'))) {
+                  out.push({ kind: 'broadcast', tokenId: id, ok: false, detail: 'unfunded' });
+                  continue; // the same relay action comes next
+                }
+              }
               const prev = deps.relayBlock.get(key);
               deps.relayBlock.set(key, { until: deps.now() + RELAY_COOLDOWN.unfunded, reason: 'unfunded' });
               // Report the address that really has to be funded: the derived one. The owner-written `from_address` is shown only if derivation fails.
@@ -422,7 +513,7 @@ export async function tickOnce(deps: KeeperDeps): Promise<TickResult> {
     if (matchesFilter(last, deps) && needsSettlement(last, deps.now())) pending.push(v.token_id);
   }
   await deps.notifier?.flush();
-  return { vaults: vaults.length, actions, pending, error: actions.some((a) => !a.ok && a.detail !== 'not_due' && a.detail !== 'unfunded' && a.detail !== 'stale') ? 'action_failed' : undefined };
+  return { vaults: vaults.length, actions, pending, error: actions.some((a) => !a.ok && a.detail !== 'not_due' && a.detail !== 'unfunded' && a.detail !== 'stale' && a.detail !== 'step3_window') ? 'action_failed' : undefined };
 }
 
 export interface RunOpts {

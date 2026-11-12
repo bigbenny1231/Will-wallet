@@ -6,7 +6,7 @@ Node 22, TypeScript, run through `tsx` (no build step). Spec: [`SPEC.md`](../SPE
 ```bash
 cd keeper && npm install
 cp .env.example .env        # then fill it in; see the table below
-npm test                    # 90 unit tests, no network
+npm test                    # 124 unit tests, no network
 ```
 
 ## Do X, see Y
@@ -21,6 +21,9 @@ npm test                    # 90 unit tests, no network
 | ask whether a sweep has work, without sending anything | `npm run dmw -- due --owner-prefix dmw-guest-` | `work=true  2 to settle (...)` or `work=false  no matching vault is past its deadline or Triggered` |
 | look at a vault | `npm run dmw -- status --token 1` | state, countdown, step, heirs, payouts and the last log lines |
 | see where to fund the vault | `npm run derive -- --token 1` | Base Sepolia, Monad testnet and Solana devnet source addresses (the vault's `derivation_paths`: `base-<id>-<salt>` etc. on contract v2, `base-<id>` on v1) plus faucet links |
+| see the funder wallet that pays for payout sources | `KEEPER_SEED=... npm run dmw -- funder` | its EVM address (Base Sepolia and Monad testnet) and Solana address with balances; never a key |
+| fund one vault's payout sources | `KEEPER_SEED=... npm run dmw -- fund-sources --token 7 [--dry-run]` | one line per source: `holds …, needs …: funded +0.0005002 ETH <basescan link>` or `enough` |
+| run the keeper and fund sources as it goes | `KEEPER_SEED=... npm run keeper -- --fund-sources` | a `fund` line with a funding tx link before each step-III signature; relays that land |
 | show the agent guard rails | `npm run agent-demo -- --token 1 --key ed25519:<agent key>` | one green `agent_pay_allowed` and one red `agent_pay_denied reason=receiver_not_allowlisted` (the denied call goes to an unknown receiver and is also over `per_tx_max`; the contract checks the receiver first) |
 | create the estate DAO | `npm run dao -- create --name estate-1 --owner andrew.testnet` | `DAO created: estate-1.sputnik-v2.testnet`, or the exact `near` command to run by hand (exit 1) |
 
@@ -38,6 +41,11 @@ Read from the process environment, then `keeper/.env`, then the repo-root `.env`
 | `BASE_RPC`, `MONAD_RPC`, `SOLANA_RPC` | keeper, derive | defaults from SPEC section 1 (Base Sepolia, Monad testnet `https://testnet-rpc.monad.xyz`, Solana devnet) |
 | `DMW_NOTIFY_WEBHOOK` | keeper | optional; webhook URL for owner notifications (see below). It is a secret and is never printed |
 | `DMW_DASHBOARD_URL` | keeper | optional; base URL for the vault link in notifications, default `https://will-wallet.vercel.app` |
+| `DMW_NOTIFY_NTFY_TOPIC`, `DMW_NOTIFY_NTFY_SERVER` | keeper | optional; phone push through [ntfy](https://ntfy.sh) (see below). The topic is a secret and is never printed |
+| `KEEPER_SEED` | funder, fund-sources, keeper `--fund-sources` | at least 32 characters; the funder keys are derived from it (see below). The same secret the long-lived keeper's NEAR key comes from |
+| `DMW_FUND_SOURCES=1` | keeper | same as `--fund-sources` |
+| `FUND_CAP_ETH`, `FUND_CAP_MON`, `FUND_CAP_SOL` | funder | largest single top-up, default 0.002 ETH, 0.05 MON, 0.02 SOL |
+| `FUND_RUN_CAP_ETH`, `FUND_RUN_CAP_MON`, `FUND_RUN_CAP_SOL` | funder | most one process sends in total, default 0.01 ETH, 0.25 MON, 0.1 SOL |
 | `DMW_MOCK=1` | all | offline mock vault, state in `keeper/.mock-state.json` |
 
 ## Mock mode: demo before the contract exists
@@ -57,6 +65,7 @@ npm run pulse -- --token 1 --interval 4           # terminal B: vault stays Aliv
 - **pulse** signs `heartbeat({token_id})` with the pulse function-call key, with the contract account as the signer. It beats once on start, then every `--interval` seconds, and never exits on an RPC error.
 - **keeper** polls `get_vaults`. Per vault it relays any `signed` payout first (Solana blockhashes expire in about 60-90 s), then `poke`s if the deadline passed, then calls `execute_step` until the vault is Settled. Before each step-3 call it fetches Base nonce and fees, or a Solana blockhash, from `src/chains/`. If a Solana sign does not advance the payout the keeper does not retry right away (a second signature over a live blockhash could double-pay); it waits for `resign_allowed_after_ms`. RPC errors are retried with exponential backoff and the loop never exits; use `--once` for a single pass. `--token 5,6` restricts the keeper to those vaults (without it every vault on the contract is driven). `--owner-prefix`, `--until-idle` and `--max-seconds` are described in the next section.
 - **relay failures never fail a payout.** An unfunded source (`insufficient funds` / `AccountNotFound`) is logged once, the payout stays `signed`, and the keeper retries every 60 s while it carries on with the remaining steps. A stale signed tx (expired Solana blockhash, EVM price/nonce problem) is handled under the hardened contract rules (SPEC 2.7): read `get_sign_track`, wait until `resign_allowed_after_ms` (5 min after the last request), check the old tx never landed (`getSignatureStatuses` / `eth_getTransactionByHash`; if it did, record it with `mark_broadcast` instead), then `resign_foreign`. EVM re-signs send max(fresh fees, 1.1 x last fees) for both fee fields with gas 21000..100000 (we send 21000; the contract raises the EVM gas it signs with to its 50,000 floor, final audit H-5) and max fee within the chain's cap (Base 100 gwei, Monad 1000 gwei, read from `get_config().chains`) (the contract ignores the nonce we send). Solana re-signs of a signed payout must come from the keeper account (`set_keeper`). Contract v2: every re-sign and `mark_broadcast` must come from an operator (contract keeper, vault keeper, owner or heir), and the keeper's owner heartbeat path attaches 1 yoctoNEAR. Second v2 review: a `signed`/`broadcast` Solana payout is re-signed only by a keeper (contract keeper or vault keeper), never by an heir; a fee bump that would pass the chain cap is held at the cap (the contract accepts a fee at the cap as a bump); and EVM fees from an account that is not a keeper are clamped by the contract (max fee and priority fee at most 10 gwei on Base, 200 gwei on Monad; gas limit 50,000). A keeper may re-sign a signed EVM payout at any fee (G1), so when this backend's account is the contract or vault keeper (`isKeeperFor`) it re-signs at the fresh honest fees instead of a 1.1x bump. At most 2 re-signs per payout, then a 5 min pause. A payout that is `broadcast` but whose hash is not on chain gets its stored `signed_tx` relayed again (no new `mark_broadcast`). `mark_broadcast` is only called after a successful broadcast.
+- **step III window:** during the first hour of step 3, and of each payout in it, the contract lets only an operator sign a payout (contract keeper, vault keeper, vault owner, heir; `step3_open_after_ms` in `get_config`). A keeper account that is not an operator does not call `execute_step` then: it reads the window start from the vault log (the latest `step_2` / `foreign_signed` / `foreign_failed` entry), parks the vault until the window opens, and logs once: `vault 9 step III: dmw-sweep-….testnet is not an operator of this vault …; the contract opens signing to anyone at 2026-11-12T13:00:05Z, retrying then (in 51 min)`. If the contract still refuses (the window start could not be read), the refusal parks the vault for 5 minutes and is not counted as a failed action.
 - **gas:** `heartbeat` 10 TGas (the key allowance is charged on prepaid gas), `poke` 60, `execute_step` and `resign_foreign` 300, `mark_broadcast` 30.
 - **agent-demo** reads the vault policy, sends an allowed payment (a tenth of `per_tx_max` to the first allowlisted receiver) and a denied one (twice `per_tx_max` to a random account), then prints the result and the NEP-297 `dmw` events from the receipt logs.
 
@@ -114,6 +123,56 @@ There is one message per transition per vault. A heartbeat that brings the vault
 - The webhook URL is a secret. It is never written to the log; error text is stripped of the URL, its host and its path before it is printed.
 - Tested with an injected `fetch` in `test/notify.test.ts`. No message has been posted to a real Slack or Discord webhook from this code yet.
 
+## Funding payout sources
+
+Each vault's foreign payouts are signed by NEAR Chain Signatures for per-vault derived source addresses (`derive`). Nothing else funds those addresses, so without a top-up the relay finds them unfunded and no payout lands. The funder wallet pays exactly what each source is short.
+
+**The funder wallet** is derived from `KEEPER_SEED` with the same HKDF construction as the long-lived keeper's NEAR key (`scripts/near-admin.mjs derive-keeper`): HKDF-SHA256 with ikm = the seed as UTF-8, salt = `dmw-keeper`, 32 bytes.
+
+- EVM key (one key for Base Sepolia and Monad testnet): info `evm funder key v1`, read big-endian. It must be a valid secp256k1 scalar (1 ≤ k < n). If not (probability about 2⁻¹²⁸), the info becomes `evm funder key v1#1`, `#2`, … and the first valid output is the key. No mod-n reduction.
+- Solana key: info `solana funder key v1`, used as the ed25519 seed.
+
+Fund the funder once by hand from the faucets (`dmw funder` prints the addresses and explorer links). After that, every top-up is unattended.
+
+```text
+$ KEEPER_SEED=… npm run dmw -- funder
+funder wallet (derived from KEEPER_SEED; fund these addresses, the keys are never printed)
+  Base Sepolia   0x0B5F…f1C2  0.05 ETH  https://sepolia.basescan.org/address/0x0B5F…f1C2
+  Monad testnet  0x0B5F…f1C2  2 MON  https://testnet.monadexplorer.com/address/0x0B5F…f1C2
+  Solana devnet  8xY5…jnHL  1.5 SOL  https://explorer.solana.com/address/8xY5…jnHL?cluster=devnet
+  caps: per top-up 0.002 ETH / 0.05 MON / 0.02 SOL; per run 0.01 ETH / 0.25 MON / 0.1 SOL
+
+$ KEEPER_SEED=… npm run dmw -- fund-sources --token 7
+vault 7 base   0x7F98…5f3b  holds 0 ETH, needs 0.0005002 ETH: funded +0.0005002 ETH  https://sepolia.basescan.org/tx/0x…
+vault 7 monad  0xa8fd…4b91  holds 0 MON, needs 0.0302 MON: funded +0.0302 MON  https://testnet.monadexplorer.com/tx/0x…
+vault 7 solana CPRM…hZdc  holds 0 SOL, needs 0.010005 SOL: funded +0.010005 SOL  https://explorer.solana.com/tx/…?cluster=devnet
+```
+
+`--dry-run` prints `would send …` and sends nothing; `--json` prints the report; progress lines go to stderr. The exit code is 1 when a source is left short (cap, guest rule, failed send).
+
+**What a source must hold** (only payouts that are not `broadcast` count):
+
+- Base Sepolia and Monad testnet: a signed payout needs exactly value + gas limit × max fee of its signed tx (a node checks that before it accepts the tx). An unsigned payout needs amount + 2 × 50,000 gas × the current max fee, where max fee = 2 × base fee + priority fee: the price the keeper signs payouts with (`getEvmStepArgs`). 50,000 is the gas limit the contract signs with (its floor, final audit H-5); Monad bills the full limit. A signed payout whose nonce is already mined is skipped; a broadcast one that is not mined yet still counts against the balance.
+- Monad reserve rule ([docs](https://docs.monad.xyz/developer-essentials/reserve-balance)): a tx may leave its sender below 10 MON only if the sender sent nothing in the last 3 blocks, and consensus checks a sender against its balance as of 3 blocks back. A source address sends one tx in its life (one Monad payout per vault, nonce 0), so the payout always qualifies, and amount + gas is enough; no 10 MON reserve is needed. After a Monad top-up the funder waits until 3 blocks have passed: the payout is then checked against the funded balance, and the funder's own next Monad tx keeps the same exception (so the funder may itself hold less than 10 MON). A top-up that is included but reverted is reported as failed.
+- Solana devnet: amount + 5000 lamports. With one payout the source is funded to exactly that and ends at 0. If something is already there, the top-up leaves at least the rent-exempt minimum (890,880 lamports) behind instead of a smaller remainder; a fresh account that would get less than that minimum gets need + minimum.
+
+**Caps:** a top-up above `FUND_CAP_*` is refused, and a process stops sending once `FUND_RUN_CAP_*` would be passed (counted when a top-up is sent). Guest vaults (owner `dmw-guest-…`) are funded only when every payout is within the amounts the dashboard's guest mode creates (`dashboard/src/pages/Try.tsx`: 0.0001 ETH on Base, 0.001 SOL on Solana, no Monad), so strangers' guest vaults cannot drain the funder.
+
+**In the keeper:** `--fund-sources` (or `DMW_FUND_SOURCES=1`) tops a vault's sources up right before each step-III signature, so a Solana signature is never made for an empty source and does not go stale waiting for funds. When a relay still reports `unfunded`, the keeper tops up once for that signed tx and relays again at once; a second `unfunded` result parks the payout for 60 s as before. A stale signature still goes through the `resign_foreign` rules above (5 minute cooldown).
+
+Tested with an in-memory chain (`test/funder.test.ts`): derivation vectors cross-checked with `node:crypto`, the decoder against the contract-signed vectors in `src/chains/selfcheck.ts`, shortfall math, caps, guest rule, skips, and the keeper-loop paths. No top-up has been sent to a real chain from this code yet.
+
+## Phone push with ntfy
+
+[ntfy](https://ntfy.sh) is a free push service with phone apps and no account. Install the app, subscribe to a long, hard-to-guess topic, and set:
+
+```bash
+DMW_NOTIFY_NTFY_TOPIC=dmw-pick-a-long-random-topic   # letters, digits, - and _, at most 64
+# DMW_NOTIFY_NTFY_SERVER=https://ntfy.sh             # default; a self-hosted server works too
+```
+
+The keeper then sends the same notices as the webhook (Warning, Triggered; same rules, same text) as a plain POST to `<server>/<topic>` with headers `Title` (`Vault 12 missed a heartbeat` / `Vault 12 triggered: settlement started`), `Tags` (`warning` / `rotating_light`), `Priority` (`default` / `high`) and `Click` (the vault page, so a tap opens the dashboard). It works next to `DMW_NOTIFY_WEBHOOK` or alone. Anyone who knows the topic can read the pushes, so the topic is treated as a secret and never logged. Tested with an injected `fetch` in `test/notify.test.ts`; no push has been sent to ntfy.sh from this code yet.
+
 ## Hosted guest sweep (GitHub Actions)
 
 The dashboard's guest mode creates throwaway accounts named `dmw-guest-<random>.testnet`, each with a short-interval vault on the public contract. A visitor who leaves would otherwise leave that vault overdue with nobody to settle it. [`.github/workflows/keeper.yml`](../.github/workflows/keeper.yml) (`guest-sweep`) settles those vaults and no others.
@@ -131,7 +190,7 @@ Setup: none is required. One optional step: add the repository secrets `KEEPER_A
 
 What to expect:
 
-- Foreign payouts of guest vaults are signed and stay `signed`. Their derived source addresses are unfunded, so the relay fails and is not retried after settlement.
+- Foreign payouts of guest vaults are signed and stay `signed`. Their derived source addresses are unfunded, so the relay fails and is not retried after settlement. The keeper can fund them (`--fund-sources` with a `KEEPER_SEED` secret; guest amounts only), but the workflow does not pass that flag yet.
 - A one-off faucet account is not the contract's registered keeper. It cannot re-sign a signed Solana payout. That only matters for a funded source with an expired blockhash.
 - Each run that finds work without the secrets leaves one faucet account behind with its remaining testnet NEAR. If the faucet refuses, that run fails and the next one tries again.
 - `DMW_NOTIFY_WEBHOOK` is not passed to the workflow. Guest vaults have no owner to notify.
@@ -144,6 +203,7 @@ What has been tested: the filter, the sweep and the pre-check are unit-tested ag
 - `src/machine.ts` pure state derivation, countdown math, step scheduling (unit tested)
 - `src/keeperLoop.ts` the poll loop; `src/backend.ts` NEAR calls with retry; `src/mock.ts` the mock vault
 - `src/chainsApi.ts` the interface to `src/chains/` (derive / evm / solana); `src/relay.ts` classifies relay errors
-- `src/notify.ts` owner notifications; `src/commands/due.ts` the read-only sweep pre-check
+- `src/notify.ts` owner notifications (webhook, ntfy); `src/commands/due.ts` the read-only sweep pre-check
+- `src/funder.ts` source top-ups and caps; `src/commands/fund.ts` the `funder` and `fund-sources` commands; `src/step3.ts` the step III operator window
 - `LIVE_RUN.md` a real testnet run with every tx link; `SHOWCASE.md` the demo-video vault and the addresses to fund
 - `src/commands/` one file per CLI command; `test/` vitest

@@ -2,7 +2,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { makeDeps, tickOnce } from '../src/keeperLoop.js';
 import { mockChains, mockCreate } from '../src/mock.js';
-import { buildNotice, makeNotifier, notifierFromEnv, redactWebhook, vaultLink, type NoticeBody } from '../src/notify.js';
+import { buildNotice, buildNtfy, makeNotifier, makeNtfyNotifier, notifierFromEnv, redactWebhook, vaultLink, type NoticeBody } from '../src/notify.js';
 import { GUEST, recordingLogger, seedBackend } from './helpers.js';
 
 const T0 = Date.UTC(2026, 10, 9, 14, 0, 0); // 2026-11-09 14:00:00 UTC
@@ -212,5 +212,80 @@ describe('configuration from the environment', () => {
     expect(redactWebhook(`request to ${HOOK} failed`, HOOK)).toBe('request to [webhook] failed');
     expect(redactWebhook('POST /services/T000SECRET/B000SECRET/xoxSECRETtoken on hooks.slack.example refused', HOOK)).toBe('POST [webhook] on [webhook] refused');
     expect(redactWebhook('x'.repeat(500), HOOK).length).toBeLessThanOrEqual(201);
+  });
+});
+
+describe('ntfy phone push (DMW_NOTIFY_NTFY_TOPIC)', () => {
+  const TOPIC = 'dmw-andrew-Secret_Topic42';
+  /** records raw ntfy requests (plain-text body, not JSON) */
+  const ntfyFetch = (status = 200) => {
+    const calls: { url: string; init: RequestInit }[] = [];
+    const fn = (async (url: string | URL | Request, init?: RequestInit) => {
+      calls.push({ url: String(url), init: init ?? {} });
+      return new Response('{}', { status });
+    }) as unknown as typeof fetch;
+    return { fn, calls };
+  };
+
+  it('builds a plain POST with the same line, and Title / Tags / Priority / Click headers', () => {
+    const v = mockCreate(T0, { token_id: '12', heartbeat_interval_s: 3600, grace_missed: 2 });
+    const w = buildNtfy('vault_warning', v, { topic: TOPIC, contract: 'c.testnet' });
+    expect(w.url).toBe(`https://ntfy.sh/${TOPIC}`);
+    expect(w.body).toBe(buildNotice('vault_warning', v, { contract: 'c.testnet' }).text);
+    expect(w.headers).toEqual({
+      'content-type': 'text/plain; charset=utf-8',
+      Title: 'Vault 12 missed a heartbeat',
+      Tags: 'warning,dmw',
+      Priority: 'default',
+      Click: 'https://will-wallet.vercel.app/vault/12',
+    });
+    const t = buildNtfy('vault_triggered', { ...v, state: 'Triggered', token_id: '<b>9' }, { server: 'https://ntfy.example.org/', topic: TOPIC, contract: 'c.testnet', dashboardUrl: 'https://dash.test' });
+    expect(t.url).toBe(`https://ntfy.example.org/${TOPIC}`);
+    expect(t.headers.Title).toBe('Vault b9 triggered: settlement started');
+    expect(t.headers.Tags).toBe('rotating_light,dmw');
+    expect(t.headers.Priority).toBe('high');
+    expect(t.headers.Click).toBe('https://dash.test/vault/%3Cb%3E9');
+    for (const h of Object.values(t.headers)) expect(h).toMatch(/^[\x20-\x7e]*$/); // ASCII header values
+  });
+
+  it('is configured from the environment next to the webhook; both receive the notice from the keeper loop', async () => {
+    const clock = { t: T0 };
+    const f = ntfyFetch();
+    const { log, lines } = recordingLogger();
+    const notifier = notifierFromEnv({ DMW_NOTIFY_WEBHOOK: HOOK, DMW_NOTIFY_NTFY_TOPIC: TOPIC }, 'c.testnet', log, f.fn)!;
+    expect(lines.some((l) => l.includes('ntfy push is on') && l.includes('ntfy.sh'))).toBe(true);
+    expect(lines.join('\n')).not.toContain(TOPIC);
+    const s = seedBackend(clock, [{ token_id: '1', foreign: 'none' }]);
+    const deps = makeDeps({ backend: s.backend, chains: mockChains(), contractId: 'c.testnet', now: () => clock.t, log, notifier });
+    await tickOnce(deps);
+    clock.t = T0 + 11_000;
+    await tickOnce(deps);
+    expect(f.calls.map((c) => c.url)).toEqual([HOOK, `https://ntfy.sh/${TOPIC}`]);
+    const push = f.calls[1].init;
+    expect(push.method).toBe('POST');
+    expect(String(push.body)).toMatch(/^Vault 1 missed a heartbeat\. .* https:\/\/will-wallet\.vercel\.app\/vault\/1$/);
+    expect((push.headers as Record<string, string>).Click).toBe('https://will-wallet.vercel.app/vault/1');
+    expect(lines.some((l) => l.includes('sent to ntfy'))).toBe(true);
+  });
+
+  it('DMW_NOTIFY_NTFY_SERVER overrides the server; bad values switch ntfy off; failures are logged without the topic', async () => {
+    const { log, lines } = recordingLogger();
+    const f = ntfyFetch(500);
+    const n = notifierFromEnv({ DMW_NOTIFY_NTFY_TOPIC: TOPIC, DMW_NOTIFY_NTFY_SERVER: 'https://push.example.org' }, 'c.testnet', log, f.fn)!;
+    n.notify('vault_triggered', { ...mockCreate(T0, { token_id: '4' }), state: 'Triggered' });
+    await n.flush();
+    expect(f.calls[0].url).toBe(`https://push.example.org/${TOPIC}`);
+    expect(lines.some((l) => l.includes('not delivered to ntfy (HTTP 500)'))).toBe(true);
+    expect(notifierFromEnv({ DMW_NOTIFY_NTFY_TOPIC: 'has spaces/and slash' }, 'c.testnet', log)).toBeUndefined();
+    expect(notifierFromEnv({ DMW_NOTIFY_NTFY_TOPIC: TOPIC, DMW_NOTIFY_NTFY_SERVER: 'ftp://x' }, 'c.testnet', log)).toBeUndefined();
+
+    const thrower = (async () => {
+      throw new Error(`connect to https://ntfy.sh/${TOPIC} refused`);
+    }) as unknown as typeof fetch;
+    const m = makeNtfyNotifier({ topic: TOPIC, contract: 'c.testnet', log, fetchFn: thrower, timeoutMs: 50 });
+    m.notify('vault_warning', mockCreate(T0, { token_id: '5' }));
+    await m.flush();
+    expect(lines.join('\n')).not.toContain(TOPIC);
+    expect(lines.some((l) => l.includes('vault 5') && l.includes('not delivered to ntfy'))).toBe(true);
   });
 });
