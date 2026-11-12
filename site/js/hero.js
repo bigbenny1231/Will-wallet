@@ -1,18 +1,24 @@
-// The hero: hold to stop your heartbeat. Runs a client-side simulation of example vault 0042; nothing is sent.
-// The heir's name is typed by the visitor, kept in localStorage, and used by the seal, the ledger and the last line.
+// The hero: hold to stop your heartbeat. Replays the settlement of vault 4, the recorded run on testnet (the story below
+// and docs/LIVE_CONTRACT.md); nothing is sent. Each step links to its real transaction, read from the story's step lines.
+// The heir's name is typed by the visitor, kept in localStorage, and used by the seal and the last line.
 import { reducedMotion, emit } from './seal.js';
 import { createHeroSeal } from './sealhost.js';
 
 const HOLD_MS = 1500;
-const B58 = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
 const KEY = 'dmw-heir';
 const DEFAULT_HEIR = 'Sarah';
+const VAULT = '4';
 
-function fakeHash() {
-  const a = new Uint8Array(44);
-  crypto.getRandomValues(a);
-  const s = Array.from(a, (b) => B58[b % 58]).join('');
-  return s.slice(0, 6) + '…' + s.slice(-4);
+// The five settlement transactions of vault 4, in order, from the story's step lines (#track .ev-tick): the first
+// nearblocks link of each. The hero and the story therefore always show the same recorded run.
+function recordedSteps() {
+  return Array.from(document.querySelectorAll('#track .ev-tick')).map((li) => {
+    const a = li.querySelector('a[href^="https://testnet.nearblocks.io/txns/"]');
+    if (!a) return null;
+    const href = a.getAttribute('href');
+    const hash = href.split('/').pop();
+    return { href, short: hash.slice(0, 6) + '…' + hash.slice(-4) };
+  });
 }
 
 export function cleanName(v) {
@@ -43,7 +49,17 @@ export function initHero() {
   const input = document.getElementById('heir-name');
   if (!hero || !btn || !wrap) return null;
 
-  const seal = createHeroSeal(wrap, '0042');
+  const seal = createHeroSeal(wrap, VAULT);
+  recordedSteps().forEach((t, i) => {
+    const code = rows[i] && rows[i].querySelector('.sim-hash');
+    if (!code || !t) return;
+    const a = document.createElement('a');
+    a.href = t.href;
+    a.textContent = t.short;
+    a.setAttribute('aria-label', 'Step ' + (i + 1) + ' of vault 4, transaction on nearblocks');
+    code.textContent = '';
+    code.append(a);
+  });
   let holdTimer = 0;
   let timers = [];
   let running = false;
@@ -88,12 +104,7 @@ export function initHero() {
     switch (kind) {
       case 'warn': seal.setState('warn', 'Warning'); say('A beat was missed.', 'warn'); break;
       case 'dead': seal.setState('dead', 'Triggered'); say('This executes.', 'dead'); emit('flatline', { source: 'hero' }); break;
-      case 'row': {
-        const r = rows[arg];
-        r.querySelector('.sim-hash').textContent = fakeHash();
-        r.classList.add('on');
-        break;
-      }
+      case 'row': rows[arg].classList.add('on'); break;
       case 'still': seal.setState('still', 'Settled'); say('Settled. Left to ' + heir + '.', 'still'); emit('settled', { source: 'hero' }); break;
       case 'done':
         hero.classList.remove('is-sim'); hero.classList.add('is-done');
@@ -110,7 +121,7 @@ export function initHero() {
     hero.classList.remove('is-holding', 'is-done');
     rows.forEach((r) => r.classList.remove('on'));
     hero.classList.add('is-sim');
-    label.textContent = 'Simulation running';
+    label.textContent = 'Replaying vault 4';
     const pace = reducedMotion() ? 1.25 : 1;
     SCRIPT.forEach(([t, kind, arg]) => timers.push(setTimeout(() => step(kind, arg), t * pace)));
   }

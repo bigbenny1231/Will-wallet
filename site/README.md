@@ -1,13 +1,13 @@
 # Dead Man's Wallet: landing page (v4)
 
 Static, build-free site: `index.html`, `styles.css`, `js/`, `fonts/`, `assets/`. No CDN, no runtime
-dependencies. Design rules are in [`../DESIGN.md`](../DESIGN.md) (binding); every sentence is held to
-[`../docs/AUDIT_CLAIMS.md`](../docs/AUDIT_CLAIMS.md).
+dependencies. Design rules are in [`../DESIGN.md`](../DESIGN.md) (binding); every claim is held to the code and to the live
+contract's record, [`../docs/LIVE_CONTRACT.md`](../docs/LIVE_CONTRACT.md).
 
 | File | What it does |
 |---|---|
 | `js/main.js` | fills `[data-link]` anchors, starts the hero, the pointer light, the sound toggle, loads the WebGL seal on first interaction, lazy-loads the rest near the viewport, demo player |
-| `js/hero.js` | "Hold to stop your heartbeat": 1.5 s press-and-hold (pointer, touch, Space; Enter starts at once), then an 11 s client-side simulation of example vault 0042 with invented, labelled hashes. "Who should it arrive to?" names the heir (localStorage key `dmw-heir`; never sent); the seal rim, the ledger and the last line use it. `?sim=run`, `?sim=settled`, `?heir=Maria` for screenshots |
+| `js/hero.js` | "Hold to stop your heartbeat": 1.5 s press-and-hold (pointer, touch, Space; Enter starts at once), then an 11 s client-side replay of vault 4's recorded settlement; each step links to its real transaction, read from the story's step lines (`#track .ev-tick`). "Who should it arrive to?" names the heir (localStorage key `dmw-heir`; never sent); the seal rim and the last line use it. `?sim=run`, `?sim=settled`, `?heir=Maria` for screenshots |
 | `js/sealhost.js` | the hero seal: the SVG seal always (the accessible image and the fallback), the WebGL seal from `js/seal3d.bundle.js` over it when `<html data-seal3d="on">` and WebGL works. Pointer tilt on desktop; DeviceOrientation on phones after "Tilt the seal" (iOS permission). Both seals tilt |
 | `js/seal3d.bundle.js` | built by `node design/seal3d/build.mjs` from `design/seal3d/` (three.js, MIT). Contract: `createSeal3D(canvas, opts)` and `supportsWebGL()`. Loaded only after the first pointer, touch, key or scroll, so it never costs first paint (`?seal3d` loads it at once) |
 | `js/story.js` | "Vault 4, as it happened": the recorded run of vault 4 on `dmw-885364.testnet` (12 Nov 2026, 19:31 to 19:43 UTC) as one vertical ECG line drawn by scroll. Events come from the run's keeper log, agent transcript and recording events (`ci/testnet-results`, run 43290509255), spaced by the time between them; every transaction link goes to the chain |
@@ -43,7 +43,7 @@ re-inlines both seals, renders the phone-pulse QR code with `design/qr.js`). Com
 
 - `node design/shoot-v4.cjs http://127.0.0.1:8091` writes `screenshots/v4-*.png` at 390 and 1440 (hero idle also at 360, 430
   and 768): hero idle,
-  mid-simulation and settled with the heir "Maria"; the story at three scroll positions; the graph and a node's
+  mid-replay and settled with the heir "Maria"; the story at three scroll positions; the graph and a node's
   detail; the quiz card (and `v4-quiz-card.png`, the canvas itself). Add `full` as the third argument for full pages.
 - `node design/tour-v4.cjs` records `screenshots/v4-tour.mp4` (19 s scroll through the page).
 - `node design/shoot.cjs og` renders `assets/og.png` (the WebGL seal, else the SVG); `poster` renders `assets/poster-v4.jpg`.
@@ -57,14 +57,13 @@ subset, OFL (licences in `fonts/`).
 `assets/demo-v4-720p.mp4` is the v4 cut (2:50, vault 4 on `dmw-885364.testnet`, 5.7 MB), made by `docs/video/tools/v4` in the
 `testnet` workflow (run 43290509255); `assets/demo-v4-x-720p.mp4` is the 2:14 cut for X (4.8 MB). Both are committed so a
 git-triggered deploy serves them. `assets/poster-v4.jpg` is the 720p cut's frame at 0:18 (`ffmpeg -ss 18 -i
-assets/demo-v4-720p.mp4 -frames:v 1 -q:v 3 assets/poster-v4.jpg`). The earlier v4 cut (2:41, vault 5 on the v1 contract
-`dmw-979268.testnet`, edit run 42972214388) and the v3 cut (vault 17 on the replaced `dmw-x8cx.testnet`) are in git history.
+assets/demo-v4-720p.mp4 -frames:v 1 -q:v 3 assets/poster-v4.jpg`). Earlier cuts are described in [`../docs/history/`](../docs/history/README.md).
 
 ## Configure
 
 `CONFIG` at the top of `js/main.js` holds the dashboard, site and GitHub links (plain links; the site has no
 backend and collects nothing). `index.html` carries the same defaults so links work without JS.
-Canonical and Open Graph URLs point at the Vercel deployment until `deadmanswallet.dev` is registered.
+Canonical and Open Graph URLs point at the Vercel deployment.
 
 ## Content Security Policy
 
