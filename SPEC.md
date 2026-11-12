@@ -123,7 +123,7 @@ for them exists anywhere; the contract requests signatures at settlement time.
 
 | Method | Caller | Deposit | Effect |
 | --- | --- | --- | --- |
-| `new(owner_id, keeper_id?, mpc_signer?)` | the contract account itself (`#[private]`), in the same transaction as the deploy | — | init; contract owner, keeper, MPC signer (default `v1.signer-prod.testnet`), NFT metadata |
+| `new(owner_id, keeper_id?, mpc_signer?, keeper_admin?)` | the contract account itself (`#[private]`), in the same transaction as the deploy | — | init; contract owner, keeper, MPC signer (default `v1.signer-prod.testnet`), v3: keeper admin (not the contract, not the keeper; §2.10), NFT metadata |
 | `create_vault({heartbeat_interval_s, grace_missed, heirs, policy?, bounty?})` → `token_id` | anyone | ≥ 0.1 NEAR (storage) + vault balance | mints Will NFT to caller; `last_beat = now`; `balance = deposit − storage` |
 | `deposit({token_id})` | owner: > 0; anyone else: ≥ 0.01 NEAR (v2) | | adds to vault balance |
 | `heartbeat({token_id})` | owner, or pulse key (predecessor == contract && signer_pk ∈ pulse_keys) | owner: exactly 1 yocto (v2); pulse key: — | `last_beat = now`; event. A pulse-key beat clears only a pause that has run out; the owner's beat also ends a running pause |
@@ -131,22 +131,26 @@ for them exists anywhere; the contract requests signatures at settlement time.
 | `add_agent_key({token_id, public_key})` | owner | exactly 1 yocto | stores pk; FC key scoped to `agent_pay` |
 | `remove_key({token_id, public_key})` | owner | exactly 1 yocto | removes from vault + `delete_key`; the 1 NEAR allowance is not refunded (v2 second review) |
 | `agent_pay({token_id, receiver_id, amount, memo?})` | agent key only | — | policy check; on allow: `balance -= amount`, `Promise::new(receiver).transfer(amount)`; event `agent_pay_allowed` / `agent_pay_denied` with `reason` in {`over_per_tx_max`, `over_daily_max`, `receiver_not_allowlisted`, `vault_not_alive`, `insufficient_balance`}. Denied calls **do not panic** (so the log entry persists) |
-| `set_heirs`, `set_policy`, `set_foreign_payouts`, `set_dao({token_id, dao_id})`, `set_timing({token_id, heartbeat_interval_s, grace_missed})` | owner, while not Triggered | exactly 1 yocto | update |
+| `set_heirs`, `set_policy`, `set_foreign_payouts`, `set_dao({token_id, dao_id})`, `set_timing({token_id, heartbeat_interval_s, grace_missed})` | owner, while not Triggered | exactly 1 yocto | update. v3 `set_foreign_payouts`: at most 1 Solana payout per vault; a Solana `to` must be base58 of exactly 32 bytes and its amount ≤ u64::MAX lamports; an EVM `to` must be `0x` + 40 hex |
 | `set_guardian({token_id, guardian_id, max_pause_s})` | owner, while not Triggered | exactly 1 yocto | appoint (`guardian_id: null` clears) the guardian; `max_pause_s` 10 s..90 d (§2.8) |
 | `pause({token_id})` → `trigger_at_ms` | guardian or owner, while Live and before the deadline | exactly 1 yocto (from either) | `paused_until = now + max_pause_s`, once per heartbeat cycle; event `paused` (§2.8) |
 | `unpause({token_id})` → `trigger_at_ms` (v2) | owner, while a pause runs | exactly 1 yocto | ends the pause (`paused_until = now`) and counts as proof of life (`last_beat = now`, second review); the guardian is not re-armed until the next heartbeat; event `unpaused` |
 | `set_bounty({token_id, bounty})` (v2) | owner, while Alive | exactly 1 yocto | `bounty ≤ 1 NEAR` |
 | `set_vault_keeper({token_id, keeper_id})` (v2) | owner, while Live | exactly 1 yocto | per-vault keeper (`null` clears); an operator for this vault |
-| `set_keeper({account_id})` | contract owner (when not the contract itself) or the current keeper (hand-over) | exactly 1 yocto (v2 second review) | contract keeper; cannot be cleared on a locked contract (v2) |
+| `set_keeper({account_id})` | contract owner (when not the contract itself) or the current keeper (hand-over) | exactly 1 yocto (v2 second review) | v3: **proposes** `account_id` as the next keeper (`pending_keeper`; event `keeper_proposed`); naming the current keeper cancels the proposal. `null` clears the role at once, but not on a locked contract (v2) |
+| `accept_keeper()` (v3) | the `pending_keeper` | exactly 1 yocto | takes the keeper role; event `keeper_set` |
+| `propose_keeper({account_id})`, `propose_mpc_signer({account_id})`, `set_keeper_admin({account_id})` (v3) | the keeper admin | exactly 1 yocto | stores one admin proposal, executable 48 h later (replaces any pending one); event `admin_proposal` (§2.10) |
+| `cancel_admin_proposal()` (v3) | the keeper admin | exactly 1 yocto | drops the pending proposal; event `admin_proposal_cancelled` |
+| `execute_admin_proposal()` (v3) | anyone, once `now ≥ eta_ms` | — | applies the proposal; event `admin_proposal_executed` |
 | `poke({token_id})` | anyone | — | if deadline passed: state=Triggered, step=1, pay `min(bounty, 1 NEAR, 10% of balance)` to predecessor from balance, event `triggered`. Else panic `not_due` |
 | `execute_step({token_id, args?})` | anyone; v2: a step-3 payout during its first hour only by an operator (contract keeper, vault keeper, vault owner, heir) | — | runs the current step (see §2.4), advances `step`; idempotent on re-entry; panics if not Triggered or already Settled |
 | `mark_broadcast({token_id, index, tx_hash})` | v2: operator (or the vault's DAO for `dao-ratified`) | — | sets foreign[index].status=broadcast, tx_hash (must equal the stored signed tx's id; §2.7) |
-| `resign_foreign({token_id, index, args})` | v2: operator, ≥ 5 min after the last request; a `signed`/`broadcast` Solana payout only by a keeper (second review) | — | §2.7 |
+| `resign_foreign({token_id, index, args})` | v2: operator, ≥ 5 min after the last request; a `signed`/`broadcast` Solana payout only by a keeper (second review), at most 3 times per keeper epoch (v3) | — | §2.7 |
 | `claim({token_id})` | current NFT owner, only when Settled | — (deliberately) | transfers remaining balance to caller |
 | `get_vault({token_id})` → VaultView | view | | |
 | `get_vaults({from_index, limit})` → [VaultView] | view | | for keeper polling |
-| `get_vaults_for_owner({account_id})` | view | | |
-| `nft_token`, `nft_transfer`, `nft_transfer_call`, `nft_metadata`, `nft_total_supply`, `nft_tokens`, `nft_tokens_for_owner`, `nft_supply_for_owner` | NEP-171 / NEP-177 / NEP-181 | exactly 1 yocto on `nft_transfer` / `nft_transfer_call` | `nft_transfer` by owner only while Alive (v2: not overdue, not paused); it transfers ownership of the vault and resets it for the buyer (§2.9); `media` is an on-chain SVG data URI |
+| `get_vaults_for_owner({account_id, from_index?, limit?})` | view | | v3: paged over the owner's index, default 50, max 100 (old calls with `account_id` only still work and return the first 50) |
+| `nft_token`, `nft_transfer`, `nft_transfer_call`, `nft_metadata`, `nft_total_supply`, `nft_tokens`, `nft_tokens_for_owner`, `nft_supply_for_owner` | NEP-171 / NEP-177 / NEP-181 | exactly 1 yocto on `nft_transfer` / `nft_transfer_call` | `nft_transfer` by owner only while Alive (v2: not overdue, not paused); it transfers ownership of the vault and resets it for the buyer (§2.9); v3: the reset also raises the timing to at least a 1-day interval and grace ≥ 1; `media` is an on-chain SVG data URI |
 | `contract_source_metadata` | NEP-330 | | |
 
 **Deposits (security review 2, M-6).** "exactly 1 yocto" means the call panics with `Requires attached deposit of
@@ -163,6 +167,9 @@ key, and `poke` / `execute_step` / `mark_broadcast` / `resign_foreign` from a ke
 in to the dashboard with a function-call key can still collect; it only moves the remaining balance to the NFT owner
 after Settled, which a function-call key holder cannot redirect. `set_keeper` needs exactly 1 yocto since the second
 v2 review, so a function-call key of the keeper account cannot hand the global keeper role to someone else.
+
+v3: the keeper admin methods and `accept_keeper` need exactly 1 yocto too, so only a full-access key of that account
+can use them.
 
 Events are NEP-297: `EVENT_JSON:{"standard":"dmw","version":"1.0.0","event":"<name>","data":{...}}`.
 
@@ -228,6 +235,16 @@ These are the places where the shipped contract (`contracts/dmw`, deployed at `d
     - **v2 second review (F1):** a `signed`/`broadcast` Solana payout may only be re-signed by a keeper (`is_keeper`: the contract owner while it is not the contract itself, the contract keeper, the vault keeper). A Solana transfer has no nonce, so a new signature over a fresh blockhash is a second valid payment. Heirs and the vault owner may re-sign a `failed` Solana payout, and any EVM payout (the nonce is pinned, so a re-sign only replaces).
     - **v2 second review (F4, G1):** EVM fees from a non-keeper (heir, vault owner, or anyone once step 3 is open) are clamped, in step 3 and in `resign_foreign`: `max_fee_per_gas` and `max_priority_fee_per_gas` ≤ the chain's `non_keeper_max_fee_per_gas` (Base 10 gwei, Monad 200 gwei; in `get_config().chains[]`), gas limit = the chain floor (50 000). A keeper's fees are only bounded by the cap.
     - The view `get_sign_track({token_id, index})` shows the last request time, the last fees and `resign_allowed_after_ms`.
+    - **v3 (review v3 H-1):** a keeper may re-sign a `signed`/`broadcast` Solana payout at most 3 times per keeper epoch
+      (`MAX_KEEPER_SOLANA_RESIGNS`; the counter lives in the payout's sign track and counts every request, also one whose
+      MPC call then fails). A keeper change through `execute_admin_proposal` starts a new epoch; a hand-over with
+      `set_keeper` + `accept_keeper` does not. `get_sign_track` adds `keeper_resigns` and `keeper_resigns_left`.
+    - **v3 (H-1(3)):** when the last signed EVM fees are above the chain's non-keeper clamp (a keeper signed high), a
+      non-keeper may replace the tx at the clamp without the 110% rule: `max_fee_per_gas` exactly the clamp and
+      `max_priority_fee_per_gas` ≥ min(last priority fee, clamp). Below the clamp the 110% rule still applies.
+    - **v3 (L-3):** a re-sign records only the request time and the in-flight flag. The new fees become the payout's last
+      fees only when `on_foreign_resigned` stores the signature, so a failed MPC call leaves the old fees (and the heirs'
+      110% baseline) in place. A failed re-sign never changes the payout's status.
   - **Keys follow the NFT owner.** Changing the Will NFT owner while Alive/Warning revokes every pulse and agent key (v2: only while Alive, and the whole vault is reset, §2.9). A key whose AddKey lands after an owner change is deleted.
   - **Key auth checks the signer account.** Key auth also requires `signer_account_id == contract`.
   - **No `agent_pay` to the contract.** `agent_pay` panics if `receiver_id` is the contract itself.
@@ -315,6 +332,35 @@ Details, rationale and test names: [`docs/SECURITY_FIXES_V2.md`](docs/SECURITY_F
 - **Agent window:** rolling 24 h over `spends` (≤ 24 entries, merged conservatively).
 - **Derivation:** salted per vault (§1); EVM signatures are ecrecovered against the derived key (§2.4).
 - `get_config()` adds `mpc_signer`, `keeper`, `max_bounty`, `min_deposit`, `step3_open_after_ms`, `resign_cooldown_ms`.
+
+### 2.10 Contract v3 (security fixes, 2026-11-12)
+
+Details, gas arithmetic and test names: [`docs/SECURITY_FIXES_V3.md`](docs/SECURITY_FIXES_V3.md). v3 changes the state
+layout, so it goes to a new contract account. In short:
+
+- **Keeper admin** (H-1): optional `keeper_admin` in `new` (not the contract, not the keeper). It may only propose a new
+  keeper (`propose_keeper`, `null` clears), a new MPC signer (`propose_mpc_signer`) or a new admin (`set_keeper_admin`,
+  `null` gives up the role), and cancel its proposal (`cancel_admin_proposal`); all exactly 1 yocto. One proposal at a time;
+  a new one replaces it. Anyone runs `execute_admin_proposal` once `ADMIN_TIMELOCK_MS` (48 h) has passed. The admin is never
+  an operator or a keeper. On a locked contract this is the only way to remove a compromised keeper.
+- **Two-step keeper hand-over:** `set_keeper` (owner or keeper) proposes; the new account calls `accept_keeper`.
+- **Solana:** at most 1 payout per vault (all Solana payouts would share one derived address); `to` validated; keeper
+  re-signs of a signed payout capped at 3 per keeper epoch. **M-1:** a step-3 Solana blockhash only comes from an
+  operator. After the operator hour a stranger's `execute_step` records the current Solana payout `failed` without a
+  signature (settlement moves on), and any operator may re-sign it at once. EVM keeps the 1 h opening.
+- **EVM re-sign:** clamp replacement of a keeper's high fees (H-1(3)); fees stored only on success (L-3). See §2.7.
+- **History** (L-2): `vault_created`, `triggered`, `step_1`..`step_5` and `settled` are pinned in the 40-entry history
+  ring; a full ring evicts the oldest unpinned entry. A repeated `dao_ratified` mark goes to the routine log.
+- **Sale** (L-6): a Will NFT transfer while Live raises the interval to ≥ 86 400 s and grace to ≥ 1 (event
+  `owner_changed` gains `timing_raised`, `heartbeat_interval_s`, `grace_missed`).
+- **Gas** (M-2): the transfer callback gets 10 TGas (was 5) and writes the vault once; the DAO and AddKey callbacks get
+  15 TGas (was 10); the self-call that fails an unbuildable payout gets 20 TGas (was 10). Step 1 / step 5 with 10 heirs
+  stay under 300 TGas; `poke` / `claim` need more than 30 TGas (attach ≥ 50).
+- **`nft_resolve_transfer`** without exactly one promise result logs and changes nothing (L-1, contract side).
+- `get_config()` adds `pending_keeper`, `keeper_admin`, `admin_timelock_ms`, `admin_proposal`
+  (`{action: "keeper"|"mpc_signer"|"keeper_admin", account_id, proposed_ms, eta_ms}` or `null`), `keeper_epoch`,
+  `max_keeper_solana_resigns`, `sale_min_interval_s`, `sale_min_grace`; the Solana entry of `chains[]` adds
+  `max_payouts` and `max_keeper_resigns`.
 
 ## 3. Keeper: `keeper/` (TypeScript, Node 22, ESM)
 

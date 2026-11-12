@@ -19,6 +19,8 @@ mod audit_v2;
 mod audit_v2b;
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod tests_v3;
 
 pub use foreign::{EvmArgs, ForeignChain, ForeignPayout, ForeignStatus, SolanaArgs, StepArgs};
 pub use types::*;
@@ -83,10 +85,42 @@ pub const DAY_MS: u64 = 86_400_000;
 /// A step-3 request older than this is considered lost and may be retried as failed.
 pub const FOREIGN_INFLIGHT_TIMEOUT_MS: u64 = 10 * 60 * 1000;
 
+/// `keeper_admin` proposals take effect this long after they are made (v3, H-1): 48 h.
+pub const ADMIN_TIMELOCK_MS: u64 = 48 * 60 * 60 * 1000;
+/// A Will NFT sale raises the vault timing to at least this interval and grace (v3, L-6), so the
+/// seller cannot hand over a vault that is due seconds later.
+pub const SALE_MIN_INTERVAL_S: u64 = 86_400;
+pub const SALE_MIN_GRACE: u32 = 1;
+/// Default and largest page of `get_vaults_for_owner` (v3, L-5).
+pub const OWNER_PAGE_DEFAULT: u64 = 50;
+pub const OWNER_PAGE_MAX: u64 = 100;
+
 const GAS_ADD_PROPOSAL: Gas = Gas::from_tgas(100);
-const GAS_ON_DAO: Gas = Gas::from_tgas(10);
-const GAS_ON_TRANSFER: Gas = Gas::from_tgas(5);
-const GAS_ON_KEY: Gas = Gas::from_tgas(10);
+/// v3 (M-2): 10 -> 15 TGas. `on_dao_proposal` reads and writes the vault once (`save_vault_once`).
+/// Step 4 attaches 100 + 15 TGas plus ~30 TGas of receipt fees: < 150 TGas of a 300 TGas step.
+const GAS_ON_DAO: Gas = Gas::from_tgas(15);
+/// v3 (M-2). Budget of the transfer callback: 5 -> 10 TGas. Worst case is the failure path on a
+/// maximal vault (~40 KB of borsh: both 40-entry rings full of 400-byte details, 10 heirs with
+/// 64-char names, 4 signed payouts). Since v3 that path writes the vault ONCE (`save_vault_once`
+/// folds the storage charge into the write instead of a second read + write in
+/// `charge_storage`). Measured host gas (storage, logs; the mock does not meter wasm): 2.56 TGas
+/// (v2's insert + charge_storage: 4.96 TGas, i.e. v2's 5 TGas was already exceeded before any
+/// wasm work). With ~2-3 TGas of wasm (borsh of 40 KB, I-11 measured 3.17 TGas in all on a v1
+/// vault) the need is ~5.5 TGas, so 10 TGas leaves ~2x on the worst case.
+///
+/// Why not more (the review suggested 20): the callers must still fit 300 TGas. Measured on the
+/// maximal vault, each heir costs 14.8 TGas of receipt fees (transfer receipt, callback
+/// receipt, its data dependency: 0.45 + 4.86 + 9.39) plus the attached callback gas, and step 1
+/// itself burns ~4.9 TGas of host gas:
+///   step 1 / step 5, 10 heirs: 4.9 + 10 x (14.8 + 10) = 252.9 TGas (+ wasm, < 10) of 300.
+///   (15 TGas: 302.9, does not fit; 20 TGas: 352.9.)
+///   poke / claim / agent_pay (one transfer): ~29.7 TGas on a maximal vault (+ wasm): callers
+///   should attach >= 50 TGas (the keeper uses 60 for poke).
+/// `v3_m2_*` tests measure these numbers.
+const GAS_ON_TRANSFER: Gas = Gas::from_tgas(10);
+/// v3 (M-2): 10 -> 15 TGas. `on_key_added` reads and writes the vault once (`save_vault_once`).
+/// The key methods attach 15 TGas plus ~15 TGas of receipt fees: callers attach 100 TGas.
+const GAS_ON_KEY: Gas = Gas::from_tgas(15);
 const GAS_MARK_BROADCAST_DAO: u64 = 10_000_000_000_000;
 /// Shortest and longest guardian pause (SPEC §2.8).
 pub const MIN_PAUSE_S: u64 = 10;
@@ -147,11 +181,23 @@ pub struct Contract {
     pub key_index: LookupMap<PublicKey, KeyRecord>,
     pub next_id: u64,
     /// Contract-wide keeper. May re-sign foreign payouts, `mark_broadcast` and drive step 3 for
-    /// every vault. Rotatable by the contract owner or by the keeper itself, so it still works
-    /// after the contract account is locked (v2, finding C).
+    /// every vault. Handed over in two steps (`set_keeper` then `accept_keeper`, v3) by the
+    /// contract owner or by the keeper itself, so it still works after the contract account is
+    /// locked (v2, finding C), and replaceable by the `keeper_admin` after a timelock (v3, H-1).
     pub keeper_id: Option<AccountId>,
-    /// Chain Signatures MPC signer (set at init, v2 L-8).
+    /// Chain Signatures MPC signer (set at init, v2 L-8; replaceable by `keeper_admin`, v3 I-1).
     pub mpc_signer: AccountId,
+    /// v3 (H-1): recovery role. Its ONLY powers are timelocked proposals to replace the contract
+    /// keeper, the MPC signer or itself. It is never an operator or a keeper.
+    pub keeper_admin: Option<AccountId>,
+    /// v3: account named by `set_keeper` that has not called `accept_keeper` yet.
+    pub pending_keeper: Option<AccountId>,
+    /// v3: the one pending `keeper_admin` proposal.
+    pub admin_proposal: Option<AdminProposal>,
+    /// v3: bumped each time a `keeper_admin` proposal replaces the contract keeper. A payout's
+    /// keeper re-sign count (Solana cap) only counts re-signs of the current epoch, so a keeper the
+    /// admin installs after a compromise can still re-sign payouts the old keeper used up.
+    pub keeper_epoch: u32,
 }
 
 /// Emit a NEP-297 event with standard `dmw`.
@@ -183,12 +229,18 @@ impl Contract {
         owner_id: AccountId,
         keeper_id: Option<AccountId>,
         mpc_signer: Option<AccountId>,
+        keeper_admin: Option<AccountId>,
     ) -> Self {
         let me = env::current_account_id();
         require!(
             keeper_id.as_ref() != Some(&me),
             "keeper cannot be the dmw contract"
         );
+        require!(
+            keeper_admin.as_ref() != Some(&me),
+            "keeper_admin cannot be the dmw contract"
+        );
+        require_separate_roles(keeper_id.as_ref(), keeper_admin.as_ref());
         Self {
             owner_id,
             vaults: UnorderedMap::new(StorageKey::Vaults),
@@ -197,6 +249,10 @@ impl Contract {
             next_id: 1,
             keeper_id,
             mpc_signer: mpc_signer.unwrap_or_else(|| foreign::DEFAULT_MPC_SIGNER.parse().unwrap()),
+            keeper_admin,
+            pending_keeper: None,
+            admin_proposal: None,
+            keeper_epoch: 0,
         }
     }
 
@@ -518,6 +574,17 @@ impl Contract {
                             && foreign::chainsig::parse_evm_address(&p.to).is_ok(),
                         "evm `to` must be 0x + 40 hex"
                     );
+                } else {
+                    // v3 (review v3 L-4 / prior L-19): a payout that can never be built is refused
+                    // here, not discovered at step 3 where it fails for good.
+                    require!(
+                        foreign::is_solana_address(&p.to),
+                        "solana `to` must be a base58 32-byte public key"
+                    );
+                    require!(
+                        p.amount.0 <= u128::from(u64::MAX),
+                        "solana amount must fit in u64 lamports"
+                    );
                 }
                 p.status = ForeignStatus::Pending;
                 p.signed_tx = None;
@@ -525,19 +592,16 @@ impl Contract {
                 p
             })
             .collect();
-        // Per-chain payout limit (Monad: 1, review 2 H-4).
+        // Per-chain payout limit (Monad: 1, review 2 H-4; Solana: 1, v3 H-1 / L-4: every payout
+        // of a chain leaves one derived address, and a Solana transfer has no nonce, so a second
+        // landed signature would pay one recipient out of another's funding).
         for c in ForeignChain::ALL {
-            if let Some(e) = c.evm() {
-                let n = payouts.iter().filter(|p| p.chain == c).count();
-                require!(
-                    n <= e.max_payouts,
-                    &format!(
-                        "too many {} payouts (max {} per vault)",
-                        c.as_str(),
-                        e.max_payouts
-                    )
-                );
-            }
+            let max = c.max_payouts();
+            let n = payouts.iter().filter(|p| p.chain == c).count();
+            require!(
+                n <= max,
+                &format!("too many {} payouts (max {max} per vault)", c.as_str())
+            );
         }
         let data = json!({"token_id": id.to_string(), "foreign": payouts});
         v.foreign = payouts;
@@ -812,12 +876,14 @@ impl Contract {
                 v.dao_id.as_ref() == Some(&pred),
                 "only the vault dao may ratify"
             );
-            record(
+            // v3 (L-2): only the first ratification is a key event; repeats go to the routine ring.
+            let repeat = v.history.iter().any(|e| e.event == "dao_ratified");
+            record_to(
                 &mut v,
-                id,
                 "dao_ratified",
                 pred.as_ref(),
                 json!({"token_id": id.to_string(), "dao_id": pred}),
+                repeat,
             );
             self.vaults.insert(&id, &v);
             self.charge_storage(id, before, false);
@@ -909,11 +975,23 @@ impl Contract {
             .collect()
     }
 
-    pub fn get_vaults_for_owner(&self, account_id: AccountId) -> Vec<VaultView> {
+    /// v3 (L-5): paged. `from_index` (default 0) and `limit` (default 50, at most 100) index the
+    /// owner's token list, as in `nft_tokens_for_owner`; old callers that pass only `account_id`
+    /// get the first 50.
+    pub fn get_vaults_for_owner(
+        &self,
+        account_id: AccountId,
+        from_index: Option<u64>,
+        limit: Option<u64>,
+    ) -> Vec<VaultView> {
+        let from = usize::try_from(from_index.unwrap_or(0)).unwrap_or(usize::MAX);
+        let limit = limit.unwrap_or(OWNER_PAGE_DEFAULT).min(OWNER_PAGE_MAX) as usize;
         self.owner_index
             .get(&account_id)
             .unwrap_or_default()
             .into_iter()
+            .skip(from)
+            .take(limit)
             .filter_map(|id| self.load(id).map(|v| view(id, &v)))
             .collect()
     }
@@ -935,6 +1013,19 @@ impl Contract {
             "mpc_signer": self.mpc_signer,
             "mpc_sign_deposit": yocto(foreign::MPC_SIGN_DEPOSIT.as_yoctonear()),
             "keeper": self.keeper_id,
+            "pending_keeper": self.pending_keeper,
+            "keeper_admin": self.keeper_admin,
+            "admin_timelock_ms": ADMIN_TIMELOCK_MS,
+            "admin_proposal": self.admin_proposal.as_ref().map(|p| json!({
+                "action": p.action.as_str(),
+                "account_id": p.account_id,
+                "proposed_ms": p.proposed_ms,
+                "eta_ms": p.eta_ms,
+            })),
+            "keeper_epoch": self.keeper_epoch,
+            "max_keeper_solana_resigns": foreign::MAX_KEEPER_SOLANA_RESIGNS,
+            "sale_min_interval_s": SALE_MIN_INTERVAL_S,
+            "sale_min_grace": SALE_MIN_GRACE,
             "chains": foreign::chain_registry(),
             "min_pause_s": MIN_PAUSE_S,
             "max_pause_s": MAX_PAUSE_S,
@@ -943,11 +1034,13 @@ impl Contract {
         })
     }
 
-    /// The contract owner, or the current keeper, sets (or clears) the contract keeper. The keeper
-    /// may hand over to a successor itself, so the role stays rotatable after the contract
-    /// account's full-access key is deleted (`owner_id` is then the contract itself; v2, C). On
-    /// such a locked contract the role can be handed over but not cleared. Exactly 1 yoctoNEAR
-    /// (second review): a function-call access key of the keeper cannot hand the role over.
+    /// v3: the contract owner (while it is a separate account) or the current keeper PROPOSES a
+    /// new contract keeper. The named account takes the role only when it calls `accept_keeper`
+    /// (two-step: the role can no longer be sent to an account nobody controls, review v3 H-1(4)).
+    /// A new call replaces the pending proposal; naming the current keeper cancels it. `null`
+    /// clears the role at once (no acceptance needed), except on a locked contract (`owner_id` is
+    /// the contract itself), where the keeper may hand over but not leave the role empty.
+    /// Exactly 1 yoctoNEAR (second review): a function-call access key cannot do it.
     #[payable]
     pub fn set_keeper(&mut self, account_id: Option<AccountId>) {
         assert_one_yocto();
@@ -961,14 +1054,147 @@ impl Contract {
             account_id.as_ref() != Some(&me),
             "keeper cannot be the dmw contract"
         );
-        // On a locked contract nobody but the keeper can appoint a keeper, so the keeper may hand
-        // over but not leave the role empty.
-        require!(
-            account_id.is_some() || self.owner_id != me,
-            "the keeper role cannot be cleared on a locked contract"
+        let Some(next) = account_id else {
+            // On a locked contract nobody but the keeper (and, after a timelock, the keeper
+            // admin) can appoint a keeper, so the keeper may hand over but not clear the role.
+            require!(
+                self.owner_id != me,
+                "the keeper role cannot be cleared on a locked contract"
+            );
+            self.keeper_id = None;
+            self.pending_keeper = None;
+            emit("keeper_set", json!({"keeper": null, "by": pred}));
+            return;
+        };
+        if self.keeper_id.as_ref() == Some(&next) {
+            let cancelled = self.pending_keeper.take();
+            emit(
+                "keeper_proposal_cancelled",
+                json!({"pending_keeper": cancelled, "by": pred}),
+            );
+            return;
+        }
+        require_separate_roles(Some(&next), self.keeper_admin.as_ref());
+        self.pending_keeper = Some(next.clone());
+        emit(
+            "keeper_proposed",
+            json!({"pending_keeper": next, "keeper": self.keeper_id, "by": pred}),
         );
-        self.keeper_id = account_id.clone();
-        emit("keeper_set", json!({"keeper": account_id, "by": pred}));
+    }
+
+    /// v3: the account named by `set_keeper` takes the contract keeper role. Exactly 1 yoctoNEAR
+    /// (a full-access key of the new keeper must sign).
+    #[payable]
+    pub fn accept_keeper(&mut self) {
+        assert_one_yocto();
+        let pred = env::predecessor_account_id();
+        require!(
+            self.pending_keeper.as_ref() == Some(&pred),
+            "only the pending keeper may accept"
+        );
+        require_separate_roles(Some(&pred), self.keeper_admin.as_ref());
+        let old = self.keeper_id.replace(pred.clone());
+        self.pending_keeper = None;
+        emit(
+            "keeper_set",
+            json!({"keeper": pred, "previous": old, "by": pred}),
+        );
+    }
+
+    /// v3 (H-1): the keeper admin proposes a new contract keeper (`null` clears the role).
+    /// Anyone may execute it with `execute_admin_proposal` after `ADMIN_TIMELOCK_MS` (48 h).
+    /// Replaces any pending admin proposal. Exactly 1 yoctoNEAR.
+    #[payable]
+    pub fn propose_keeper(&mut self, account_id: Option<AccountId>) {
+        self.require_keeper_admin();
+        require!(
+            account_id.as_ref() != Some(&env::current_account_id()),
+            "keeper cannot be the dmw contract"
+        );
+        require_separate_roles(account_id.as_ref(), self.keeper_admin.as_ref());
+        self.propose(AdminAction::Keeper, account_id);
+    }
+
+    /// v3 (H-1, review v3 I-1): the keeper admin proposes a new Chain Signatures MPC signer.
+    /// Timelocked like `propose_keeper`. Exactly 1 yoctoNEAR. Note: a signer with a different root
+    /// key derives different foreign addresses; this is for a migration of the same signer.
+    #[payable]
+    pub fn propose_mpc_signer(&mut self, account_id: AccountId) {
+        self.require_keeper_admin();
+        require!(
+            account_id != env::current_account_id(),
+            "mpc signer cannot be the dmw contract"
+        );
+        self.propose(AdminAction::MpcSigner, Some(account_id));
+    }
+
+    /// v3 (H-1): the keeper admin proposes to hand its role to another account (`null` gives it
+    /// up). Timelocked like the other admin proposals (it only takes effect through
+    /// `execute_admin_proposal` after 48 h, and the admin can cancel it until then). Exactly 1
+    /// yoctoNEAR.
+    #[payable]
+    pub fn set_keeper_admin(&mut self, account_id: Option<AccountId>) {
+        self.require_keeper_admin();
+        require!(
+            account_id.as_ref() != Some(&env::current_account_id()),
+            "keeper_admin cannot be the dmw contract"
+        );
+        require_separate_roles(self.keeper_id.as_ref(), account_id.as_ref());
+        require_separate_roles(self.pending_keeper.as_ref(), account_id.as_ref());
+        self.propose(AdminAction::KeeperAdmin, account_id);
+    }
+
+    /// v3 (H-1): the keeper admin withdraws its pending proposal. Exactly 1 yoctoNEAR.
+    #[payable]
+    pub fn cancel_admin_proposal(&mut self) {
+        self.require_keeper_admin();
+        let p = self
+            .admin_proposal
+            .take()
+            .unwrap_or_else(|| env::panic_str("no pending admin proposal"));
+        emit(
+            "admin_proposal_cancelled",
+            json!({"action": p.action.as_str(), "account_id": p.account_id, "by": env::predecessor_account_id()}),
+        );
+    }
+
+    /// v3 (H-1): anyone carries out the pending admin proposal once its timelock has run out.
+    /// A keeper change also drops any pending `set_keeper` handover and starts a new keeper epoch
+    /// (fresh Solana re-sign allowance for the new keeper).
+    pub fn execute_admin_proposal(&mut self) {
+        let now = env::block_timestamp_ms();
+        let p = self
+            .admin_proposal
+            .clone()
+            .unwrap_or_else(|| env::panic_str("no pending admin proposal"));
+        require!(now >= p.eta_ms, "admin proposal timelock has not passed");
+        match p.action {
+            AdminAction::Keeper => {
+                require_separate_roles(p.account_id.as_ref(), self.keeper_admin.as_ref());
+                self.keeper_id = p.account_id.clone();
+                self.pending_keeper = None;
+                self.keeper_epoch = self.keeper_epoch.saturating_add(1);
+            }
+            AdminAction::MpcSigner => {
+                self.mpc_signer = p
+                    .account_id
+                    .clone()
+                    .unwrap_or_else(|| env::panic_str("mpc signer proposal without account"));
+            }
+            AdminAction::KeeperAdmin => {
+                require_separate_roles(self.keeper_id.as_ref(), p.account_id.as_ref());
+                require_separate_roles(self.pending_keeper.as_ref(), p.account_id.as_ref());
+                self.keeper_admin = p.account_id.clone();
+            }
+        }
+        self.admin_proposal = None;
+        emit(
+            "admin_proposal_executed",
+            json!({
+                "action": p.action.as_str(), "account_id": p.account_id,
+                "by": env::predecessor_account_id(), "keeper_epoch": self.keeper_epoch,
+            }),
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -992,6 +1218,7 @@ impl Contract {
         let Some(mut v) = self.load(token_id) else {
             return false;
         };
+        let old_len = blob_len(&v);
         let pk_str = String::from(&public_key);
         let owner_changed = owner.as_ref().is_some_and(|o| o != &v.owner_id);
         let list_len = match kind {
@@ -1033,13 +1260,12 @@ impl Contract {
                 &detail,
                 json!({"token_id": token_id.to_string(), "public_key": pk_str, "kind": kind, "reason": why, "allowance_refund": yocto(refund)}),
             );
-            self.vaults.insert(&token_id, &v);
+            self.save_vault_once(token_id, &mut v, old_len, before);
             if ok || unexpected {
                 Promise::new(env::current_account_id())
                     .delete_key(public_key)
                     .detach();
             }
-            self.charge_storage(token_id, before, false);
             return false;
         }
         match kind {
@@ -1053,8 +1279,7 @@ impl Contract {
             &format!("{} {pk_str}", kind.method()),
             json!({"token_id": token_id.to_string(), "public_key": pk_str, "kind": kind, "method": kind.method()}),
         );
-        self.vaults.insert(&token_id, &v);
-        self.charge_storage(token_id, before, false);
+        self.save_vault_once(token_id, &mut v, old_len, before);
         true
     }
 
@@ -1078,6 +1303,7 @@ impl Contract {
         }
         let before = env::storage_usage();
         if let Some(mut v) = self.load(token_id) {
+            let old_len = blob_len(&v);
             // Money that was part of the pre-split balance (an agent spend or a bounty) is split
             // by bps at step 5 when it comes back after step 1. A failed heir or claim transfer is
             // the residual and stays claimable by the NFT owner.
@@ -1092,8 +1318,8 @@ impl Contract {
                 &format!("{kind} {receiver_id} {}", amount.0),
                 json!({"token_id": token_id.to_string(), "receiver_id": receiver_id, "amount": amount, "kind": kind}),
             );
-            self.vaults.insert(&token_id, &v);
-            self.charge_storage(token_id, before, false);
+            // One vault write (v3, M-2): this path runs on the GAS_ON_TRANSFER budget.
+            self.save_vault_once(token_id, &mut v, old_len, before);
         }
         false
     }
@@ -1112,6 +1338,7 @@ impl Contract {
             Err(near_sdk::PromiseError::Failed)
         };
         let mut v = self.vault(token_id);
+        let old_len = blob_len(&v);
         match result {
             Ok(pid) => {
                 v.dao_proposal_id = Some(pid);
@@ -1142,8 +1369,7 @@ impl Contract {
                 );
             }
         }
-        self.vaults.insert(&token_id, &v);
-        self.charge_storage(token_id, before, false);
+        self.save_vault_once(token_id, &mut v, old_len, before);
         v.step
     }
 }
@@ -1173,6 +1399,35 @@ impl Contract {
             "only the vault owner"
         );
         require!(v.stored == StoredState::Live, "vault_triggered");
+    }
+
+    /// v3: the caller is the keeper admin and attached exactly 1 yoctoNEAR.
+    fn require_keeper_admin(&self) {
+        assert_one_yocto();
+        require!(
+            self.keeper_admin.as_ref() == Some(&env::predecessor_account_id()),
+            "only the keeper admin"
+        );
+    }
+
+    /// v3: store `action` as the one pending admin proposal, executable after the timelock.
+    fn propose(&mut self, action: AdminAction, account_id: Option<AccountId>) {
+        let now = env::block_timestamp_ms();
+        let eta_ms = now.saturating_add(ADMIN_TIMELOCK_MS);
+        let replaced = self.admin_proposal.replace(AdminProposal {
+            action,
+            account_id: account_id.clone(),
+            proposed_ms: now,
+            eta_ms,
+        });
+        emit(
+            "admin_proposal",
+            json!({
+                "action": action.as_str(), "account_id": account_id, "eta_ms": eta_ms,
+                "by": env::predecessor_account_id(),
+                "replaced": replaced.map(|r| r.action.as_str()),
+            }),
+        );
     }
 
     /// Accounts that may act for a vault's settlement beyond the permissionless surface: the
@@ -1214,33 +1469,29 @@ impl Contract {
         let Some(mut v) = self.vaults.get(&id) else {
             return;
         };
-        let bytes = if after >= before {
-            v.storage_bytes.saturating_add(after - before)
-        } else {
-            v.storage_bytes.saturating_sub(before - after)
-        };
-        let need = u128::from(bytes).saturating_mul(env::storage_byte_cost().as_yoctonear());
-        let mut changed = bytes != v.storage_bytes;
-        v.storage_bytes = bytes;
-        if need > v.storage_deposit {
-            let short = need - v.storage_deposit;
-            if v.balance >= short {
-                v.balance -= short;
-                v.storage_deposit = add_yocto(v.storage_deposit, short);
-            } else {
-                require!(
-                    !strict,
-                    "vault balance cannot cover the storage this change needs"
-                );
-                v.storage_deposit = add_yocto(v.storage_deposit, v.balance);
-                v.balance = 0;
-            }
-            changed = true;
-        }
-        if changed {
+        if apply_storage(&mut v, i128::from(after) - i128::from(before), strict) {
             // Only fixed-size fields changed, so this write does not change storage use.
             self.vaults.insert(&id, &v);
         }
+    }
+
+    /// v3 (M-2): write a vault ONCE with its storage charge folded in, for callbacks that run on a
+    /// small static gas budget. `charge_storage` re-reads and re-writes the whole vault (~2 TGas
+    /// per write on a maximal vault); here the size change of the vault blob is computed from its
+    /// borsh length instead. `old_len` is `blob_len` of the vault as loaded; every storage write
+    /// since `before` other than the vault itself must already have happened, and none may follow.
+    pub(crate) fn save_vault_once(&mut self, id: u64, v: &mut Vault, old_len: u64, before: u64) {
+        let others = i128::from(env::storage_usage()) - i128::from(before);
+        let delta = others + i128::from(blob_len(v)) - i128::from(old_len);
+        // Only fixed-size fields change here, so the blob length stays `blob_len(v)`.
+        apply_storage(v, delta, false);
+        self.vaults.insert(&id, v);
+        #[cfg(test)]
+        assert_eq!(
+            i128::from(env::storage_usage()) - i128::from(before),
+            delta,
+            "save_vault_once: predicted storage change is wrong"
+        );
     }
 
     /// Settlement: hand back to the vault balance the storage deposit the vault no longer needs
@@ -1407,11 +1658,28 @@ impl Contract {
                 // of each payout only an operator may supply them (finding C); after that anyone
                 // may, so settlement never depends on one party.
                 let pred = env::predecessor_account_id();
+                let operator = self.is_operator(&v, &pred);
+                let open = now >= v.step3_progress_ms.saturating_add(STEP3_OPEN_AFTER_MS);
                 require!(
-                    self.is_operator(&v, &pred)
-                        || now >= v.step3_progress_ms.saturating_add(STEP3_OPEN_AFTER_MS),
+                    operator || open,
                     "step 3: during the first hour only the keeper, the vault owner or an heir may sign a payout"
                 );
+                if !operator && v.foreign[idx].chain == ForeignChain::Solana {
+                    // v3 (review v3 M-1): a Solana blockhash only ever comes from an operator. A
+                    // stranger's stale or junk blockhash would leave a `signed` payout that only a
+                    // keeper could re-sign (a second payment risk). After the hour a stranger can
+                    // only move settlement on: the payout is recorded `failed` without any
+                    // signature, and every operator (heirs included) may re-sign a failed payout
+                    // with `resign_foreign` at any time.
+                    return PromiseOrValue::Value(self.finish_foreign(
+                        id,
+                        idx,
+                        ForeignStatus::Failed,
+                        None,
+                        None,
+                        "skipped: no operator signed within 1 h; an operator may re-sign it",
+                    ));
+                }
                 v.foreign_inflight_since_ms = Some(now);
                 self.vaults.insert(&id, &v);
                 PromiseOrValue::Promise(self.request_foreign_signature(id, idx, args))
@@ -1621,8 +1889,17 @@ impl Contract {
         v.owner_id = to.clone();
         let live = v.stored == StoredState::Live;
         let revoked = if live { self.take_keys(v) } else { vec![] };
+        let mut timing_raised = false;
         if live {
             v.last_beat_ms = env::block_timestamp_ms();
+            // v3 (L-6): the seller's timing does not carry over below a safe minimum. A 10 s x 0
+            // vault could otherwise be poked 10 s after the sale and settle with no foreign
+            // payouts (they are cleared), stranding the derived addresses' balances.
+            if v.heartbeat_interval_s < SALE_MIN_INTERVAL_S || v.grace_missed < SALE_MIN_GRACE {
+                v.heartbeat_interval_s = v.heartbeat_interval_s.max(SALE_MIN_INTERVAL_S);
+                v.grace_missed = v.grace_missed.max(SALE_MIN_GRACE);
+                timing_raised = true;
+            }
             v.heirs = vec![Heir {
                 account_id: to.clone(),
                 bps: 10_000,
@@ -1642,7 +1919,11 @@ impl Contract {
             id,
             "owner_changed",
             &format!("{old} -> {to}"),
-            json!({"token_id": id.to_string(), "old_owner_id": old, "new_owner_id": to, "revoked_keys": revoked, "reset": live}),
+            json!({
+                "token_id": id.to_string(), "old_owner_id": old, "new_owner_id": to,
+                "revoked_keys": revoked, "reset": live, "timing_raised": timing_raised,
+                "heartbeat_interval_s": v.heartbeat_interval_s, "grace_missed": v.grace_missed,
+            }),
         );
         self.vaults.insert(&id, v);
         delete_keys(revoked);
@@ -1773,7 +2054,8 @@ pub(crate) fn policy_check(
 }
 
 /// Events that routine traffic produces. They go to the evictable `log` ring; every other event
-/// goes to the `history` ring (finding D).
+/// goes to the `history` ring (finding D). v3 (L-2): a failed re-sign changes nothing and an
+/// operator can repeat it, so it is routine too.
 fn is_routine(event: &str, detail: &str) -> bool {
     matches!(
         event,
@@ -1786,11 +2068,39 @@ fn is_routine(event: &str, detail: &str) -> bool {
             | "key_removed"
             | "key_add_failed"
             | "key_add_revoked"
+            | "foreign_resign_failed"
     ) || (event == "transfer_failed" && detail.starts_with("agent_pay "))
+}
+
+/// History entries that are never evicted (v3, L-2; `vault_created` since v2). Each happens at
+/// most once per vault, so at most 8 of the 40 history slots are pinned.
+fn is_pinned(event: &str) -> bool {
+    matches!(
+        event,
+        "vault_created"
+            | "triggered"
+            | "step_1"
+            | "step_2"
+            | "step_3"
+            | "step_4"
+            | "step_5"
+            | "settled"
+    )
 }
 
 /// Append to the right bounded on-chain ring and emit the matching NEP-297 event.
 pub(crate) fn record(v: &mut Vault, _id: u64, event: &str, detail: &str, data: serde_json::Value) {
+    record_to(v, event, detail, data, is_routine(event, detail));
+}
+
+/// `record` with the ring chosen by the caller (`routine`: the evictable `log` ring).
+pub(crate) fn record_to(
+    v: &mut Vault,
+    event: &str,
+    detail: &str,
+    data: serde_json::Value,
+    routine: bool,
+) {
     let entry = LogEntry {
         ms: env::block_timestamp_ms(),
         event: event.to_string(),
@@ -1798,7 +2108,7 @@ pub(crate) fn record(v: &mut Vault, _id: u64, event: &str, detail: &str, data: s
         seq: v.log_seq,
     };
     v.log_seq = v.log_seq.saturating_add(1);
-    if is_routine(event, detail) {
+    if routine {
         v.log.push(entry);
         if v.log.len() > MAX_LOG {
             let excess = v.log.len() - MAX_LOG;
@@ -1807,12 +2117,66 @@ pub(crate) fn record(v: &mut Vault, _id: u64, event: &str, detail: &str, data: s
     } else {
         v.history.push(entry);
         if v.history.len() > MAX_HISTORY {
-            // `vault_created` (the original owner, which the dashboard needs) is never evicted.
-            let first = usize::from(v.history[0].event == "vault_created");
-            v.history.remove(first);
+            // The oldest entry that is not pinned goes (v3, L-2): operators and the DAO can no
+            // longer evict the trigger, the settlement steps or the creation record.
+            let at = v
+                .history
+                .iter()
+                .position(|e| !is_pinned(&e.event))
+                .unwrap_or(0);
+            v.history.remove(at);
         }
     }
     emit(event, data);
+}
+
+/// v3 (M-2): the storage accounting of a vault for a storage change of `delta` bytes. The vault's
+/// storage deposit must cover `storage_bytes x byte cost`; any shortfall moves from the vault
+/// balance. `strict` (owner-initiated growth) panics when the balance cannot cover it; otherwise
+/// the balance covers what it can. Touches only fixed-size fields. Returns whether it changed any.
+fn apply_storage(v: &mut Vault, delta: i128, strict: bool) -> bool {
+    let bytes = if delta >= 0 {
+        v.storage_bytes
+            .saturating_add(u64::try_from(delta).unwrap_or(u64::MAX))
+    } else {
+        v.storage_bytes
+            .saturating_sub(u64::try_from(-delta).unwrap_or(u64::MAX))
+    };
+    let need = u128::from(bytes).saturating_mul(env::storage_byte_cost().as_yoctonear());
+    let mut changed = bytes != v.storage_bytes;
+    v.storage_bytes = bytes;
+    if need > v.storage_deposit {
+        let short = need - v.storage_deposit;
+        if v.balance >= short {
+            v.balance -= short;
+            v.storage_deposit = add_yocto(v.storage_deposit, short);
+        } else {
+            require!(
+                !strict,
+                "vault balance cannot cover the storage this change needs"
+            );
+            v.storage_deposit = add_yocto(v.storage_deposit, v.balance);
+            v.balance = 0;
+        }
+        changed = true;
+    }
+    changed
+}
+
+/// Length of a vault's stored borsh blob (the raw-slot `guard` is not part of it).
+pub(crate) fn blob_len(v: &Vault) -> u64 {
+    near_sdk::borsh::to_vec(v)
+        .map(|b| b.len() as u64)
+        .unwrap_or_else(|_| env::panic_str("vault serialization failed"))
+}
+
+/// v3: the keeper and the keeper admin are different accounts, so one leaked key never holds both
+/// the keeper's powers and the power to replace the keeper.
+fn require_separate_roles(keeper: Option<&AccountId>, admin: Option<&AccountId>) {
+    require!(
+        keeper.is_none() || keeper != admin,
+        "keeper and keeper_admin must be different accounts"
+    );
 }
 
 /// Exact decimal NEAR string from yoctoNEAR, trailing zeros trimmed ("5.34", "1").

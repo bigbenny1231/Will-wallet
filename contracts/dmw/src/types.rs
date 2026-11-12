@@ -346,6 +346,39 @@ pub struct AgentPayResult {
     pub balance: U128,
 }
 
+/// What a `keeper_admin` proposal changes once its timelock has run out (v3, H-1).
+#[near(serializers = [borsh, json])]
+#[serde(rename_all = "snake_case")]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum AdminAction {
+    /// Replace (or clear, with `account_id: null`) the contract keeper.
+    Keeper,
+    /// Replace the Chain Signatures MPC signer (review v3 I-1).
+    MpcSigner,
+    /// Hand the `keeper_admin` role to another account (or give it up, with `null`).
+    KeeperAdmin,
+}
+
+impl AdminAction {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            AdminAction::Keeper => "keeper",
+            AdminAction::MpcSigner => "mpc_signer",
+            AdminAction::KeeperAdmin => "keeper_admin",
+        }
+    }
+}
+
+/// The one pending `keeper_admin` proposal (v3, H-1). Anyone may execute it from `eta_ms` on.
+#[near(serializers = [borsh, json])]
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct AdminProposal {
+    pub action: AdminAction,
+    pub account_id: Option<AccountId>,
+    pub proposed_ms: u64,
+    pub eta_ms: u64,
+}
+
 /// Which list a function-call key belongs to.
 #[near(serializers = [borsh, json])]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

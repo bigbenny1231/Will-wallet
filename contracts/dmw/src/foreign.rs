@@ -62,8 +62,9 @@ pub const GAS_DERIVED_KEY: Gas = Gas::from_tgas(10);
 /// Minimum gas for `on_foreign_sol_key` / `on_foreign_evm_key` (each schedules sign +
 /// callback); gets unused gas too.
 pub const GAS_ON_SOL_KEY: Gas = Gas::from_tgas(100);
-/// Gas for the self-call that records an unbuildable payout as failed.
-const GAS_FOREIGN_FAIL: Gas = Gas::from_tgas(10);
+/// Gas for the self-call that records an unbuildable payout as failed (v3, M-2: 10 -> 20 TGas;
+/// `finish_foreign` + `charge_storage` read and write a maximal vault twice, ~6.5 TGas).
+const GAS_FOREIGN_FAIL: Gas = Gas::from_tgas(20);
 /// Cap on caller-supplied EIP-1559 fees on Base (100 gwei). Bounds how much of the derived
 /// address's ETH a permissionless caller can burn as gas (H-2). Each registry chain has
 /// its own cap (`EvmChain::max_fee_per_gas`).
@@ -91,6 +92,17 @@ pub const EVM_FEE_BUMP_PCT: u128 = 110;
 /// Minimum age of the last signature request before any payout may be re-signed (Solana: the
 /// old blockhash is long expired; EVM: rate limit on fee ratchets and status flips).
 pub const RESIGN_COOLDOWN_MS: u64 = 5 * 60 * 1000;
+/// Most Solana payouts one vault may hold (v3, review v3 H-1 / L-4). They would all leave the one
+/// `sol-<id>-<salt>` address, and a Solana transfer has no nonce: any extra landed signature (a
+/// keeper re-sign, or a "failed" request whose signature was still produced) would pay one
+/// recipient out of another recipient's funding. With one payout, an extra signature can only
+/// spend what the owner over-funded the address with.
+pub const SOLANA_MAX_PAYOUTS: usize = 1;
+/// Most keeper re-signs of a Solana payout that already has a signature (`signed`/`broadcast`),
+/// per keeper epoch (v3, review v3 H-1). Every request counts, whether or not the MPC call then
+/// succeeds (a sign result is public in the signer's receipt). After that the re-sign is refused;
+/// only a keeper the `keeper_admin` installs (a new epoch) gets a fresh allowance.
+pub const MAX_KEEPER_SOLANA_RESIGNS: u32 = 3;
 /// Default MPC signer contract (SPEC §1). The signer actually used is set once in `new`
 /// (`Contract::mpc_signer`, shown by `get_config`), so a sandbox or mainnet deploy can point
 /// at its own signer (finding L-8).
@@ -188,6 +200,21 @@ impl ForeignChain {
     pub fn is_evm(&self) -> bool {
         self.evm().is_some()
     }
+    /// Most payouts of this chain one vault may hold (Monad 1, Solana 1, Base `MAX_FOREIGN`).
+    pub fn max_payouts(&self) -> usize {
+        match self.evm() {
+            Some(e) => e.max_payouts,
+            None => SOLANA_MAX_PAYOUTS,
+        }
+    }
+}
+
+/// A Solana public key: base58 that decodes to exactly 32 bytes (v3, L-4).
+pub fn is_solana_address(s: &str) -> bool {
+    s.len() <= 44
+        && near_sdk::bs58::decode(s)
+            .into_vec()
+            .is_ok_and(|b| b.len() == 32)
 }
 
 /// Chain registry as JSON (exposed through `get_config().chains`).
@@ -209,6 +236,8 @@ pub fn chain_registry() -> Vec<serde_json::Value> {
                 "path": "sol-<token_id>-<salt>", "domain_id": DOMAIN_EDDSA,
                 "rpc": "https://api.devnet.solana.com",
                 "explorer_tx": "https://explorer.solana.com/tx/",
+                "max_payouts": SOLANA_MAX_PAYOUTS,
+                "max_keeper_resigns": MAX_KEEPER_SOLANA_RESIGNS,
             }),
         })
         .collect()
@@ -344,9 +373,15 @@ pub struct SignTrack {
     pub last_request_ms: u64,
     /// A `resign_foreign` request is outstanding.
     pub inflight: bool,
-    /// EVM fees of the most recent request (0 for Solana).
+    /// EVM fees of the most recent SIGNED request (0 for Solana). v3 (L-3): a re-sign writes them
+    /// only once its signature is stored, so a failed MPC call leaves the previous fees.
     pub max_fee_per_gas: u128,
     pub max_priority_fee_per_gas: u128,
+    /// v3 (H-1): keeper re-signs of this payout while it already had a signature (Solana), counted
+    /// in `keeper_epoch`; capped at `MAX_KEEPER_SOLANA_RESIGNS`.
+    pub keeper_resigns: u32,
+    /// `Contract::keeper_epoch` that `keeper_resigns` counts in.
+    pub keeper_epoch: u32,
 }
 
 fn track_key(token_id: u64, index: usize) -> Vec<u8> {
@@ -652,6 +687,7 @@ impl Contract {
                         inflight: false,
                         max_fee_per_gas: a.max_fee_per_gas.0,
                         max_priority_fee_per_gas: a.max_priority_fee_per_gas.0,
+                        ..Default::default()
                     },
                 );
                 match evm_transfer_for(&payout, &a) {
@@ -926,6 +962,12 @@ impl Contract {
     /// `signed` or `broadcast` may therefore only be re-signed by a keeper (contract owner while
     /// unlocked, contract keeper, vault keeper), as in v1; heirs and the vault owner may only
     /// re-sign a `failed` one (F1). A non-keeper's EVM fees are clamped like in step 3 (F4).
+    ///
+    /// v3: a keeper may re-sign a `signed`/`broadcast` Solana payout at most
+    /// `MAX_KEEPER_SOLANA_RESIGNS` times per keeper epoch (H-1). When the last signed EVM fees are
+    /// above the non-keeper clamp (a keeper signed high), a non-keeper may replace the tx at the
+    /// clamp without the 110% rule (H-1(3)): max fee exactly the clamp, priority fee not below
+    /// min(last, clamp). New fees are recorded only once the signature is stored (L-3).
     pub fn resign_foreign(&mut self, token_id: TokenRef, index: u32, args: StepArgs) -> Promise {
         let before = env::storage_usage();
         let id = token_id.id();
@@ -967,6 +1009,28 @@ impl Contract {
             !(has_sig && payout.chain == ForeignChain::Solana) || keeper,
             "only the keeper may re-sign a signed or broadcast solana payout (no nonce: a new signature is a second payment)"
         );
+        // The record written up front: request time and the in-flight flag only. The fees of the
+        // last signed request stay until this request's signature is stored (v3, L-3).
+        let mut next = SignTrack {
+            last_request_ms: now,
+            inflight: true,
+            ..track.clone()
+        };
+        if has_sig && payout.chain == ForeignChain::Solana {
+            let used = if track.keeper_epoch == self.keeper_epoch {
+                track.keeper_resigns
+            } else {
+                0
+            };
+            require!(
+                used < MAX_KEEPER_SOLANA_RESIGNS,
+                &format!(
+                    "keeper re-sign limit reached for this solana payout ({MAX_KEEPER_SOLANA_RESIGNS} per keeper)"
+                )
+            );
+            next.keeper_resigns = used + 1;
+            next.keeper_epoch = self.keeper_epoch;
+        }
         let me = env::current_account_id();
         let path = v.path(id, payout.chain);
         let promise = match payout.chain {
@@ -981,34 +1045,40 @@ impl Contract {
                 // A keeper may lower fees (second review G1): an heir or a stranger who signed first
                 // must not be able to lock the payout above an honest fee. Only non-keepers ratchet.
                 if has_sig && !keeper {
-                    // Fees are capped per chain (validated above), so real products are small;
-                    // saturating math keeps an absurd stored value from overflowing.
-                    let cap = payout
+                    let c = payout
                         .chain
                         .evm()
-                        .unwrap_or_else(|| env::panic_str("not an evm chain"))
-                        .max_fee_per_gas;
-                    require!(
-                        is_fee_bump(a.max_fee_per_gas.0, track.max_fee_per_gas, cap)
-                            && is_fee_bump(
-                                a.max_priority_fee_per_gas.0,
-                                track.max_priority_fee_per_gas,
-                                cap
-                            ),
-                        "re-sign of a signed evm payout must raise both fees by >= 10% (or to the chain cap)"
-                    );
+                        .unwrap_or_else(|| env::panic_str("not an evm chain"));
+                    let clamp = c.non_keeper_max_fee_per_gas;
+                    if track.max_fee_per_gas > clamp || track.max_priority_fee_per_gas > clamp {
+                        // v3 (H-1(3)): a keeper signed above what a non-keeper may ever pick. The
+                        // 110% rule would lock heirs out for good, so a replacement AT the clamp is
+                        // allowed. The nonce is pinned: this only replaces the tx, and the old
+                        // signature stays relayable. Afterwards the last fees are the clamp, so the
+                        // normal rule applies again (no repeated flips).
+                        require!(
+                            a.max_fee_per_gas.0 == clamp
+                                && a.max_priority_fee_per_gas.0
+                                    >= track.max_priority_fee_per_gas.min(clamp),
+                            "re-sign below a keeper's fee: max_fee_per_gas must be the non-keeper limit and the priority fee may not drop"
+                        );
+                    } else {
+                        // Fees are capped per chain (validated above), so real products are small;
+                        // saturating math keeps an absurd stored value from overflowing.
+                        let cap = c.max_fee_per_gas;
+                        require!(
+                            is_fee_bump(a.max_fee_per_gas.0, track.max_fee_per_gas, cap)
+                                && is_fee_bump(
+                                    a.max_priority_fee_per_gas.0,
+                                    track.max_priority_fee_per_gas,
+                                    cap
+                                ),
+                            "re-sign of a signed evm payout must raise both fees by >= 10% (or to the chain cap)"
+                        );
+                    }
                 }
                 let (t, _) = evm_transfer_for(&payout, &a).unwrap_or_else(|e| env::panic_str(&e));
-                write_track(
-                    id,
-                    i,
-                    &SignTrack {
-                        last_request_ms: now,
-                        inflight: true,
-                        max_fee_per_gas: a.max_fee_per_gas.0,
-                        max_priority_fee_per_gas: a.max_priority_fee_per_gas.0,
-                    },
-                );
+                write_track(id, i, &next);
                 derived_key_call(&self.mpc_signer, &path, DOMAIN_ECDSA).then(
                     Self::ext(me)
                         .with_static_gas(GAS_ON_SOL_KEY)
@@ -1027,15 +1097,7 @@ impl Contract {
                     a.recent_blockhash.clone(),
                 )
                 .unwrap_or_else(|e| env::panic_str(&e));
-                write_track(
-                    id,
-                    i,
-                    &SignTrack {
-                        last_request_ms: now,
-                        inflight: true,
-                        ..Default::default()
-                    },
-                );
+                write_track(id, i, &next);
                 derived_key_call(&self.mpc_signer, &path, DOMAIN_EDDSA).then(
                     Self::ext(me)
                         .with_static_gas(GAS_ON_SOL_KEY)
@@ -1052,12 +1114,20 @@ impl Contract {
     /// know when the re-sign cooldown ends).
     pub fn get_sign_track(&self, token_id: TokenRef, index: u32) -> serde_json::Value {
         let t = read_track(token_id.id(), index as usize);
+        // Re-signs counted in an older keeper epoch no longer count (v3).
+        let keeper_resigns = if t.keeper_epoch == self.keeper_epoch {
+            t.keeper_resigns
+        } else {
+            0
+        };
         json!({
             "last_request_ms": t.last_request_ms,
             "inflight": t.inflight,
             "max_fee_per_gas": U128(t.max_fee_per_gas),
             "max_priority_fee_per_gas": U128(t.max_priority_fee_per_gas),
             "resign_allowed_after_ms": t.last_request_ms.saturating_add(RESIGN_COOLDOWN_MS),
+            "keeper_resigns": keeper_resigns,
+            "keeper_resigns_left": MAX_KEEPER_SOLANA_RESIGNS.saturating_sub(keeper_resigns),
         })
     }
 
@@ -1099,6 +1169,13 @@ impl Contract {
         let chain = v.foreign[index].chain;
         match outcome {
             Ok((raw, txid)) => {
+                // v3 (L-3): only now do the request's fees become the payout's last signed fees.
+                if let PendingTx::Evm(t) = &pending {
+                    let mut tr = read_track(token_id, index);
+                    tr.max_fee_per_gas = t.max_fee_per_gas.0;
+                    tr.max_priority_fee_per_gas = t.max_priority_fee_per_gas.0;
+                    write_track(token_id, index, &tr);
+                }
                 v.foreign[index].status = ForeignStatus::Signed;
                 v.foreign[index].signed_tx = Some(raw);
                 v.foreign[index].tx_hash = None;
