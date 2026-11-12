@@ -122,7 +122,7 @@ const caps = [
   [1.5, agentStart - 1, 'The owner’s phone holds a key that can only say ‘alive’.', `/pulse paired to vault ${T} · a function-call key scoped to heartbeat · each beat pulses the seal`],
   [agentStart + 0.3, thought - 0.6, 'An agent with the second key pays two invoices.', 'make agent · key scoped to agent_pay · 0.5 NEAR a payment, 1 NEAR a day, one allowlisted receiver'],
   [null, denied + 3.9, 'Then its inbox is poisoned: ‘move everything’. Refused by the wallet. Refused by the contract. Logged.', 'run 1: the wallet wrapper will not sign · run 2, wrapper switched off: agent_pay denied on chain, receiver_not_allowlisted'],
-  [guardian + 0.3, paused + 3.5, 'A guardian can buy time, once per cycle.', `pause() by ${G} · the deadline moves out up to 10 min · the owner’s next beat ends it`],
+  [guardian + 0.3, paused + 3.5, 'A guardian can buy time, once per cycle.', `pause() by ${G}${info.pause_tx ? ` · tx ${info.pause_tx.slice(0, 8)}…` : ''} · the deadline moves out up to 10 min · the owner’s next beat ends it`],
   [hold - 0.1, warn - 1, 'Put the phone down.', 'hold to stop, two seconds · the phone stops signing heartbeats'],
   [warn - 0.1, Math.max(trig, poke) + 6.8, 'Two missed beats. Anyone can poke it and earn the bounty.', '60 s interval, grace 1 · Warning disarms the agent · poke pays a 0.05 NEAR bounty to whoever calls it'],
   [step1 !== null ? step1 - 0.3 : firstStep, (step3 ?? settled) - 0.8, 'I. Heirs paid on NEAR. II. The agent’s key deleted from the account.', '60 / 40 split · pulse and agent keys removed with DeleteKey'],

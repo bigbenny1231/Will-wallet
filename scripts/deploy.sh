@@ -46,7 +46,7 @@ if [ ! -f "keys/$ACCOUNT.json" ] && [ ! -f "$HOME/.near-credentials/testnet/$ACC
 fi
 
 if [ -n "${DMW_WASM:-}" ]; then
-  # A prebuilt wasm, e.g. DMW_WASM=contracts/release/dmw.wasm (the reviewed release build, docs/FINAL_REVIEW.md)
+  # A prebuilt wasm, e.g. DMW_WASM=contracts/release/dmw.wasm (the reviewed release build, docs/history/FINAL_REVIEW.md)
   [ -f "$DMW_WASM" ] || die "DMW_WASM=$DMW_WASM does not exist"
   WASM=$DMW_WASM
   say "using prebuilt $WASM"

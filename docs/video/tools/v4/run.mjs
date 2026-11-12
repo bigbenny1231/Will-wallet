@@ -167,7 +167,8 @@ while (!st.Settled) {
 await sleep(10000);
 const f = dash();
 const info = await f.evaluate(() => { const img = document.querySelector('section.grid figure img'); const m = document.body.innerText.match(/Will passed to\s+(\S+?)\.?\s*$/m); return { src: img ? img.src : null, heir: m ? m[1] : null }; });
-fs.writeFileSync(S + '/endinfo.json', JSON.stringify({ token: TOKEN, contract: C, guardian: GUARD, ...info }, null, 1));
+let pauseTx = null; try { pauseTx = (fs.readFileSync(S + '/pause.out', 'utf8').match(/txns\/([A-Za-z0-9]+)/) || [])[1] || null; } catch {}
+fs.writeFileSync(S + '/endinfo.json', JSON.stringify({ token: TOKEN, contract: C, guardian: GUARD, pause_tx: pauseTx, ...info }, null, 1));
 ev('record_end');
 await cdp.send('Page.stopScreencast');
 await sleep(300); clearInterval(tick); clearInterval(bannerTimer); ff.stdin.end(); const fc = await ffDone;

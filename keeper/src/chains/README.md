@@ -52,9 +52,10 @@ stale, call `dmw.resign_foreign({ token_id, index, args })` with fresh args (300
 
 - Derivation uses the live `derived_public_key` view. It's byte-identical to chainsig.js
   `deriveAddressAndPublicKey` (checked in `selfcheck.ts` and docs/chainsig-notes.md), with no extra npm deps.
-- EVM fees: `max_fee = 2 * baseFee + priority`, `gas_limit = 21000` (native transfer). Monad testnet's
-  base fee floor is 100 gwei, so its contract cap is 1000 gwei (Base: 100 gwei). Monad bills `gas_limit`,
-  not gas used, so keep 21000 for native transfers.
+- EVM fees: `max_fee = 2 * baseFee + priority`. The contract signs every EVM payout with at least 50,000 gas
+  (`EVM_GAS_LIMIT_FLOOR` in `foreign.rs`, final audit H-5), so a source must hold value + 50,000 × max fee. Monad
+  testnet's base fee floor is 100 gwei, so its contract cap is 1000 gwei (Base: 100 gwei). Monad bills `gas_limit`,
+  not gas used.
 - The derived source addresses hold no funds of their own. `dmw fund-sources --token <id>` (or `dmw keeper
   --fund-sources`) tops them up from the funder wallet derived from `KEEPER_SEED`; see "Funding payout sources" in
   `keeper/README.md`. The funder itself is filled once by hand from the faucets (Base Sepolia: Coinbase CDP / Alchemy;

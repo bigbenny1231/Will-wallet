@@ -167,10 +167,16 @@ function keeperRows(text) {
       const s = +m[1]; const nm = s === 3 ? `${CHAIN[m[2]] || 'Foreign'} payout ${STEPN[3]}` : STEPN[s];
       rows.push({ k, c: 'step', t, m: `<span class="rn">${ROMAN[s]}</span><span class="nm">${nm}</span><span class="sub tx">${txs(m[3])}</span>`, flash: 1 }); continue;
     }
+    // foreign hashes: 0x… (Base, Monad) or base58 (Solana), shown short; the full link is in keeper.log
+    if (kind === 'fund' && (m = rest.match(/payout #\d+ (\w+) topped up by (\S+ \w+)/))) { rows.push({ k, c: 'relay', t, m: `${CHAIN[m[1]] || m[1]} source funded · ${m[2]}` }); continue; }
     if (kind === 'relay') {
-      if ((m = rest.match(/payout #\d+ (\w+) (?:NOT broadcast|relay error: .*insufficient)/))) { if (seenRelay[m[1]]) continue; seenRelay[m[1]] = 1; rows.push({ k, c: 'relay', t, m: `${CHAIN[m[1]] || m[1]} <span class="w">signed</span> · relay pending funding of the source` }); continue; }
+      if ((m = rest.match(/payout #\d+ (\w+) (?:re-)?sent\s+(\S+)/))) {
+        const h = (m[2].match(/(?:tx\/)([A-Za-z0-9]+)/) || [])[1] || '';
+        rows.push({ k, c: 'relay', t, m: `${CHAIN[m[1]] || m[1]} payout <span class="w">broadcast</span><span class="sub tx">${h ? 'tx ' + h.slice(0, 8) + '…' : ''}</span>`, flash: 1 }); continue;
+      }
       continue;
     }
+    if (kind === 'mark' && (m = rest.match(/mark_broadcast #(\d+)\s+(\S+)/))) { rows.push({ k, c: 'mute', t, m: `recorded on NEAR · payout #${m[1]}<span class="sub tx">${txs(m[2])}</span>` }); continue; }
   }
   return rows;
 }

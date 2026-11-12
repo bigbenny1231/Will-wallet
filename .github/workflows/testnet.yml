@@ -215,6 +215,12 @@ jobs:
           mkdir -p /tmp/pw && cd /tmp/pw && npm init -y >/dev/null && npm i --no-audit --no-fund playwright@1.63.0 >/dev/null && npx playwright install --with-deps chromium >/dev/null
           echo "PW_MODULE=/tmp/pw/node_modules/playwright/index.mjs" >> "$GITHUB_ENV"
           cd "$GITHUB_WORKSPACE/dashboard" && npm ci --no-audit --no-fund --loglevel=error
+      - name: Diagram PNGs and the one-pager PDF from their sources (saved with the results)
+        if: ${{ !cancelled() && (inputs.task == 'all' || inputs.task == 'record' || inputs.task == 'finish' || inputs.task == 'edit') }}
+        continue-on-error: true
+        run: |
+          PW=/tmp/pw/node_modules/playwright node docs/diagrams/build.mjs
+          mkdir -p "$OUT/rendered" && cp docs/diagrams/*.png docs/diagrams/*.svg docs/one-pager/attorney-one-pager.pdf "$OUT/rendered/"
       - name: Raw footage from the record run
         if: inputs.task == 'edit'
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
