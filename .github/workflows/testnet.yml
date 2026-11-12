@@ -10,9 +10,11 @@ name: testnet
 #   task=record   only the demo video, on `contract`
 #   task=finish   the C-2 attack check and the demo video, on `contract` (an `all` run that stopped after the smoke test)
 #   task=edit     re-edit the video from the raw footage of an earlier record run (`raw_run`), no chain access
-#   task=release  reproducible build (`cargo near build reproducible-wasm` in the Docker image pinned in
-#                 contracts/dmw/Cargo.toml) of the dispatched commit, committed to the same branch as
-#                 contracts/release/dmw.wasm; no chain access. Run it before `all` so the deploy uses that build.
+#   task=release  only the reproducible build below, no chain access
+#
+# `all` and `release` first make a reproducible build (`cargo near build reproducible-wasm` in the Docker image pinned
+# in contracts/dmw/Cargo.toml) of the dispatched commit and commit it to the same branch as contracts/release/dmw.wasm,
+# so the deployed code hash is checkable by anyone from the source commit named in that commit's message.
 #
 # Keys. No key leaves the runner: every account here is a throwaway testnet faucet account whose key lives only in
 # this job's keys/ folder and is masked in the log the moment it exists (scripts/ci/mask.sh). The contract account
@@ -67,7 +69,7 @@ jobs:
 
       # ---------------- release build ----------------
       - name: Reproducible release build, committed to this branch
-        if: inputs.task == 'release'
+        if: inputs.task == 'release' || inputs.task == 'all'
         run: |
           set -o pipefail
           case "$GITHUB_REF" in refs/heads/*) ;; *) echo "dispatch release on a branch"; exit 1;; esac
@@ -79,7 +81,8 @@ jobs:
           echo "source $SRC  code hash $H  $(wc -c < contracts/release/dmw.wasm) bytes" | tee -a "$OUT/release-build.log"
           git config user.name "github-actions[bot]"; git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add contracts/release/dmw.wasm
-          git commit -qm "release: reproducible build of $SRC (code hash $H)" && git push -q origin "HEAD:$GITHUB_REF_NAME"
+          if git diff --cached --quiet; then echo "release wasm already matches this build"; else
+            git commit -qm "release: reproducible build of $SRC (code hash $H)" && git push -q origin "HEAD:$GITHUB_REF_NAME"; fi
 
       - name: Contract from the input
         if: inputs.task == 'verify' || inputs.task == 'record' || inputs.task == 'finish'
