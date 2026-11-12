@@ -735,7 +735,9 @@ impl Contract {
         let now = env::block_timestamp_ms();
         require!(v.is_paused(now), "not_paused");
         let previous = v.trigger_at_ms();
-        v.guard.paused_until_ms = 0;
+        // Ends the pause now, but keeps it on record as spent (paused_until_ms in the past, like a
+        // pause that ran out), so clients still read "pause used" until the next heartbeat.
+        v.guard.paused_until_ms = now;
         write_guard(id, &v.guard);
         let after = v.trigger_at_ms();
         let data = json!({"token_id": id.to_string(), "trigger_at_ms": after, "previous_trigger_at_ms": previous});

@@ -2758,13 +2758,20 @@ fn v2_l4_owner_unpause() {
     Ctx::new().at(T0 + 6_000).dep(1).set();
     assert_eq!(c.unpause(1.into()), T0 + 40_000);
     let view = c.get_vault(1.into()).unwrap();
-    assert_eq!(view.paused_until_ms, 0);
+    // The pause ended now and reads as spent (in the past, not 0) until the next heartbeat.
+    assert_eq!(view.paused_until_ms, T0 + 6_000);
     assert_eq!(view.state, VaultState::Alive);
     Ctx::new().by("gina.testnet").at(T0 + 7_000).dep(1).set();
     let m = panics(|| {
         c.pause(1.into());
     });
     assert!(m.contains("already_paused"), "{m}");
+    // Only the owner's next heartbeat re-arms the guardian.
+    Ctx::new().at(T0 + 8_000).dep(1).set();
+    c.heartbeat(1.into());
+    assert_eq!(c.get_vault(1.into()).unwrap().paused_until_ms, 0);
+    Ctx::new().by("gina.testnet").at(T0 + 9_000).dep(1).set();
+    c.pause(1.into());
 }
 
 /// L-8: the MPC signer is set at init (default v1.signer-prod.testnet), shown by get_config and
@@ -3071,4 +3078,41 @@ fn v2_solana_key_lookup_uses_salted_path() {
     let dk = created_calls("derived_public_key");
     assert_eq!(dk[0]["path"], v(&c).path(1, ForeignChain::Solana));
     assert_eq!(dk[0]["domain_id"], 1);
+}
+
+/// validate_heirs: besides the contract itself (l10 above), duplicate heirs and zero shares are
+/// refused on both create_vault and set_heirs, so a share can never be counted twice or be empty.
+#[test]
+fn v2_validate_heirs_rejects_duplicates_and_zero_shares() {
+    let mut c = setup();
+    let h = |a: &str, bps: u16| Heir {
+        account_id: acc(a),
+        bps,
+    };
+    let cases = [
+        (
+            vec![h("sarah.testnet", 5000), h("sarah.testnet", 5000)],
+            "duplicate heir",
+        ),
+        (
+            vec![h("sarah.testnet", 10_000), h("tom.testnet", 0)],
+            "heir bps must be > 0",
+        ),
+        (
+            vec![h("sarah.testnet", 6000), h("tom.testnet", 3000)],
+            "heir bps must sum to 10000",
+        ),
+        (vec![], "1..=10 heirs required"),
+    ];
+    for (bad, want) in cases {
+        Ctx::new().dep(1).set();
+        let m = panics(|| c.set_heirs(1.into(), bad.clone()));
+        assert!(m.contains(want), "set_heirs: {want}: {m}");
+        Ctx::new().dep(STORAGE_FEE).set();
+        let m = panics(|| {
+            c.create_vault(20, 1, bad.clone(), None, None);
+        });
+        assert!(m.contains(want), "create_vault: {want}: {m}");
+    }
+    assert_eq!(v(&c).heirs, heirs2());
 }
