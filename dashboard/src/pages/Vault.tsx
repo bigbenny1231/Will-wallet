@@ -171,7 +171,7 @@ export default function Vault() {
           </Label>
           {showcase && (
             <p className="mt-3 max-w-[60ch] border-l border-accent pl-3 text-[14px] leading-relaxed text-text-2">
-              The example vault. The project keeps it alive so there is always a living one to read. Its foreign payouts are pending, and nothing has been relayed.{" "}
+              The example vault. The project’s hosted keeper sends its heartbeat so there is always a living one to read.{" "}
               {guestAvailable() && <Link className="link" to="/try">Run one of your own, no wallet needed.</Link>}
             </p>
           )}

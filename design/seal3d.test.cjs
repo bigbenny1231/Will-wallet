@@ -60,7 +60,7 @@ const check = (name, fn) => Promise.resolve().then(fn).then(() => { pass++; cons
     assert.strictEqual(mod.inscriptionText('alive', '7'), 'DEAD MAN’S WALLET · VAULT 0007 · ALIVE');
     assert.strictEqual(mod.inscriptionText('alive', '12345'), 'DEAD MAN’S WALLET · VAULT 12345 · ALIVE');
     const svg = fs.readFileSync(path.join(__dirname, 'seal.svg'), 'utf8');
-    assert(svg.includes('DEAD MAN&#8217;S WALLET &#183; VAULT 0042 &#183;'), 'seal.svg wording changed');
+    assert(svg.includes('DEAD MAN&#8217;S WALLET &#183; VAULT 0004 &#183;'), 'seal.svg wording changed');
   });
   await check('rim carries two passes, each closed with a middle dot', () => {
     assert.strictEqual(mod.inscriptionRing('alive', '0042'), `${expect.alive} · ${expect.alive} ·`);

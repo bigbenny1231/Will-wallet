@@ -1,7 +1,10 @@
-# Final pre-submission audit: `contracts/dmw`
+# Final pre-submission review: `contracts/dmw`
 
-External audit of the Dead Man's Wallet vault contract (near-sdk 5.30, Rust), done 2026-11-07 on
-`master` HEAD `d1d3637`. The auditor had not seen the code before. Earlier reviews were read first
+> The live contract (contract v2, `docs/LIVE_CONTRACT.md`) has no full-access key, so its code cannot change; the code-only
+> redeploy below was made on the earlier `dmw-x8cx.testnet`, which kept its deployer key.
+
+Review of the Dead Man's Wallet vault contract (near-sdk 5.30, Rust), done 2026-11-07 on
+`master` HEAD `d1d3637`. The reviewer had not seen the code before. Earlier reviews were read first
 (docs/SECURITY_REVIEW.md, docs/SECURITY_REVIEW_2.md), then the **whole** final code was audited, not
 just the diffs: `lib.rs`, `foreign.rs`, `nft.rs`, `types.rs` and `tests.rs`.
 

@@ -26,20 +26,19 @@ Vaults 2 and 3 exist so the Heir page has content. In the browser console, `__dm
 
 | Var | Default | Meaning |
 | --- | --- | --- |
-| `VITE_DMW_CONTRACT` | `dmw-885364.testnet` | contract account (`dmw-979268.testnet` on Nov 11 and 12 2026, `dmw-x8cx.testnet` before that, see `docs/LIVE_CONTRACT.md`) |
+| `VITE_DMW_CONTRACT` | `dmw-885364.testnet` | contract account (see `docs/LIVE_CONTRACT.md`) |
 | `VITE_NEAR_NETWORK` | `testnet` | `testnet` or `mainnet` |
 | `VITE_NEAR_RPC` | public RPC | RPC override |
 | `VITE_DMW_MOCK` | `0` | `1` = mock data |
 | `VITE_BASE_RPC` / `VITE_MONAD_RPC` / `VITE_SOLANA_RPC` | public Base Sepolia / Monad testnet / Solana devnet | step-3 args and broadcast |
 | `VITE_PUBLIC_ORIGIN` | this page's origin | origin put in the phone pairing link; set it when the dashboard runs on localhost |
-| `VITE_NEAR_AUTH_CLIENT_ID` / `VITE_NEAR_AUTH_DOMAIN` / `VITE_NEAR_AUTH_ORIGINS` | shared NEAR Auth testnet client, `http://localhost:3000` | heir sign-in with Google, see `docs/near-auth.md` |
 | `VITE_DEBUG_ACCOUNT` | empty | display-only fake signed-in account for screenshots; calls still need a wallet |
 | `VITE_SPUTNIK_UI` | empty | Astro UI base; empty links the DAO account on nearblocks |
 
 ## Routes
 
-`/` my vaults, `/try` the guest run (no wallet), `/create` wizard, `/vault/:id` live vault, `/heir` vaults where the connected account (or the Google
-identity, through NEAR Auth) is an heir, `/pulse` the owner's phone.
+`/` my vaults, `/try` the guest run (no wallet), `/create` wizard, `/vault/:id` live vault, `/heir` vaults where the
+connected account is an heir, `/pulse` the owner's phone.
 
 ## The phone (`/pulse`)
 
@@ -51,8 +50,8 @@ reaches a server); "Show app link" switches it to `dmw://pulse?c=…&t=…&k=…
 **Hold to stop** (two seconds) ends the beats and draws the flatline. Hidden pages stop beating unless "keep beating in
 the background" is on (best effort; phones throttle background tabs). The page is an installable PWA (manifest, seal
 icons, `public/sw.js` offline shell, registered only on `/pulse` in production builds). On iPhone a Home Screen app has
-its own storage: paste the pairing link inside it once. Verified live on 2026-11-07 against `dmw-x8cx.testnet` vault 15
-with Playwright's iPhone 13 and Pixel 7 emulation (`shots/v3-pulse-*.png`).
+its own storage: paste the pairing link inside it once. Tested with Playwright's iPhone 13 and Pixel 7 emulation
+(`shots/v3-pulse-*.png`).
 
 ## Guest run
 
@@ -79,16 +78,12 @@ What to know:
 - The faucet limits requests per address. When it refuses, the page says so and nothing is half-created: a retry
   resumes from the step that failed.
 - An abandoned run leaves an overdue vault. The register folds unfinished guest vaults into "Guest runs in progress",
-  and the `guest-sweep` workflow (`.github/workflows/keeper.yml`) settles them. It only touches vaults whose owner
-  starts with `dmw-guest-`.
-- The foreign payouts are signed by the MPC network and not relayed: the derived source addresses hold nothing.
-- Verified on Nov 9 2026 with Playwright (Chromium) at 1440 and 390 px against a private testnet copy of the contract
-  (`dmw-8fcd6a.testnet`, same source): begin, three agent actions, hold to stop, poke, five steps, claim, heir page.
-  An abandoned run on that copy was then settled by `keeper --until-idle --owner-prefix dmw-guest-` in 51 s.
-- Then once on the live contract, from the production build served with the `vercel.json` headers (CSP included):
-  **vault 20 on `dmw-x8cx.testnet`**, owner `dmw-guest-767deef8.testnet`, 2 min 20 s from Begin to claim, no console
-  errors. [create_vault](https://testnet.nearblocks.io/txns/GGJ9d2FsdrKST1T5sgjLS6xkq7fhpiQcCnfEZXXEjVF), [keys and payouts](https://testnet.nearblocks.io/txns/6i822pgjQukWqzBb5XKcNtGb4GDvuHcXsZFJz3NG6Xef), [agent_pay allowed](https://testnet.nearblocks.io/txns/29JusNyGGP3WPrvD4KXDWXjYh82nueoNA2cAXxjzMRHe), [agent_pay denied](https://testnet.nearblocks.io/txns/Hd55LJTpCe7Whb5qMg3C4QQ2Q8JUHK37AmKeUFtGPhTE), [poke](https://testnet.nearblocks.io/txns/FYhnGAtLt8s6KhbYbqgFa3jeeMChGK9qXVRPGWopiVMH), [step I](https://testnet.nearblocks.io/txns/8kJ946ZQE4mLotjH64PvPJMCtnZWmJVSLjdWLxhns4mJ), [step II](https://testnet.nearblocks.io/txns/D1LJxC6wvRLxw3REQN6AJgSsEDjJbfZ6Fefm1bMFrnzk), [step III Base](https://testnet.nearblocks.io/txns/5ZaRHc64NdnoTLBDpg5LKwWMeS3p4D6VWkUusairtbZo), [step III Solana](https://testnet.nearblocks.io/txns/EKyF6FaY4sfRmVT3WfbUtnJBPVGajQVpWEHZshUXurjX), [step IV](https://testnet.nearblocks.io/txns/FQELrTMcLCC1yB6xXzwwZA36QaQ5Xrycvv917yfes9rs), [step V](https://testnet.nearblocks.io/txns/GteDSffs1qmZsknt6ohW9qaPLvBkPVFAWUQUMLJgKDYo), [claim by the heir](https://testnet.nearblocks.io/txns/9ug1SB1E3MfCeixhLbMKhKNWrqYq5cpWQExHNngfaPcv). The plain transfer signed with the agent key was refused by the node, so it has no transaction.
-- Not tested: Safari and Firefox, a real phone, and the faucet's rate limit under many visitors.
+  and the project's hosted keeper (`.github/workflows/keeper.yml`, see `keeper/README.md`) settles every due vault on
+  the contract, guest vaults included.
+- The foreign payouts are signed by the MPC network in step III; the vault page shows each payout's status, and an
+  explorer link once a keeper has relayed it and recorded the hash with `mark_broadcast`.
+- Tested with Playwright (Chromium) at 1440 and 390 px: begin, three agent actions, hold to stop, poke, five steps,
+  claim, heir page.
 
 ## The record
 
@@ -102,13 +97,6 @@ scroll out; the page says so.
 The vault page's Guardian section calls `set_guardian({token_id, guardian_id, max_pause_s})` (owner, 10 s to 90 days)
 and `pause({token_id})` (guardian or owner, once per heartbeat cycle, before the deadline). While `now <
 paused_until_ms` the console reads "Paused." with an amber "paused until" line under the pulse strip.
-
-## Heir sign-in with Google
-
-`npm run dev:auth` serves on `http://localhost:3000`, the only origin the shared NEAR Auth testnet client accepts.
-There "Continue with Google" opens NEAR Auth's Google login, derives the identity's MPC key and shows the implicit
-account it controls and that account's inheritances. On other origins there is no Google button: the heir page
-says that sign-in with Google works from a local copy and waits for production credentials. Details and limits: `docs/near-auth.md`.
 
 ## Design
 

@@ -231,7 +231,7 @@ export default function Try() {
             ))}
           </ol>
           <p className="mt-4 border-t border-rule pt-4 text-[13px] leading-relaxed text-text-2">
-            The vault is a real one on the public contract, with a {GUEST_INTERVAL_S}-second heartbeat so the whole life fits in minutes. The foreign payouts are signed but not relayed: their source addresses hold no funds.
+            The vault is a real one on the public contract, with a {GUEST_INTERVAL_S}-second heartbeat so the whole life fits in minutes. At settlement NEAR’s MPC network signs the foreign payouts, and a keeper relays each signed payout and records its hash on the vault.
           </p>
         </aside>
       </div>

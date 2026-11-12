@@ -17,7 +17,7 @@ the time) unless a line says otherwise. Explorer: `https://testnet.nearblocks.io
 | 7 | Hosted guest sweep (`.github/workflows/keeper.yml`) on a vault left alone on purpose | PASS. Vault 24 was settled by a scheduled run with a one-off account |
 | 8 | Both deployments, 9 pages each at 1440 px and iPhone 13: console errors, failed requests, horizontal overflow | PASS, none |
 | 9 | Every link on those pages | 4 fail: the GitHub links, because the repository is still private. Explorer links could not be checked from the test machine (403 to automated clients) |
-| 10 | Security and bug review | 1 Critical, 3 Medium, 14 Low: [`SECURITY_REVIEW_3.md`](SECURITY_REVIEW_3.md) |
+| 10 | Security and bug review | 1 Critical, 3 Medium, 14 Low: [`SECURITY_REVIEW_3.md`](../SECURITY_REVIEW_3.md) |
 | 11 | Claims: every checkable statement in the README, SPEC, submission kit, component docs and site copy (818 checked) | 39 were wrong or stale and are corrected in the same commits as this file |
 | 12 | After the fixes: fixed contract build on a private copy, all tests, `make demo`, `make kill`, and a guest run on the fixed dashboard | PASS (details below) |
 

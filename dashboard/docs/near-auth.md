@@ -1,5 +1,10 @@
 # Heir sign-in with Google through NEAR Auth
 
+> **Design note.** This describes a design that is kept in the code but switched off: the deployed dashboard has no
+> Google sign-in. It is turned on only with `VITE_HEIR_GOOGLE=1` (see `.env.example`), and then only on the origins the
+> NEAR Auth client accepts.
+
+
 Researched and built 2026-11-07. Sources: https://docs.auth.near.org (Quickstart, Browser SDK, Authenticate users,
 Resources/Testnet) and the published packages `@fast-auth-near/browser-sdk@1.4.2` and
 `@fast-auth-near/javascript-provider@1.4.1`.
@@ -50,7 +55,7 @@ The shared testnet Auth0 client accepts exactly one callback URL: `http://localh
 `http://127.0.0.1:3000`, `https://localhost:3000`, the Vercel deployment and `https://example.com` all return
 "Callback URL mismatch". So:
 
-- `npm run dev:auth` (Vite on port 3000): **Continue with Google works.** Verified with Playwright on 2026-11-07: the
+- `VITE_HEIR_GOOGLE=1 npm run dev:auth` (Vite on port 3000): **Continue with Google works.** Verified with Playwright on 2026-11-07: the
   button opens the NEAR Auth popup, which goes on to Google's sign-in page (`shots/v3-heir-nearauth-google-popup.png`).
   We did not finish a Google login in the sandbox (no Google account there), so the last step, reading the `sub` and
   deriving the key, is checked against the same code path with a known `sub` (see the test and the RPC call above)

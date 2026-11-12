@@ -7,7 +7,7 @@ A heartbeat that speeds up, flatlines, and becomes the five settlement steps, un
 > Your crypto shouldn't die with you.
 
 Every frame is drawn by code (`teaser.html` exposes `renderFrame(i)`, a pure function of the frame index) in the
-site's own type and colours. Nothing in it is footage, and vault 0042 is the same example vault as the site's hero.
+site's own type and colours. Nothing in it is footage; vault 0042 is an example number, not a vault on chain.
 The voice is recorded first and the picture is cut to it: `build.py` asks ElevenLabs for each line with character
 timings and writes the timeline (`vo/timeline.json`, and the `const TL = ...` line of `teaser.html`) from them.
 
@@ -22,7 +22,7 @@ timings and writes the timeline (`vo/timeline.json`, and the `const TL = ...` li
 | 0:07.8 to 0:10.5 | End card: seal, name, tagline | line 3, a chord, then one heartbeat as the seal turns green |
 
 The claims are the ones the README makes: heirs paid on NEAR, the agent key deleted, Base, Monad and Solana payouts
-**signed** (not relayed), a DAO proposal filed when a DAO is named, the Will NFT to the heir.
+**signed** by NEAR's MPC network, a DAO proposal filed when a DAO is named, the Will NFT to the heir.
 
 ## Files
 

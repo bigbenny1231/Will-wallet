@@ -96,7 +96,7 @@ this wasm size (612 KB unoptimised; no `wasm-opt` on the build machine). No new 
 
 ## Second review (Nov 12 2026)
 
-An independent adversarial review of `claude/contract-v2` found four issues and two info items. Its tests are kept as
+An adversarial review of `claude/contract-v2`, by a reviewer that had not written the fixes, found four issues and two info items. Its tests are kept as
 regression tests in `contracts/dmw/src/audit_v2.rs` (`cargo test --locked audit_`); all four failed before the fixes
 and pass now. `cargo fmt` reflowed that file; no test logic changed.
 

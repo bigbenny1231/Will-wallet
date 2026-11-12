@@ -88,7 +88,13 @@ function units(raw, dec) {
   return whole.toString() + (frac ? '.' + frac.slice(0, 6) : '');
 }
 const near = (y) => units(y, 24) + ' NEAR';
-const statusWord = (s) => (s === 'signed' ? 'Signed, not relayed' : s === 'pending' ? 'Pending until settlement' : cap(s));
+// A payout's status as the contract records it: signed by MPC, then relayed by a keeper, which records the hash with
+// mark_broadcast. The explorer link is shown only for a recorded hash of the chain's own shape.
+const STATUS_WORD = { pending: 'Pending until settlement', signed: 'Signed by MPC, waiting for a keeper to relay', broadcast: 'Relayed', failed: 'Signature request timed out; it can be made again' };
+const statusWord = (s) => STATUS_WORD[s] || cap(s);
+const EXPLORER_TX = { base: (h) => 'https://sepolia.basescan.org/tx/' + h, monad: (h) => 'https://testnet.monadexplorer.com/tx/' + h, solana: (h) => 'https://explorer.solana.com/tx/' + h + '?cluster=devnet' };
+const HASH_SHAPE = { base: /^0x[0-9a-fA-F]{64}$/, monad: /^0x[0-9a-fA-F]{64}$/, solana: /^[1-9A-HJ-NP-Za-km-z]{64,90}$/ };
+const payoutTxUrl = (f) => (f.status === 'broadcast' && f.tx_hash && HASH_SHAPE[f.chain] && HASH_SHAPE[f.chain].test(f.tx_hash) ? EXPLORER_TX[f.chain](f.tx_hash) : null);
 
 // Node positions as % of the graph box.
 const LAYOUT = {
@@ -170,11 +176,11 @@ export async function init() {
     const from = ownerTyped ? 'Written by the contract at signing' : f.from_address ? f.from_address : 'Not recorded yet';
     const rows = [['Network', c.net], ['Amount', units(f.amount, c.dec) + ' ' + c.unit], ['From', from, !ownerTyped && !!f.from_address]];
     if (paths) rows.push(['Derivation path', chain === 'solana' ? paths.solana : paths[chain], true]);
-    rows.push(['To', f.to, true], ['Status', statusWord(f.status)]);
+    rows.push(['To', f.to, true], ['Status', statusWord(f.status), false, payoutTxUrl(f)]);
     return {
       h: id.startsWith('r') ? 'Recipient on ' + c.net : c.name + ', step III',
       rows,
-      note: 'The vault has NEAR’s MPC network sign this payout only after the trigger, from an address derived from the vault. A keeper then relays it; the source address must hold the funds.',
+      note: 'The vault has NEAR’s MPC network sign this payout only after the trigger, from an address derived from the vault. A keeper then relays it from that address and records its hash on the vault.',
     };
   }
 
@@ -185,7 +191,12 @@ export async function init() {
     detail.textContent = '';
     detail.append(el('h3', '', d.h));
     const dl = el('dl');
-    d.rows.forEach(([k, val, mono]) => { const row = el('div'); row.append(el('dt', '', k)); const dd = el('dd', mono ? 'mono' : '', val); row.append(dd); dl.append(row); });
+    d.rows.forEach(([k, val, mono, href]) => {
+      const row = el('div'); row.append(el('dt', '', k));
+      const dd = el('dd', mono ? 'mono' : '', val);
+      if (href) { const a = el('a', '', 'explorer'); a.href = href; a.target = '_blank'; a.rel = 'noopener'; dd.append(' ', a); }
+      row.append(dd); dl.append(row);
+    });
     detail.append(dl);
     if (d.note) detail.append(el('p', '', d.note));
     edges.forEach((e) => e.path.classList.toggle('is-hot', e.b === id || (e.a === id && id !== 'vault') || (onRoute(id, e))));
@@ -290,7 +301,7 @@ export async function init() {
       const what = el('span', '', label);
       let d = l.detail;
       if (l.event === 'step_1') d = d.split(', ').map((p) => { const [a, ...r] = p.split(' '); return cap(short(a)) + ' ' + r.join(' '); }).join(', ');
-      if (l.event === 'step_3') d = v17.foreign.map((f) => cap(f.chain) + ' ' + f.status).join(', ') + '; none relayed';
+      if (l.event === 'step_3') d = v17.foreign.map((f) => cap(f.chain) + ' ' + (f.status === 'broadcast' ? 'relayed' : f.status)).join(', ');
       if (l.event === 'step_4' && /no dao/i.test(d)) d = 'No estate DAO set, so skipped';
       if (l.event === 'step_5') d = 'to ' + cap(short(d.replace(/^will nft -> /, '')));
       what.append(el('span', 'd', d + ', ' + utc(l.ms)));
@@ -302,6 +313,14 @@ export async function init() {
         a.setAttribute('aria-label', a.textContent + ': ' + label + ', transaction on nearblocks');
         if (i) tx.append(' ');
         tx.append(a);
+      });
+      if (l.event === 'step_3') v17.foreign.forEach((f) => {
+        const url = payoutTxUrl(f);
+        if (!url) return;
+        const a = el('a', '', cap(f.chain) + ' relay');
+        a.href = url;
+        a.setAttribute('aria-label', cap(f.chain) + ' payout relayed, transaction on its explorer');
+        tx.append(' ', a);
       });
       li.append(tx);
       list.append(li);

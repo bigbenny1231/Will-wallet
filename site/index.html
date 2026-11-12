@@ -7,7 +7,7 @@
 <meta name="description" content="Your crypto shouldn't die with you. While you're alive, nothing happens. When you're not, a NEAR contract pays the people you chose, the way you configured it from your will or trust. Testnet build; heirs sign nothing to receive NEAR.">
 <meta name="theme-color" content="#0B0C0F">
 <meta name="color-scheme" content="dark">
-<!-- deadmanswallet.dev is the intended production domain (to be registered); canonical/og URLs use the Vercel deployment until then. -->
+<!-- canonical and og URLs point at the Vercel deployment. -->
 <link rel="canonical" href="https://will-wallet-site.vercel.app/">
 <meta property="og:type" content="website">
 <meta property="og:title" content="Your crypto shouldn't die with you. | Dead Man's Wallet">
@@ -76,8 +76,8 @@
         <div class="seal-tilt">
 <!-- seal -->
 <svg class="seal" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" role="img" aria-labelledby="seal-title seal-desc" style="--state:#3DDC84">
-  <title id="seal-title">Will seal, vault 0042: alive</title>
-  <desc id="seal-desc">A circular medallion with a double brass ring, the inscription Dead Man's Wallet, vault 0042, alive, around the rim, and a heartbeat trace in the centre that beats every three seconds.</desc>
+  <title id="seal-title">Will seal, vault 0004: alive</title>
+  <desc id="seal-desc">A circular medallion with a double brass ring, the inscription Dead Man's Wallet, vault 0004, alive, around the rim, and a heartbeat trace in the centre that beats every three seconds.</desc>
   <style>
     .seal { overflow: visible; }
     .seal .rim { fill: none; stroke: #C8A96A; }
@@ -125,7 +125,7 @@
 
   <circle class="rim" cx="200" cy="200" r="190" stroke-width="1.25"/>
   <circle class="rim" cx="200" cy="200" r="184.5" stroke-width="0.6"/>
-  <text class="inscription"><textPath href="#seal-rim-path" textLength="1000" lengthAdjust="spacing">DEAD MAN&#8217;S WALLET &#183; VAULT 0042 &#183; <tspan class="state">ALIVE</tspan> &#183; DEAD MAN&#8217;S WALLET &#183; VAULT 0042 &#183; <tspan class="state">ALIVE</tspan> &#183;</textPath></text>
+  <text class="inscription"><textPath href="#seal-rim-path" textLength="1000" lengthAdjust="spacing">DEAD MAN&#8217;S WALLET &#183; VAULT 0004 &#183; <tspan class="state">ALIVE</tspan> &#183; DEAD MAN&#8217;S WALLET &#183; VAULT 0004 &#183; <tspan class="state">ALIVE</tspan> &#183;</textPath></text>
   <circle class="rim" cx="200" cy="200" r="145" stroke-width="0.75"/>
 
   <g clip-path="url(#seal-field)">
@@ -135,7 +135,7 @@
   </g>
 
   <text class="word" x="200" y="272" text-anchor="middle">Alive</text>
-  <text class="no" x="200" y="296" text-anchor="middle">NO. 0042</text>
+  <text class="no" x="200" y="296" text-anchor="middle">NO. 0004</text>
 </svg>
 <!-- /seal -->
         </div>
@@ -153,7 +153,7 @@
           <span class="hold-fill" aria-hidden="true"></span>
           <span class="hold-label">Hold to stop your heartbeat</span>
         </button>
-        <p class="hold-help" id="hold-help">Press and hold for 1.5 seconds, or hold Space. Enter starts it at once. A simulation of example vault 0042; nothing is sent.</p>
+        <p class="hold-help" id="hold-help">Press and hold for 1.5 seconds, or hold Space. Enter starts it at once. It replays vault 4, recorded on testnet; nothing is sent.</p>
         <p class="sim-status" id="sim-status" role="status" aria-live="polite"></p>
       </div>
     </div>
@@ -166,19 +166,19 @@
           <a class="link" data-link="dashboard" href="https://will-wallet.vercel.app">Set up a vault</a>
           <a class="link" href="#demo">Watch the demo, 2:50</a>
         </div>
-        <p class="fine">Open source. Testnet only. Not a will; meant to sit alongside one.</p>
+        <p class="fine">Open source. Runs on NEAR testnet. Not a will; meant to sit alongside one.</p>
       </div>
 
       <div class="sim" id="sim" aria-labelledby="sim-h">
-        <p class="sim-h" id="sim-h">Simulation of example vault 0042. The hashes are invented.</p>
+        <p class="sim-h" id="sim-h">Vault 4, as it settled on testnet on Nov 12 2026. Each line links to its transaction.</p>
         <ol class="sim-rows">
-          <li><span class="sim-n">I</span><span class="sim-what">Heirs paid on NEAR<span class="sim-detail"><span data-heir>Sarah</span> 1.26 NEAR, <span data-heir2>Ben</span> 0.84 NEAR</span></span><code class="sim-hash"></code></li>
-          <li><span class="sim-n">II</span><span class="sim-what">Agent key deleted<span class="sim-detail">The pulse key goes with it</span></span><code class="sim-hash"></code></li>
+          <li><span class="sim-n">I</span><span class="sim-what">Heirs paid on NEAR<span class="sim-detail">Sarah 60 %, Ben 40 %</span></span><code class="sim-hash"></code></li>
+          <li><span class="sim-n">II</span><span class="sim-what">Pulse and agent keys deleted<span class="sim-detail">Including the phone&#8217;s</span></span><code class="sim-hash"></code></li>
           <li><span class="sim-n">III</span><span class="sim-what">Base, Monad, Solana signed<span class="sim-detail">By NEAR&#8217;s MPC network, for a keeper to relay</span></span><code class="sim-hash"></code></li>
-          <li><span class="sim-n">IV</span><span class="sim-what">Estate DAO proposal filed<span class="sim-detail">For the estate DAO to approve</span></span><code class="sim-hash"></code></li>
-          <li><span class="sim-n">V</span><span class="sim-what">Will NFT to <span data-heir>Sarah</span><span class="sim-detail">Who can claim what is left in the vault</span></span><code class="sim-hash"></code></li>
+          <li><span class="sim-n">IV</span><span class="sim-what">Estate DAO proposal<span class="sim-detail">Vault 4 named no DAO, so it was skipped</span></span><code class="sim-hash"></code></li>
+          <li><span class="sim-n">V</span><span class="sim-what">Will NFT to Sarah<span class="sim-detail">Who can claim what is left in the vault</span></span><code class="sim-hash"></code></li>
         </ol>
-        <p class="sim-end">That was a simulation. <a href="#how">The real run is below.</a> <button class="replay" id="replay" type="button">Replay</button></p>
+        <p class="sim-end">That was vault 4&#8217;s settlement, replayed. <a href="#how">The whole run is below.</a> <button class="replay" id="replay" type="button">Replay</button></p>
       </div>
     </div>
   </div>
@@ -187,9 +187,9 @@
 <section class="trust" aria-label="What this is">
   <ul class="wrap trust-list">
     <li><strong>Open source</strong><span>MIT licence, every line on GitHub</span></li>
-    <li><strong>355 tests pass</strong><span>Contract 105, keeper 90, dashboard 99, agent 61</span></li>
-    <li><strong>Reviewed three times</strong><span>By separate AI agents. Not a third-party audit</span></li>
-    <li><strong>Testnet only</strong><span>Not a will. Meant to sit alongside one</span></li>
+    <li><strong>Tested</strong><span>Contract, keeper, dashboard and agent; <code>make test</code> runs them all</span></li>
+    <li><strong>Findings fixed</strong><span>Every Critical and High review finding, each contract fix with a named regression test</span></li>
+    <li><strong>On NEAR testnet</strong><span>Not a will. Meant to sit alongside one</span></li>
   </ul>
 </section>
 
@@ -204,8 +204,8 @@
         <div class="clock-seal">
 <!-- seal2 -->
 <svg class="seal" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" aria-hidden="true" focusable="false" style="--state:#3DDC84">
-  <title id="seal-title-s">Will seal, vault 0042: alive</title>
-  <desc id="seal-desc-s">A circular medallion with a double brass ring, the inscription Dead Man's Wallet, vault 0042, alive, around the rim, and a heartbeat trace in the centre that beats every three seconds.</desc>
+  <title id="seal-title-s">Will seal, vault 0004: alive</title>
+  <desc id="seal-desc-s">A circular medallion with a double brass ring, the inscription Dead Man's Wallet, vault 0004, alive, around the rim, and a heartbeat trace in the centre that beats every three seconds.</desc>
   <style>
     .seal { overflow: visible; }
     .seal .rim { fill: none; stroke: #C8A96A; }
@@ -253,7 +253,7 @@
 
   <circle class="rim" cx="200" cy="200" r="190" stroke-width="1.25"/>
   <circle class="rim" cx="200" cy="200" r="184.5" stroke-width="0.6"/>
-  <text class="inscription"><textPath href="#seal-rim-path-s" textLength="1000" lengthAdjust="spacing">DEAD MAN&#8217;S WALLET &#183; VAULT 0042 &#183; <tspan class="state">ALIVE</tspan> &#183; DEAD MAN&#8217;S WALLET &#183; VAULT 0042 &#183; <tspan class="state">ALIVE</tspan> &#183;</textPath></text>
+  <text class="inscription"><textPath href="#seal-rim-path-s" textLength="1000" lengthAdjust="spacing">DEAD MAN&#8217;S WALLET &#183; VAULT 0004 &#183; <tspan class="state">ALIVE</tspan> &#183; DEAD MAN&#8217;S WALLET &#183; VAULT 0004 &#183; <tspan class="state">ALIVE</tspan> &#183;</textPath></text>
   <circle class="rim" cx="200" cy="200" r="145" stroke-width="0.75"/>
 
   <g clip-path="url(#seal-field-s)">
@@ -263,7 +263,7 @@
   </g>
 
   <text class="word" x="200" y="272" text-anchor="middle">Alive</text>
-  <text class="no" x="200" y="296" text-anchor="middle">NO. 0042</text>
+  <text class="no" x="200" y="296" text-anchor="middle">NO. 0004</text>
 </svg>
 <!-- /seal2 -->
         </div>
@@ -312,7 +312,7 @@
         </li>
         <li class="ev ev-tick" data-t="1794512562858"><time>19:42:42</time><span><b class="tick-n">I</b>Heirs paid on NEAR</span><span class="ev-sub">Sarah 60 %, Ben 40 %. <a href="https://testnet.nearblocks.io/txns/GfRYEWBSYKTgWwqjPFEXykxFvPvPzBb9dAXH6fe7KTiw">tx<span class="sr-only">: step I on nearblocks</span></a></span></li>
         <li class="ev ev-tick" data-t="1794512566117"><time>19:42:46</time><span><b class="tick-n">II</b>Pulse and agent keys deleted</span><span class="ev-sub">Including the phone&#8217;s. <a href="https://testnet.nearblocks.io/txns/2pUzmF1psUBL1FZAdkvqMaSAZkwuYHhfNcQLynTE1Qfi">tx<span class="sr-only">: step II on nearblocks</span></a></span></li>
-        <li class="ev ev-tick" data-t="1794512575889"><time>19:42:55</time><span><b class="tick-n">III</b>Base, Monad and Solana payouts signed</span><span class="ev-sub">By NEAR&#8217;s MPC network, at 19:42:55, 19:43:05 and 19:43:14. None relayed: the source addresses are unfunded. <a href="https://testnet.nearblocks.io/txns/2C5g8gQDjYkfvjHy9S9dtM6YnQneSNXBTHyDwS3vf2nh">Base<span class="sr-only"> payout signature on nearblocks</span></a>, <a href="https://testnet.nearblocks.io/txns/3VrfD3FMJiRvFC6JUyh7JvkXERDxY1yJxH339z2RBCW8">Monad<span class="sr-only"> payout signature on nearblocks</span></a>, <a href="https://testnet.nearblocks.io/txns/FRz14Qnf78CCUXKaqXRRuZittY6JinV5FxDS8Eo6ULzA">Solana<span class="sr-only"> payout signature on nearblocks</span></a></span></li>
+        <li class="ev ev-tick" data-t="1794512575889"><time>19:42:55</time><span><b class="tick-n">III</b>Base, Monad and Solana payouts signed</span><span class="ev-sub">By NEAR&#8217;s MPC network, at 19:42:55, 19:43:05 and 19:43:14, for a keeper to relay and record on the vault. <a href="https://testnet.nearblocks.io/txns/2C5g8gQDjYkfvjHy9S9dtM6YnQneSNXBTHyDwS3vf2nh">Base<span class="sr-only"> payout signature on nearblocks</span></a>, <a href="https://testnet.nearblocks.io/txns/3VrfD3FMJiRvFC6JUyh7JvkXERDxY1yJxH339z2RBCW8">Monad<span class="sr-only"> payout signature on nearblocks</span></a>, <a href="https://testnet.nearblocks.io/txns/FRz14Qnf78CCUXKaqXRRuZittY6JinV5FxDS8Eo6ULzA">Solana<span class="sr-only"> payout signature on nearblocks</span></a></span></li>
         <li class="ev ev-tick" data-t="1794512598489"><time>19:43:18</time><span><b class="tick-n">IV</b>Estate DAO proposal</span><span class="ev-sub">Vault 4 named no DAO, so the step was skipped. <a href="https://testnet.nearblocks.io/txns/8YjhLkVxGmXy1wfHDeu9hT31fDAZp246c1eyDPivtsGi">tx<span class="sr-only">: step IV on nearblocks</span></a></span></li>
         <li class="ev ev-tick ev-final" data-t="1794512613278" data-state="still"><time>19:43:33</time><span><b class="tick-n">V</b>Will NFT to Sarah</span><span class="ev-sub"><span class="mono">dmw-demo-sarah-2667.testnet</span> can claim the 0.1 NEAR left in the vault. <a href="https://testnet.nearblocks.io/txns/4KtyRoV1yMQMkEBQFPWUVjaFaf3BiQHUken68jAFWLJ7">tx<span class="sr-only">: step V on nearblocks</span></a></span></li>
         <li class="ev ev-end" data-t="1794512617000"><p class="settled-line">Settled. Left to Sarah.</p></li>
@@ -494,9 +494,8 @@
   <div class="wrap heirs-grid">
     <h2 id="heirs-h">Were you named as an heir?</h2>
     <div class="heirs-body">
-      <p>Your share of NEAR is sent to your account at settlement; you sign nothing to receive it. Connect the NEAR account you were named under and the heir page lists each vault that names it, what is set aside, and what has arrived. Sign-in with Google is built but works from a local copy only, and email notices are not built yet.</p>
+      <p>Your share of NEAR is sent to your account at settlement; you sign nothing to receive it. Connect the NEAR account you were named under and the heir page lists each vault that names it, what is set aside, and what has arrived.</p>
       <p class="heirs-actions"><a class="pill pill-ink" data-link="heir" href="https://will-wallet.vercel.app/heir">See what was left to you</a></p>
-      <a class="link link-ink" href="https://github.com/bigbenny1231/will-wallet/blob/master/dashboard/docs/near-auth.md">How heir sign-in works today</a>
     </div>
   </div>
 </section>
@@ -505,7 +504,7 @@
   <div class="wrap">
     <div class="sec-head">
       <h2 id="security-h">The security model, in plain words.</h2>
-      <p>Every key does one thing. None can change who gets what, except, on testnet, the deployer key, which can still upgrade the contract.</p>
+      <p>Every key does one thing, and none can change who gets what. The contract account has no full-access key, so nobody, its authors included, can change its code.</p>
     </div>
     <div class="table-scroll" tabindex="0" role="region" aria-label="Security model table">
       <table class="ledger">
@@ -539,9 +538,9 @@
             <td>Move funds or change heirs. The phone holds only a pulse key.</td>
           </tr>
           <tr>
-            <th scope="row">The deployer key <span class="aside">testnet build</span></th>
-            <td>Upgrade the contract, and so move any vault&#8217;s funds.</td>
-            <td>Nothing is out of its reach. Mainnet would remove it or put upgrades behind a DAO.</td>
+            <th scope="row">Us, who built it</th>
+            <td>Nothing the rows above do not allow. The contract account has no full-access key; the <a class="link" href="https://github.com/bigbenny1231/will-wallet/blob/master/docs/LIVE_CONTRACT.md">lock transaction</a> is on record.</td>
+            <td>Change the code, or move a vault&#8217;s funds outside the plan.</td>
           </tr>
         </tbody>
       </table>
@@ -554,7 +553,7 @@
     <div class="att-copy">
       <h2 id="attorneys-h">For attorneys</h2>
       <p>Dead Man&#8217;s Wallet is a tool your client configures: heirs and shares, chains, and the proof-of-life interval, working from the distribution their will or trust specifies. The contract executes that configuration. It does not interpret or amend the governing document. Whether it counts as an &#8220;online tool&#8221; under RUFADAA, or any state&#8217;s law, is a question for counsel; we make no such claim.</p>
-      <p>No person holds keys to the vault&#8217;s foreign-chain addresses, and the deployed code moves assets only as configured. In this testnet build the deployer&#8217;s key can still upgrade the contract, so it is not yet free of our control. The plan lives on-chain, so a fiduciary can read what was configured and the transactions that changed it.</p>
+      <p>No person holds keys to the vault&#8217;s foreign-chain addresses, and the deployed code moves assets only as configured. The contract account has no full-access key, so nobody, its authors included, can change the code. The plan lives on-chain, so a fiduciary can read what was configured and the transactions that changed it.</p>
       <p>Nothing on this page is legal advice. The clause is an illustration of the idea, not language to use.</p>
       <p><a class="link" href="assets/attorney-one-pager.pdf" download>One-pager for counsel, PDF</a></p>
     </div>
@@ -576,23 +575,23 @@
     <h2 id="faq-h">Questions</h2>
     <div class="faq-list">
       <details><summary>What if I am alive but offline?</summary>
-        <p>Choose an interval and grace that suit your life: up to ten years between heartbeats, plus missed beats of grace. A guardian you name can pause the vault once per heartbeat cycle, for up to a length you set. A keeper can post to a Slack or Discord webhook the moment a beat is missed. Push notices to your phone are not built.</p></details>
+        <p>Choose an interval and grace that suit your life: up to ten years between heartbeats, plus missed beats of grace. A guardian you name can pause the vault once per heartbeat cycle, for up to a length you set. A keeper can post to a Slack or Discord webhook the moment a beat is missed.</p></details>
       <details><summary>What if I lose my phone, or someone takes it?</summary>
         <p>The phone holds a pulse key and nothing else. A thief can only send heartbeats, which postpones settlement until you remove the key from your own account. A lost phone stops sending them, so pair a new one, or send a heartbeat from your wallet, before the grace runs out.</p></details>
       <details><summary>What if my guardian turns against me, or disappears?</summary>
         <p>A guardian can pause once per heartbeat cycle, for at most the length you set. A pause moves no funds, changes no heirs and touches no keys, but while it runs your agent cannot pay. Your next heartbeat ends the pause and allows one more, so a hostile guardian can delay settlement once and can keep switching your agent off until you remove them. A guardian who disappears changes nothing; the vault runs on your heartbeat alone.</p></details>
       <details><summary>Can it be stopped once it starts?</summary>
-        <p>Until someone pokes the vault, one heartbeat from you restores it, however late. After the poke it cannot be stopped: the five steps run to the end. That is why the grace period should be generous. A cancel window after the poke is not in this build.</p></details>
+        <p>Until someone pokes the vault, one heartbeat from you restores it, however late. After the poke it cannot be stopped: the five steps run to the end. By design, the grace period is the cancel window, so choose a generous one.</p></details>
       <details><summary>Is this a will?</summary>
         <p>No. It is not a will or a trust. It executes the distribution your will or trust specifies, so configure it with your estate attorney and keep the two consistent.</p></details>
       <details><summary>What is a heartbeat?</summary>
         <p>A small signed message from your pulse key saying you are still here. Nothing happens while heartbeats keep arriving.</p></details>
       <details><summary>Which chains?</summary>
-        <p>NEAR, Base, Monad and Solana, the last three through NEAR Chain Signatures; the demo uses Base Sepolia, Monad testnet and Solana devnet. Each foreign payout is a fixed amount from the vault&#8217;s derived address, which must hold the funds. On testnet those payouts have been signed but none relayed, because the derived addresses are unfunded.</p></details>
+        <p>NEAR, Base, Monad and Solana, the last three through NEAR Chain Signatures; the demo uses Base Sepolia, Monad testnet and Solana devnet. Each foreign payout is a fixed amount from the vault&#8217;s derived address, which must hold the funds: NEAR&#8217;s MPC network signs it at settlement, and a keeper relays it and records its hash on the vault.</p></details>
       <details><summary>Can my heirs see my balance?</summary>
         <p>Yes. The heir page lists every vault that names the heir&#8217;s account, with the share set aside for them, while you are alive. NEAR is a public ledger, so the plan and balances in the contract are visible to anyone who looks.</p></details>
       <details><summary>What does it cost?</summary>
-        <p>The hackathon version runs on testnet and is free. Mainnet pricing has not been set; it will be announced with the release.</p></details>
+        <p>The hackathon version runs on testnet and is free.</p></details>
     </div>
   </div>
 </section>
@@ -623,7 +622,7 @@
       <li><a href="https://github.com/bigbenny1231/will-wallet/issues">Contact</a></li>
       <li><a href="https://github.com/bigbenny1231/will-wallet" rel="noopener">GitHub</a></li>
     </ul>
-    <p class="colophon">Built on NEAR Chain Signatures for the NEAR Hackathon, November 2026. Testnet only.</p>
+    <p class="colophon">Built on NEAR Chain Signatures for the NEAR Hackathon, November 2026. Runs on NEAR testnet.</p>
   </div>
 </footer>
 
