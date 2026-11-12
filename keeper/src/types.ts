@@ -32,13 +32,20 @@ export interface EvmStepArgs {
   gas_limit: string;
 }
 
-/** `get_sign_track` view: last signature request for a payout (SPEC 2.7). */
+/**
+ * `get_sign_track` view: last signature request for a payout (SPEC 2.7). Contract v3: the fees are those of the last
+ * SIGNED request (a failed re-sign no longer changes them, L-3).
+ */
 export interface SignTrack {
   last_request_ms: number;
   inflight: boolean;
   max_fee_per_gas: string;
   max_priority_fee_per_gas: string;
   resign_allowed_after_ms: number;
+  /** v3: keeper re-signs of this signed/broadcast Solana payout in the current keeper epoch (absent before v3). */
+  keeper_resigns?: number;
+  /** v3: keeper re-signs still allowed in this epoch (3 minus `keeper_resigns`; absent before v3). */
+  keeper_resigns_left?: number;
 }
 
 export interface StepArgs {

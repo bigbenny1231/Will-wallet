@@ -15,6 +15,13 @@ export function classifyRelayError(chain: ChainName, e: unknown): RelayErrorKind
   return 'other';
 }
 
-/** Cooldowns (ms) before a parked payout is retried. */
-export const RELAY_COOLDOWN = { unfunded: 60_000, other: 30_000, resignCap: 300_000 };
+/**
+ * Cooldowns (ms) before a parked payout is retried. `parked`: a re-sign this account may not make (contract v3 keeper
+ * allowance used up for a Solana payout, not an operator, no legal non-keeper fee): looked at again hourly, quietly,
+ * because a keeper change (new keeper epoch) or a role change can lift it.
+ */
+export const RELAY_COOLDOWN = { unfunded: 60_000, other: 30_000, resignCap: 300_000, parked: 3_600_000 };
 export const MAX_RESIGNS = 2;
+
+/** Contract v3: a keeper may re-sign a signed/broadcast Solana payout at most 3 times per keeper epoch. Final, never retried. */
+export const RESIGN_LIMIT_ERROR = /keeper re-sign limit reached for this solana payout/;

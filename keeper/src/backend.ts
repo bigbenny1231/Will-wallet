@@ -1,6 +1,6 @@
 // The keeper talks to a vault through this interface; NearBackend is the real one, MockBackend lives in mock.ts.
 import { Account, KeyPair, KeyPairSigner, providers } from 'near-api-js';
-import type { ContractConfig } from './step3.js';
+import type { AdminProposal, ChainConfig, ContractConfig } from './step3.js';
 import type { AgentPayArgs, SignTrack, StepArgs, TxResult, VaultView } from './types.js';
 import { withRetry } from './util.js';
 
@@ -25,7 +25,7 @@ export interface Backend {
   isKeeperFor?(v: VaultView): Promise<boolean>;
   /** The NEAR account this backend signs with (optional: without it the step III window is not checked locally). */
   readonly accountId?: string;
-  /** `get_config` fields the keeper uses (keeper, owner_id, step3_open_after_ms). Optional, like `accountId`. */
+  /** `get_config` fields the keeper uses (keeper, owner_id, step3_open_after_ms, v3 chains clamps). Optional, like `accountId`. */
   getConfig?(): Promise<ContractConfig>;
 }
 
@@ -34,11 +34,18 @@ const TGAS = 10n ** 12n;
 export const GAS = {
   // The access-key allowance is charged on PREPAID gas, so keep heartbeat small (contract notes, SPEC 2.7).
   heartbeat: 10n * TGAS,
+  // Contract v3 (SECURITY_FIXES_V3 M-2): poke pays the bounty with a transfer plus a 10 TGas callback, 29.7 TGas of
+  // host gas on a maximal vault; callers must attach >= 50 TGas.
   poke: 60n * TGAS,
+  // Step 1 / step 5 with 10 heirs: about 253 TGas of host gas (each heir transfer 14.8 TGas of fees + 10 TGas callback).
   executeStep: 300n * TGAS,
+  // One vault read and write, no promise.
   markBroadcast: 30n * TGAS,
+  // MPC derived-key call, then the sign call and a 30 TGas callback.
   resignForeign: 300n * TGAS,
+  // AddKey + 15 TGas on_key_added callback (v3): under 40 TGas.
   addKey: 50n * TGAS,
+  // One transfer with its callback: about 30 TGas.
   agentPay: 60n * TGAS,
   daoCreate: 150n * TGAS,
 };
@@ -82,6 +89,61 @@ export function toTxResult(outcome: any): TxResult {
     }
   }
   return { hash, logs, returnValue, failure };
+}
+
+const str = (x: unknown): string | null => (typeof x === 'string' ? x : null);
+const optNum = (x: unknown): number | undefined => (x === undefined || x === null || !Number.isFinite(Number(x)) ? undefined : Number(x));
+
+/** `get_sign_track` JSON -> SignTrack. `keeper_resigns*` stay undefined on a v2 contract (no cap there). */
+export function parseSignTrack(t: Record<string, unknown>): SignTrack {
+  const out: SignTrack = {
+    last_request_ms: Number(t?.last_request_ms ?? 0),
+    inflight: !!t?.inflight,
+    max_fee_per_gas: String(t?.max_fee_per_gas ?? '0'),
+    max_priority_fee_per_gas: String(t?.max_priority_fee_per_gas ?? '0'),
+    resign_allowed_after_ms: Number(t?.resign_allowed_after_ms ?? 0),
+  };
+  const used = optNum(t?.keeper_resigns);
+  const left = optNum(t?.keeper_resigns_left);
+  if (used !== undefined) out.keeper_resigns = used;
+  if (left !== undefined) out.keeper_resigns_left = left;
+  return out;
+}
+
+/** `get_config` JSON -> the fields the keeper reads (v1/v2 contracts simply lack the v3 ones). */
+export function parseConfig(c: Record<string, unknown>): ContractConfig {
+  const p = c?.admin_proposal as Record<string, unknown> | null | undefined;
+  const proposal: AdminProposal | null =
+    p && typeof p === 'object'
+      ? { action: String(p.action) as AdminProposal['action'], account_id: str(p.account_id), proposed_ms: Number(p.proposed_ms ?? 0), eta_ms: Number(p.eta_ms ?? 0) }
+      : null;
+  const chains = Array.isArray(c?.chains)
+    ? (c.chains as Record<string, unknown>[]).map((e): ChainConfig => {
+        const out: ChainConfig = { chain: String(e.chain) };
+        if (typeof e.kind === 'string') out.kind = e.kind;
+        for (const k of ['max_fee_per_gas', 'non_keeper_max_fee_per_gas', 'min_gas_limit'] as const) if (e[k] !== undefined && e[k] !== null) out[k] = String(e[k]);
+        const mp = optNum(e.max_payouts);
+        const mk = optNum(e.max_keeper_resigns);
+        if (mp !== undefined) out.max_payouts = mp;
+        if (mk !== undefined) out.max_keeper_resigns = mk;
+        return out;
+      })
+    : undefined;
+  return {
+    owner_id: str(c?.owner_id),
+    keeper: str(c?.keeper),
+    // absent on a v1 contract: no window
+    step3_open_after_ms: Number(c?.step3_open_after_ms ?? 0) || 0,
+    pending_keeper: str(c?.pending_keeper),
+    keeper_admin: str(c?.keeper_admin),
+    admin_timelock_ms: optNum(c?.admin_timelock_ms),
+    admin_proposal: proposal,
+    keeper_epoch: optNum(c?.keeper_epoch),
+    max_keeper_solana_resigns: optNum(c?.max_keeper_solana_resigns),
+    sale_min_interval_s: optNum(c?.sale_min_interval_s),
+    sale_min_grace: optNum(c?.sale_min_grace),
+    chains,
+  };
 }
 
 export class NearBackend implements Backend {
@@ -159,12 +221,7 @@ export class NearBackend implements Backend {
   /** get_config, cached for a minute (the contract keeper can be handed over; a failed read is retried next time). */
   async getConfig(): Promise<ContractConfig> {
     if (!this.config || Date.now() - this.config.at > 60_000) {
-      const p = this.view<Record<string, unknown>>('get_config', {}).then((c) => ({
-        owner_id: typeof c?.owner_id === 'string' ? c.owner_id : null,
-        keeper: typeof c?.keeper === 'string' ? c.keeper : null,
-        // absent on a v1 contract: no window
-        step3_open_after_ms: Number(c?.step3_open_after_ms ?? 0) || 0,
-      }));
+      const p = this.view<Record<string, unknown>>('get_config', {}).then(parseConfig);
       this.config = { at: Date.now(), p };
       p.catch(() => {
         if (this.config?.p === p) this.config = undefined;
@@ -182,14 +239,7 @@ export class NearBackend implements Backend {
     }
   }
   async getSignTrack(tokenId: string, index: number): Promise<SignTrack> {
-    const t = await this.view<Record<string, unknown>>('get_sign_track', { token_id: tokenId, index });
-    return {
-      last_request_ms: Number(t.last_request_ms ?? 0),
-      inflight: !!t.inflight,
-      max_fee_per_gas: String(t.max_fee_per_gas ?? '0'),
-      max_priority_fee_per_gas: String(t.max_priority_fee_per_gas ?? '0'),
-      resign_allowed_after_ms: Number(t.resign_allowed_after_ms ?? 0),
-    };
+    return parseSignTrack(await this.view<Record<string, unknown>>('get_sign_track', { token_id: tokenId, index }));
   }
   agentPay(a: AgentPayArgs) {
     // Never retried: agent_pay moves money, and a retry after an ambiguous timeout would pay twice

@@ -4,11 +4,46 @@
 // every heir. After `step3_open_after_ms` (get_config) anyone may.
 import type { VaultView } from './types.js';
 
-/** The part of `get_config` the keeper reads. */
+/** One entry of `get_config().chains` (foreign.rs chain_registry). */
+export interface ChainConfig {
+  chain: string;
+  kind?: 'evm' | 'solana' | string;
+  /** EVM: upper bound on any caller's max_fee_per_gas (wei, decimal string). */
+  max_fee_per_gas?: string;
+  /** EVM: upper bound on a non-keeper's fees; larger values are clamped by the contract. */
+  non_keeper_max_fee_per_gas?: string;
+  min_gas_limit?: string;
+  /** Most payouts of this chain one vault may hold (v3: Solana 1, Monad 1). */
+  max_payouts?: number;
+  /** v3, Solana: keeper re-signs of a signed/broadcast payout per keeper epoch. */
+  max_keeper_resigns?: number;
+}
+
+/** v3: the keeper admin's pending, timelocked proposal (`get_config().admin_proposal`). */
+export interface AdminProposal {
+  action: 'keeper' | 'mpc_signer' | 'keeper_admin';
+  account_id: string | null;
+  proposed_ms: number;
+  eta_ms: number;
+}
+
+/** The part of `get_config` the keeper reads. Every v3 field is optional: absent on a v2 contract. */
 export interface ContractConfig {
   owner_id?: string | null;
   keeper?: string | null;
   step3_open_after_ms?: number;
+  /** v3: account named by `set_keeper` that has not called `accept_keeper` yet. It is not a keeper until it does. */
+  pending_keeper?: string | null;
+  /** v3: may only propose (48 h timelock) a new keeper, MPC signer or admin. Never an operator or a keeper. */
+  keeper_admin?: string | null;
+  admin_timelock_ms?: number;
+  admin_proposal?: AdminProposal | null;
+  /** v3: bumped on every keeper change; Solana keeper re-sign counters reset with it. */
+  keeper_epoch?: number;
+  max_keeper_solana_resigns?: number;
+  sale_min_interval_s?: number;
+  sale_min_grace?: number;
+  chains?: ChainConfig[];
 }
 
 /** The contract's panic for a non-operator inside the window. */

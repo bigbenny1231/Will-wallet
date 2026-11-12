@@ -65,7 +65,7 @@ function atStep3(clock: { t: number }, me: string | undefined) {
 }
 
 describe('keeper loop: step III window', () => {
-  it('a non-operator parks step III until step-3 start + step3_open_after_ms, logs once, then signs', async () => {
+  it('a non-operator parks step III until step-3 start + step3_open_after_ms, logs once, then moves settlement on', async () => {
     const clock = { t: T0 + 10 * 60_000 };
     const { deps, lines, calls, stored } = atStep3(clock, 'dmw-sweep-abc.testnet');
     const r1 = await tickOnce(deps);
@@ -87,7 +87,11 @@ describe('keeper loop: step III window', () => {
     clock.t = T0 + HOUR + STEP3_MARGIN_MS;
     await tickOnce(deps);
     expect(calls[0]).toBe('1');
-    expect(stored('1').foreign[0].status).not.toBe('pending'); // signed (then relayed and marked in the same pass)
+    // Contract v3 (M-1): a non-operator never supplies a Solana blockhash. After the hour its step 3 records the
+    // payout failed without a signature ("skipped: ..."), settlement moves on, and an operator may re-sign it.
+    expect(stored('1').foreign[0]).toMatchObject({ status: 'failed', signed_tx: null });
+    expect(stored('1').step).toBeGreaterThan(3);
+    expect(lines.some((l) => l.includes('solana payout #0 skipped'))).toBe(true);
     expect(lines.some((l) => l.startsWith('err'))).toBe(false);
   });
 

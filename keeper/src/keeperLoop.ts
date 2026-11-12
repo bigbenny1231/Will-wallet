@@ -4,8 +4,8 @@ import type { Chains } from './chainsApi.js';
 import { deriveState, describeAction, matchesFilter, needsSettlement, nextAction } from './machine.js';
 import type { Notifier } from './notify.js';
 import type { ChainName, StepArgs, TxResult, VaultView } from './types.js';
-import { MAX_RESIGNS, RELAY_COOLDOWN, classifyRelayError } from './relay.js';
-import { bumpedEvmArgs, clampEvm, msUntilResign, payoutTxId } from './resign.js';
+import { MAX_RESIGNS, RELAY_COOLDOWN, RESIGN_LIMIT_ERROR, classifyRelayError } from './relay.js';
+import { clampEvm, msUntilResign, nonKeeperFeeClamp, nonKeeperResignArgs, payoutTxId } from './resign.js';
 import { vaultPaths } from './chains/derive.js';
 import type { Funder, SourceSet, TopUp } from './funder.js';
 import { STEP3_MARGIN_MS, STEP3_UNKNOWN_PARK_MS, STEP3_WINDOW_PANIC, isOperator, step3OpensAt } from './step3.js';
@@ -54,10 +54,16 @@ export interface KeeperDeps {
   step3Park: Map<string, number>;
   /** "token:index:txid" of unfunded relays already topped up once (a second unfunded result parks as before). */
   fundAttempts: Set<string>;
+  /**
+   * One-time notes already logged ("<kind>:token:index"): a Solana payout whose keeper re-sign allowance is used up
+   * (contract v3, 3 per keeper epoch), a failed payout this account may not re-sign, a skipped payout. Cleared when the
+   * condition goes away, so a later recurrence is logged again.
+   */
+  noted: Set<string>;
 }
 
 export function makeDeps(p: Pick<KeeperDeps, 'backend' | 'chains' | 'contractId'> & Partial<KeeperDeps>): KeeperDeps {
-  return { now: Date.now, log: consoleLogger, relayed: new Map(), lastState: new Map(), relayBlock: new Map(), resigns: new Map(), landed: new Set(), landedCheckAt: new Map(), step3Park: new Map(), fundAttempts: new Set(), ...p };
+  return { now: Date.now, log: consoleLogger, relayed: new Map(), lastState: new Map(), relayBlock: new Map(), resigns: new Map(), landed: new Set(), landedCheckAt: new Map(), step3Park: new Map(), fundAttempts: new Set(), noted: new Set(), ...p };
 }
 
 export interface ActionRecord {
@@ -98,6 +104,37 @@ export async function stepArgsFor(deps: KeeperDeps, v: VaultView, chain: ChainNa
 
 const LANDED_RECHECK_MS = 30_000;
 
+/** Contract v3 (M-1): the detail a stranger's step 3 leaves on a Solana payout after the operator hour. */
+export const SKIPPED_DETAIL = /^skipped:/;
+
+/** True when payout `index` is `failed` because a non-operator's step 3 skipped it (log: `#<index> skipped: ...`). */
+export function isSkippedPayout(v: Pick<VaultView, 'foreign' | 'log'>, index: number): boolean {
+  if (v.foreign[index]?.status !== 'failed') return false;
+  for (let i = v.log.length - 1; i >= 0; i--) {
+    const e = v.log[i];
+    if (e.event !== 'foreign_failed' && e.event !== 'foreign_signed') continue;
+    const m = e.detail.match(/^#(\d+) (.*)$/);
+    if (m && Number(m[1]) === index) return SKIPPED_DETAIL.test(m[2]);
+  }
+  return false;
+}
+
+/** Log `msg` once per `key` (until `unnote` clears it). */
+function noteOnce(deps: KeeperDeps, key: string, emit: () => void): void {
+  if (deps.noted.has(key)) return;
+  deps.noted.add(key);
+  emit();
+}
+
+/** Whether this backend's account may call resign_foreign on `v` (an operator). Unknown (no account id or config): true, the contract decides. */
+async function mayResign(deps: KeeperDeps, v: VaultView): Promise<boolean> {
+  const { backend } = deps;
+  if (!backend.accountId || !backend.getConfig) return true;
+  const cfg = await backend.getConfig().catch(() => null);
+  if (!cfg) return true;
+  return isOperator(backend.accountId, v, cfg, deps.contractId);
+}
+
 /** Indexes of `broadcast` payouts whose recorded tx is unknown to the chain (checked at most every 30 s, positives are cached). */
 async function findUnlanded(deps: KeeperDeps, v: VaultView): Promise<Set<number>> {
   const missing = new Set<number>();
@@ -125,7 +162,7 @@ async function findUnlanded(deps: KeeperDeps, v: VaultView): Promise<Set<number>
   return missing;
 }
 
-type StaleResult = { kind: 'resigned' } | { kind: 'landed'; hash: string } | { kind: 'wait' } | { kind: 'error' };
+type StaleResult = { kind: 'resigned' } | { kind: 'landed'; hash: string } | { kind: 'wait' } | { kind: 'parked' } | { kind: 'error' };
 
 /**
  * A relay of a signed tx is stale (expired Solana blockhash, EVM nonce/price problem). Hardened contract rules:
@@ -133,7 +170,11 @@ type StaleResult = { kind: 'resigned' } | { kind: 'landed'; hash: string } | { k
  *  - first confirm the old signature never landed (Solana getSignatureStatuses / EVM tx lookup);
  *  - EVM: as a keeper (contract or vault keeper), fresh honest fees (contract v2 second review G1: a keeper may re-sign at
  *    any fee, the nonce is pinned); otherwise both fees = max(fresh, 1.1 x last), held at the chain cap;
- *  - Solana: the call must come from the keeper account (set_keeper), which is the account this backend signs with.
+ *  - EVM as a non-keeper operator: when the last SIGNED fees are above the chain's non-keeper clamp (a keeper signed
+ *    them), replace at exactly the clamp (contract v3 H-1(3)); see `nonKeeperResignArgs`;
+ *  - Solana: the call must come from a keeper (contract keeper or vault keeper), and contract v3 allows a keeper 3
+ *    re-signs of a signed payout per keeper epoch (`keeper_resigns_left`). At 0 the payout is parked (logged once),
+ *    and the contract's "keeper re-sign limit reached" error is final, never retried as a transient failure.
  */
 async function handleStale(deps: KeeperDeps, v: VaultView, index: number, chain: ChainName, why: string, out: ActionRecord[]): Promise<StaleResult> {
   const { backend, chains, log } = deps;
@@ -168,6 +209,19 @@ async function handleStale(deps: KeeperDeps, v: VaultView, index: number, chain:
         return { kind: 'landed', hash: oldId };
       }
     }
+    const hasSig = p.status === 'signed' || p.status === 'broadcast';
+    if (chain === 'solana' && hasSig) {
+      // Only a keeper may re-sign a signed Solana payout (no nonce: a second landed signature is a second payment).
+      if (backend.isKeeperFor && !(await backend.isKeeperFor(v).catch(() => false))) {
+        park(RELAY_COOLDOWN.parked, 'not-keeper');
+        noteOnce(deps, `notkeeper:${key}`, () => log.warn('resign', `${label} signed tx is stale (${why}), but only a keeper may re-sign a signed Solana payout and ${backend.accountId ?? 'this account'} is not one; parked`));
+        return { kind: 'parked' };
+      }
+      deps.noted.delete(`notkeeper:${key}`);
+      // Contract v3: 3 keeper re-signs per payout per keeper epoch. Absent on v2 (no cap).
+      if (track.keeper_resigns_left === 0) return parkCapped(deps, v, index, chain);
+      deps.noted.delete(`capped:${key}`);
+    }
     const n = deps.resigns.get(key) ?? 0;
     if (n >= MAX_RESIGNS) {
       deps.resigns.set(key, 0);
@@ -176,17 +230,34 @@ async function handleStale(deps: KeeperDeps, v: VaultView, index: number, chain:
       return { kind: 'wait' };
     }
     let args = await stepArgsFor(deps, v, chain, index);
-    if (chain !== 'solana' && args.evm && (p.status === 'signed' || p.status === 'broadcast')) {
+    if (chain !== 'solana' && args.evm && hasSig) {
       // A keeper re-signs at the fresh (honest) fees, even below the last request: an heir or a stranger who signed first
-      // cannot lock the payout above an honest fee (second review G1). A non-keeper must bump: max(fresh, 1.1 x last),
-      // held at the chain cap (the contract takes a fee at the cap as a bump, F4).
+      // cannot lock the payout above an honest fee (second review G1). A non-keeper either replaces a keeper's high
+      // fees at exactly the non-keeper clamp (v3 H-1(3)) or bumps: max(fresh, 1.1 x last), never above the clamp.
       const keeper = backend.isKeeperFor ? await backend.isKeeperFor(v).catch(() => false) : false;
-      args = { evm: keeper ? clampEvm(args.evm, chain) : bumpedEvmArgs(args.evm, track, chain) };
+      if (keeper) args = { evm: clampEvm(args.evm, chain) };
+      else {
+        const cfg = backend.getConfig ? await backend.getConfig().catch(() => null) : null;
+        const evm = nonKeeperResignArgs(args.evm, track, chain, nonKeeperFeeClamp(chain, cfg));
+        if (!evm) {
+          park(RELAY_COOLDOWN.parked, 'fee-above-clamp');
+          noteOnce(deps, `clamp:${key}`, () =>
+            log.warn('resign', `${label} signed tx is stale (${why}); a 10% fee bump over the last signed fees would exceed what a non-keeper may sign, so only a keeper can replace it; parked`),
+          );
+          return { kind: 'parked' };
+        }
+        deps.noted.delete(`clamp:${key}`);
+        args = { evm };
+      }
     }
     deps.resigns.set(key, n + 1);
     log.warn('resign', `${label} signed tx is stale (${why}); resign_foreign${args.evm ? ` fees ${args.evm.max_fee_per_gas}/${args.evm.max_priority_fee_per_gas}` : ''}`);
     const rtx = await backend.resignForeign(id, index, args);
     out.push({ kind: 'step', tokenId: id, hash: rtx.hash, ok: !rtx.failure, detail: 'resign_foreign' });
+    if (rtx.failure && RESIGN_LIMIT_ERROR.test(rtx.failure)) {
+      out[out.length - 1].detail = 'parked'; // final: not an action failure, never retried as one
+      return parkCapped(deps, v, index, chain);
+    }
     log[rtx.failure ? 'err' : 'ok']('resign', `${label} resign_foreign${rtx.failure ? ` failed: ${rtx.failure}` : ''}  ${nearTxLink(rtx.hash)}`);
     if (rtx.failure) {
       park(RELAY_COOLDOWN.other, 'resign-failed');
@@ -194,6 +265,7 @@ async function handleStale(deps: KeeperDeps, v: VaultView, index: number, chain:
     }
     return { kind: 'resigned' };
   } catch (e) {
+    if (RESIGN_LIMIT_ERROR.test(errMsg(e))) return parkCapped(deps, v, index, chain);
     park(RELAY_COOLDOWN.other, 'resign-failed');
     log.err('resign', `${label}: ${errMsg(e)} (retry in ${RELAY_COOLDOWN.other / 1000}s)`);
     out.push({ kind: 'step', tokenId: id, ok: false, detail: errMsg(e) });
@@ -201,7 +273,29 @@ async function handleStale(deps: KeeperDeps, v: VaultView, index: number, chain:
   }
 }
 
-/** Payouts that ended `failed` (no usable signature): re-sign once the cooldown is over. */
+/**
+ * Contract v3: this keeper used its 3 re-signs of a signed Solana payout in the current keeper epoch. Final: park it
+ * (looked at again hourly; a new keeper epoch resets the counter) and say so once. Never counted as a failure.
+ */
+function parkCapped(deps: KeeperDeps, v: VaultView, index: number, chain: ChainName): StaleResult {
+  const key = `${v.token_id}:${index}`;
+  deps.relayBlock.set(key, { until: deps.now() + RELAY_COOLDOWN.parked, reason: 'resign-capped' });
+  deps.resigns.set(key, 0);
+  noteOnce(deps, `capped:${key}`, () =>
+    deps.log.warn(
+      'resign',
+      `vault ${v.token_id} payout #${index} ${chain}: keeper re-sign limit reached (3 per keeper epoch, contract v3); not signing it again. Its last signature stays relayable; a new keeper epoch resets the limit. Parked`,
+    ),
+  );
+  return { kind: 'parked' };
+}
+
+/**
+ * Payouts that ended `failed` (no usable signature): re-sign once the cooldown is over. This includes a Solana payout a
+ * non-operator's step 3 skipped after the operator hour (contract v3 M-1, detail `skipped: ...`): any operator may
+ * re-sign it at once, and re-signing a failed payout does not use the keeper's Solana allowance. A non-operator
+ * account cannot re-sign at all (the contract refuses), so it parks the payout and says so once.
+ */
 async function resignFailedPayouts(deps: KeeperDeps, v: VaultView, out: ActionRecord[]): Promise<void> {
   if (v.state !== 'Triggered' && v.state !== 'Settled') return;
   for (let i = 0; i < v.foreign.length; i++) {
@@ -212,6 +306,18 @@ async function resignFailedPayouts(deps: KeeperDeps, v: VaultView, out: ActionRe
     if ((deps.relayBlock.get(key)?.until ?? 0) > deps.now()) continue;
     const park = (ms: number) => deps.relayBlock.set(key, { until: deps.now() + ms, reason: 'resign-wait' });
     try {
+      const skipped = isSkippedPayout(v, i);
+      if (!(await mayResign(deps, v))) {
+        park(RELAY_COOLDOWN.parked);
+        noteOnce(deps, `notop:${key}`, () =>
+          deps.log.info(
+            'resign',
+            `vault ${v.token_id} payout #${i} ${p.chain} is failed${skipped ? ' (skipped: no operator signed within the hour)' : ''}; ${deps.backend.accountId} is not an operator of this vault, so only the keeper, the owner or an heir may re-sign it`,
+          ),
+        );
+        continue;
+      }
+      deps.noted.delete(`notop:${key}`);
       const track = await deps.backend.getSignTrack(v.token_id, i);
       const wait = msUntilResign(track, deps.now());
       if (wait > 0) {
@@ -221,11 +327,14 @@ async function resignFailedPayouts(deps: KeeperDeps, v: VaultView, out: ActionRe
       }
       const n = deps.resigns.get(key) ?? 0;
       if (n >= MAX_RESIGNS) {
+        // SPEC §3: after 2 re-signs of one payout, pause it for 5 min (then the count starts again).
+        deps.resigns.set(key, 0);
         park(RELAY_COOLDOWN.resignCap);
         continue;
       }
       deps.resigns.set(key, n + 1);
       const args = await stepArgsFor(deps, v, p.chain, i);
+      if (skipped) deps.log.info('resign', `vault ${v.token_id} payout #${i} ${p.chain} was skipped by a non-operator's step 3; re-signing it as an operator (no keeper allowance used)`);
       const rtx = await deps.backend.resignForeign(v.token_id, i, args);
       out.push({ kind: 'step', tokenId: v.token_id, hash: rtx.hash, ok: !rtx.failure, detail: 'resign_foreign' });
       deps.log[rtx.failure ? 'err' : 'ok']('resign', `vault ${v.token_id} payout #${i} ${p.chain} resign_foreign${rtx.failure ? ` failed: ${rtx.failure}` : ''}  ${nearTxLink(rtx.hash)}`);
@@ -390,6 +499,11 @@ export async function driveVaultView(deps: KeeperDeps, initial: VaultView): Prom
           // No "retry right away": a second signature over a live blockhash could double-pay (SECURITY_REVIEW C-1).
           // If the payout did not come out signed, the re-sign pass below waits for resign_allowed_after_ms.
           const after = await backend.getVault(id);
+          if (isSkippedPayout(after, action.index)) {
+            // Contract v3 (M-1): after the operator hour a non-operator's step 3 records a Solana payout `failed`
+            // without a signature (the blockhash only ever comes from an operator). Settlement moves on.
+            log.warn('step', `vault ${id} solana payout #${action.index} skipped: ${backend.accountId ?? 'this account'} is not an operator, so the contract recorded it failed without a signature; the keeper, the owner or an heir may re-sign it`);
+          }
           if (after.state === 'Triggered' && after.step === 3 && after.foreign_index === action.index) {
             log.info('step', `vault ${id} solana sign has not advanced the payout yet; the keeper waits instead of retrying (in-flight guard / 5 min re-sign cooldown)`);
             break;
@@ -416,7 +530,7 @@ export async function driveVaultView(deps: KeeperDeps, initial: VaultView): Prom
                 alreadyLanded = true;
                 hash = r.hash; // the old signature is on chain: record it instead of signing again
               } else {
-                out.push({ kind: 'broadcast', tokenId: id, ok: false, detail: 'stale' });
+                out.push({ kind: 'broadcast', tokenId: id, ok: false, detail: r.kind === 'parked' ? 'parked' : 'stale' });
                 if (r.kind === 'error') break;
                 continue;
               }
@@ -513,7 +627,7 @@ export async function tickOnce(deps: KeeperDeps): Promise<TickResult> {
     if (matchesFilter(last, deps) && needsSettlement(last, deps.now())) pending.push(v.token_id);
   }
   await deps.notifier?.flush();
-  return { vaults: vaults.length, actions, pending, error: actions.some((a) => !a.ok && a.detail !== 'not_due' && a.detail !== 'unfunded' && a.detail !== 'stale' && a.detail !== 'step3_window') ? 'action_failed' : undefined };
+  return { vaults: vaults.length, actions, pending, error: actions.some((a) => !a.ok && a.detail !== 'not_due' && a.detail !== 'unfunded' && a.detail !== 'stale' && a.detail !== 'parked' && a.detail !== 'step3_window') ? 'action_failed' : undefined };
 }
 
 export interface RunOpts {
