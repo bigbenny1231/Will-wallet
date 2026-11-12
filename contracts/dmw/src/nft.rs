@@ -249,12 +249,18 @@ impl Contract {
         approved_account_ids: Option<HashMap<AccountId, u64>>,
     ) -> bool {
         let _ = approved_account_ids;
-        // Exactly one result expected; anything else is treated as "revert" (v2).
-        let must_revert = env::promise_results_count() != 1
-            || match env::promise_result_checked(0, 16) {
-                Ok(bytes) => serde_json::from_slice::<bool>(&bytes).unwrap_or(true),
-                Err(_) => true,
-            };
+        // v3 (review v3 L-1): our own `nft_transfer_call` always chains exactly one promise, so a
+        // call with any other number of results is not a real resolution. It is a direct call
+        // through some key on the contract account, and it changes nothing (v2 treated it as a
+        // revert, which moved a live vault to any `owner_id` the caller named).
+        if env::promise_results_count() != 1 {
+            env::log_str("nft_resolve_transfer: not a transfer resolution; nothing changed");
+            return true;
+        }
+        let must_revert = match env::promise_result_checked(0, 16) {
+            Ok(bytes) => serde_json::from_slice::<bool>(&bytes).unwrap_or(true),
+            Err(_) => true,
+        };
         if !must_revert {
             return true;
         }

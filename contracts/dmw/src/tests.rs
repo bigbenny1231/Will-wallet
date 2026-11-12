@@ -116,7 +116,12 @@ fn policy() -> Policy {
 /// Contract + vault 1 (interval 20 s, grace 1, 10.1 NEAR deposit => 10 NEAR balance).
 fn setup() -> Contract {
     Ctx::new().set();
-    let mut c = Contract::new(acc("deployer.testnet"), Some(acc("keeper.testnet")), None);
+    let mut c = Contract::new(
+        acc("deployer.testnet"),
+        Some(acc("keeper.testnet")),
+        None,
+        None,
+    );
     Ctx::new().dep(10 * NEAR1 + STORAGE_FEE).set();
     let id = c.create_vault(20, 1, heirs2(), Some(policy()), Some(U128(NEAR1 / 100)));
     assert_eq!(id.0, 1);
@@ -168,7 +173,12 @@ fn create_vault_mints_and_sets_balance() {
 #[should_panic(expected = "deposit must be >= 0.1 NEAR")]
 fn create_vault_requires_storage_deposit() {
     Ctx::new().set();
-    let mut c = Contract::new(acc("deployer.testnet"), Some(acc("keeper.testnet")), None);
+    let mut c = Contract::new(
+        acc("deployer.testnet"),
+        Some(acc("keeper.testnet")),
+        None,
+        None,
+    );
     Ctx::new().dep(STORAGE_FEE - 1).set();
     c.create_vault(20, 1, heirs2(), None, None);
 }
@@ -892,10 +902,19 @@ fn nft_transfer_by_owner_while_alive_not_warning() {
     c.nft_transfer(acc("bob.testnet"), "1".into(), None, None);
     assert_eq!(v(&c).owner_id, acc("bob.testnet"));
     assert_eq!(c.nft_supply_for_owner(owner()).0, 0);
-    assert_eq!(c.get_vaults_for_owner(acc("bob.testnet")).len(), 1);
+    assert_eq!(
+        c.get_vaults_for_owner(acc("bob.testnet"), None, None).len(),
+        1
+    );
     assert!(get_logs().iter().any(|l| l.contains("nft_transfer")));
-    // v2 (finding B): an overdue (Warning) vault can't be transferred any more
-    Ctx::new().by("bob.testnet").dep(1).at(T0 + 25_000).set();
+    // v2 (finding B): an overdue (Warning) vault can't be transferred any more. v3 (L-6): the
+    // sale raised the 20 s interval to 1 day, so bob's vault is overdue only after a day.
+    assert_eq!(v(&c).heartbeat_interval_s, SALE_MIN_INTERVAL_S);
+    Ctx::new()
+        .by("bob.testnet")
+        .dep(1)
+        .at(T0 + SALE_MIN_INTERVAL_S * 1000 + 1)
+        .set();
     let m = panics(|| c.nft_transfer(owner(), "1".into(), None, Some("back".into())));
     assert!(
         m.contains("only be transferred while the vault is alive"),
@@ -1195,7 +1214,12 @@ fn step3_without_chain_args_panics_so_payout_is_not_burned() {
 
 #[test]
 fn step3_unbuildable_payout_fails_via_self_call() {
-    let mut c = at_step3(vec![sol_payout(u128::from(u64::MAX) + 1)]);
+    // v3 (L-4): set_foreign_payouts now refuses such a payout (v3_l4_*); the step-3 path for one
+    // that is stored anyway (a stored legacy payout) is still a self-call that fails it.
+    let mut c = at_step3(vec![sol_payout(1_000_000)]);
+    let mut vault = v(&c);
+    vault.foreign[0].amount = U128(u128::from(u64::MAX) + 1);
+    c.vaults.insert(&1, &vault);
     assert!(matches!(
         c.execute_step(1.into(), Some(sol_args())),
         PromiseOrValue::Promise(_)
@@ -1403,8 +1427,9 @@ fn c1_evm_resign_reuses_nonce_and_requires_fee_bump() {
     assert_eq!(calls[0]["pending"]["Evm"]["nonce"], 0);
     assert_eq!(calls[0]["req_ms"], t);
     assert_eq!(calls[0]["resign"], true);
+    // v3 (L-3): the track keeps the fees of the last SIGNED request until this one is signed.
     let t = c.get_sign_track(1.into(), 0);
-    assert_eq!(t["max_fee_per_gas"], "1650000000");
+    assert_eq!(t["max_fee_per_gas"], "1500000000");
     assert_eq!(t["inflight"], true);
 }
 
@@ -1687,7 +1712,12 @@ fn l5_agent_pay_to_contract_rejected() {
 fn m1_storage_of_a_full_vault_vs_flat_fee() {
     // Documents finding M-1: worst-case bytes of one vault vs the 0.1 NEAR (10 kB) fee.
     Ctx::new().set();
-    let mut c = Contract::new(acc("deployer.testnet"), Some(acc("keeper.testnet")), None);
+    let mut c = Contract::new(
+        acc("deployer.testnet"),
+        Some(acc("keeper.testnet")),
+        None,
+        None,
+    );
     let before = env::storage_usage();
     Ctx::new().dep(100 * NEAR1).set();
     let heirs: Vec<Heir> = (0..10)
@@ -2477,7 +2507,7 @@ fn v2_b_sale_resets_vault_for_buyer() {
 #[test]
 fn v2_b_bounty_is_capped_and_only_set_while_alive() {
     Ctx::new().set();
-    let mut c = Contract::new(acc("deployer.testnet"), None, None);
+    let mut c = Contract::new(acc("deployer.testnet"), None, None, None);
     Ctx::new().dep(STORAGE_FEE + 2 * NEAR1).set();
     let m = panics(|| {
         c.create_vault(20, 1, heirs2(), None, Some(U128(MAX_BOUNTY + 1)));
@@ -2503,7 +2533,7 @@ fn v2_b_bounty_is_capped_and_only_set_while_alive() {
 #[test]
 fn v2_c_keeper_rotates_itself_on_locked_contract() {
     Ctx::new().set();
-    let mut c = Contract::new(contract_id(), Some(acc("keeper.testnet")), None);
+    let mut c = Contract::new(contract_id(), Some(acc("keeper.testnet")), None, None);
     Ctx::new().by("dmw.testnet").dep(1).set();
     let m = panics(|| c.set_keeper(Some(acc("x.testnet"))));
     assert!(
@@ -2527,6 +2557,11 @@ fn v2_c_keeper_rotates_itself_on_locked_contract() {
     let m = panics(|| c.set_keeper(None));
     assert!(m.contains("cannot be cleared on a locked contract"), "{m}");
     c.set_keeper(Some(acc("keeper2.testnet")));
+    // v3: two-step, keeper2 must accept
+    assert_eq!(c.get_config()["keeper"], "keeper.testnet");
+    assert_eq!(c.get_config()["pending_keeper"], "keeper2.testnet");
+    Ctx::new().by("keeper2.testnet").dep(1).set();
+    c.accept_keeper();
     assert_eq!(c.get_config()["keeper"], "keeper2.testnet");
     Ctx::new().by("keeper.testnet").dep(1).set();
     let m = panics(|| c.set_keeper(Some(acc("keeper.testnet"))));
@@ -2537,7 +2572,7 @@ fn v2_c_keeper_rotates_itself_on_locked_contract() {
     // init rejects the contract itself as keeper
     Ctx::new().set();
     let m = panics(|| {
-        Contract::new(contract_id(), Some(contract_id()), None);
+        Contract::new(contract_id(), Some(contract_id()), None, None);
     });
     assert!(m.contains("keeper cannot be the dmw contract"), "{m}");
 }
@@ -2565,13 +2600,14 @@ fn v2_c_step3_params_operator_only_for_first_hour() {
 /// party).
 #[test]
 fn v2_c_step3_open_to_anyone_after_an_hour() {
-    let mut c = at_step3(vec![sol_payout(1_000_000)]);
+    // v3 (M-1): for EVM payouts. A Solana payout is skipped instead (v3_m1_*).
+    let mut c = at_step3(vec![base_payout()]);
     Ctx::new()
         .by("mallory.testnet")
         .at(T0 + 41_000 + STEP3_OPEN_AFTER_MS)
         .set();
     assert!(matches!(
-        c.execute_step(1.into(), Some(sol_args())),
+        c.execute_step(1.into(), Some(base_args())),
         PromiseOrValue::Promise(_)
     ));
 }
@@ -2812,6 +2848,7 @@ fn v2_l8_mpc_signer_is_configurable() {
         acc("deployer.testnet"),
         Some(acc("keeper.testnet")),
         Some(acc("signer.sandbox.testnet")),
+        None,
     );
     assert_eq!(c.get_config()["mpc_signer"], "signer.sandbox.testnet");
     Ctx::new().dep(10 * NEAR1 + STORAGE_FEE).set();
@@ -2838,7 +2875,7 @@ fn v2_l8_mpc_signer_is_configurable() {
 #[test]
 fn v2_l9_storage_is_measured_topped_up_and_released() {
     Ctx::new().set();
-    let mut c = Contract::new(acc("deployer.testnet"), None, None);
+    let mut c = Contract::new(acc("deployer.testnet"), None, None, None);
     Ctx::new().dep(10 * NEAR1 + STORAGE_FEE).set();
     let before = env::storage_usage();
     c.create_vault(20, 1, heirs2(), Some(policy()), None);
@@ -2904,10 +2941,17 @@ fn v2_callbacks_require_exactly_one_result() {
     assert!(!c.on_key_added(1, pk(7), KeyKind::Pulse, Some(owner())));
     assert!(v(&c).pulse_keys.is_empty());
     assert_eq!(deleted_keys(), vec![pk(7)]);
-    // no result on NFT resolve: the transfer is reverted
+    // no result on NFT resolve: v3 (review v3 L-1) not a resolution, nothing changes (v2 reverted
+    // the transfer, which let any key on the contract account move a vault to any account)
     Ctx::new().dep(1).set();
     let _ = c.nft_transfer_call(acc("market.testnet"), "1".into(), None, None, "".into());
     Ctx::new().by("dmw.testnet").set();
+    assert!(c.nft_resolve_transfer(owner(), acc("market.testnet"), "1".into(), None));
+    assert_eq!(v(&c).owner_id, acc("market.testnet"));
+    // with its one (failed) result it reverts as before
+    Ctx::new()
+        .by("dmw.testnet")
+        .set_with_result(PromiseResult::Failed);
     assert!(!c.nft_resolve_transfer(owner(), acc("market.testnet"), "1".into(), None));
     assert_eq!(v(&c).owner_id, owner());
 }
@@ -3233,7 +3277,10 @@ fn r2_f1_heir_may_still_bump_signed_evm_payout() {
     let _ = c.resign_foreign(1.into(), 0, evm(0, 1_650_000_000, 1_100_000, 21_000));
     let track = foreign::read_track(1, 0);
     assert!(track.inflight);
-    assert_eq!(track.max_fee_per_gas, 1_650_000_000);
+    // v3 (L-3): written only once the new signature is stored
+    assert_eq!(track.max_fee_per_gas, 1_500_000_000);
+    let calls = created_calls("on_foreign_evm_key");
+    assert_eq!(calls[0]["pending"]["Evm"]["max_fee_per_gas"], "1650000000");
 }
 
 /// F4 / G1: fees a non-keeper picks in step 3 are clamped (max fee and priority fee to the chain's
@@ -3308,14 +3355,11 @@ fn r2_f4_cap_signature_can_be_resigned_at_the_cap() {
     assert_eq!(c.on_foreign_signed(1, 0, key, Ok(mpc_secp_response())), 4);
     assert_eq!(v(&c).foreign[0].status, ForeignStatus::Signed);
     let t = T0 + 41_000 + foreign::RESIGN_COOLDOWN_MS;
-    Ctx::new().by("sarah.testnet").at(t).set();
-    let m = panics(|| {
-        let _ = c.resign_foreign(1.into(), 0, evm(0, cap, cap, 50_000));
-    });
-    assert!(m.contains("raise both fees"), "{m}");
+    // the keeper may re-sign a cap signature at the cap
     Ctx::new().by("keeper.testnet").at(t).set();
     let _ = c.resign_foreign(1.into(), 0, evm(0, cap, cap, 50_000));
     assert!(foreign::read_track(1, 0).inflight);
+    // v3 (H-1(3)): an heir is no longer locked out of it; see v3_h1_heir_replaces_keeper_cap_fee_at_clamp
 }
 
 /// F3: a deposit and an agent-spend refund that land after step 1 are split by bps at step 5,
@@ -3425,12 +3469,20 @@ fn r2_g1_keeper_may_resign_evm_at_any_fee_and_gas() {
     // the keeper may: lower fees, higher gas limit
     Ctx::new().by("keeper.testnet").at(t).set();
     let _ = c.resign_foreign(1.into(), 0, evm(0, 1_500_000_000, 1_000_000, 90_000));
+    let calls = created_calls("on_foreign_evm_key");
+    assert_eq!(calls[0]["pending"]["Evm"]["gas_limit"], "90000");
+    assert_eq!(calls[0]["pending"]["Evm"]["nonce"], 0);
+    // v3 (L-3): the track takes the keeper's fees once its signature is stored
+    let pending: foreign::PendingTx = serde_json::from_value(calls[0]["pending"].clone()).unwrap();
+    let key = key_for_pending(&pending);
+    Ctx::new().by("dmw.testnet").at(t + 500).cb();
+    assert_eq!(
+        c.on_foreign_resigned(1, 0, pending, Some(t), key, Ok(mpc_secp_response())),
+        "signed"
+    );
     let track = foreign::read_track(1, 0);
     assert_eq!(
         (track.max_fee_per_gas, track.max_priority_fee_per_gas),
         (1_500_000_000, 1_000_000)
     );
-    let calls = created_calls("on_foreign_evm_key");
-    assert_eq!(calls[0]["pending"]["Evm"]["gas_limit"], "90000");
-    assert_eq!(calls[0]["pending"]["Evm"]["nonce"], 0);
 }

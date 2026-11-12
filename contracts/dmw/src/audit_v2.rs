@@ -122,7 +122,7 @@ fn open_policy() -> Policy {
 /// Contract (locked: owner_id is the contract itself) + vault 1 with 10 NEAR balance.
 fn setup() -> Contract {
     Ctx::new().set();
-    let mut c = Contract::new(contract_id(), Some(acc("keeper.testnet")), None);
+    let mut c = Contract::new(contract_id(), Some(acc("keeper.testnet")), None, None);
     Ctx::new().dep(10 * NEAR1 + STORAGE_FEE).set();
     let id = c.create_vault(
         20,
