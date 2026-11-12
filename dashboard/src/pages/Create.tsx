@@ -4,7 +4,8 @@ import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../lib/near";
 import { useWallet } from "../lib/wallet";
-import { missingHeirsNote, useMissingAccounts } from "../lib/accounts";
+import { missingHeirsNote, useContractRecipients, useMissingAccounts } from "../lib/accounts";
+import { contractRecipientsNote } from "../lib/chains";
 import { MAX_BOUNTY_YOCTO, createVaultCall, type CreateDraft, type ForeignDraft } from "../lib/calls";
 import { PENDING_KEY, type Pending } from "../components/PendingCreate";
 import { bpsToPct, fmtInterval, nearToYocto, toSmallest, unitsFor } from "../lib/format";
@@ -45,6 +46,8 @@ export default function Create() {
   const [allow, setAllow] = useState("");
   // foreign
   const [foreign, setForeign] = useState<ForeignRow[]>([]);
+  // EVM recipients that are contracts: a warning, not a block (contract v2 second review G1, lib/chains.ts).
+  const contractNote = contractRecipientsNote(useContractRecipients(foreign));
   // dao + deposit
   const [dao, setDao] = useState("");
   const [bounty, setBounty] = useState("0.05");
@@ -265,6 +268,7 @@ export default function Create() {
               );
             })}
             <button className="tl" onClick={() => setForeign([...foreign, { chain: "base", to: "", amount: "" }])}>Add foreign payout</button>
+            {contractNote && <p className="border-l border-warn pl-4 text-[15px] text-warn">{contractNote}</p>}
             <p className="max-w-[62ch] text-[14px] text-text-2">
               The source address depends on the vault id and a random salt the contract draws when it creates the vault, so nobody can know it, fund it or sign for it before the vault exists. It is shown on the vault page after creation. Fund it then, while you are alive; nobody holds its key.
             </p>

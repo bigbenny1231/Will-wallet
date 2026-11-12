@@ -84,3 +84,28 @@ export async function broadcastForeign(p: ForeignPayout): Promise<string> {
   }
   return rpc<string>(SOLANA_RPC, "sendTransaction", [p.signed_tx, { encoding: "base64", preflightCommitment: "confirmed" }]);
 }
+
+const EVM_ADDR_RE = /^0x[0-9a-fA-F]{40}$/;
+
+/**
+ * EVM payout recipients that hold code (a contract, a smart wallet, an EIP-7702-delegated account), read with
+ * eth_getCode. Contract v2 (second review G1): a signature by anyone but the keeper uses the chain's 50,000 gas floor;
+ * a recipient whose `receive` needs more makes that tx revert on chain, which burns the payout's pinned nonce and
+ * strands its funds. The keeper can re-sign with more gas before anything is mined. Unknown answers raise no warning.
+ */
+export async function contractRecipients(
+  payouts: Pick<ForeignPayout, "chain" | "to">[],
+  getCode: (chain: ForeignChain, to: string) => Promise<string> = (chain, to) => rpc<string>(EVM_RPC[chain] ?? BASE_RPC, "eth_getCode", [to, "latest"]),
+): Promise<Pick<ForeignPayout, "chain" | "to">[]> {
+  const seen = new Set<string>();
+  const evm = payouts.filter((p) => EVM_RPC[p.chain] && EVM_ADDR_RE.test(p.to.trim()) && !seen.has(`${p.chain}:${p.to.trim().toLowerCase()}`) && seen.add(`${p.chain}:${p.to.trim().toLowerCase()}`));
+  const answers = await Promise.all(evm.map(async (p) => [p, await getCode(p.chain, p.to.trim()).catch(() => null)] as const));
+  return answers.filter(([, code]) => typeof code === "string" && code !== "0x" && code !== "0x0" && code !== "").map(([p]) => ({ chain: p.chain, to: p.to.trim() }));
+}
+
+/** One sentence for the warning, or null when no EVM recipient is a contract. */
+export function contractRecipientsNote(list: Pick<ForeignPayout, "chain" | "to">[]): string | null {
+  if (!list.length) return null;
+  const names = list.map((p) => `${p.to.slice(0, 6)}…${p.to.slice(-4)} (${p.chain})`).join(", ");
+  return `${list.length === 1 ? "This payout recipient is a contract" : "These payout recipients are contracts"}: ${names}. If it needs more than 50,000 gas to receive funds, a payout signed by anyone but the keeper fails on chain and its funds stay stuck in the source address. Keep a keeper running for this vault, or pay a plain wallet address.`;
+}

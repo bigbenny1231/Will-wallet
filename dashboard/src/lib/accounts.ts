@@ -4,6 +4,8 @@
 // block: a sub-account can be created later.
 import { useEffect, useState } from "react";
 import { api } from "./near";
+import { contractRecipients } from "./chains";
+import type { ForeignPayout } from "../types";
 
 const ACCOUNT_RE = /^[a-z0-9._-]{2,64}$/;
 
@@ -29,6 +31,24 @@ export function useMissingAccounts(ids: string[]): string[] {
     };
   }, [key]);
   return missing;
+}
+
+/** React hook: EVM payout recipients that are contracts (lib/chains.ts contractRecipients), checked after a pause. */
+export function useContractRecipients(payouts: Pick<ForeignPayout, "chain" | "to">[]): Pick<ForeignPayout, "chain" | "to">[] {
+  const key = payouts.map((p) => `${p.chain}:${p.to.trim()}`).join(",");
+  const [found, setFound] = useState<Pick<ForeignPayout, "chain" | "to">[]>([]);
+  useEffect(() => {
+    let stop = false;
+    const list = key ? key.split(",").map((s) => ({ chain: s.split(":")[0] as ForeignPayout["chain"], to: s.slice(s.indexOf(":") + 1) })) : [];
+    const t = setTimeout(() => {
+      contractRecipients(list).then((m) => !stop && setFound(m)).catch(() => undefined);
+    }, 500);
+    return () => {
+      stop = true;
+      clearTimeout(t);
+    };
+  }, [key]);
+  return found;
 }
 
 /** One sentence for the warning, or null when every heir exists. */

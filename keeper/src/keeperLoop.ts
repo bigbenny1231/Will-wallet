@@ -120,7 +120,8 @@ type StaleResult = { kind: 'resigned' } | { kind: 'landed'; hash: string } | { k
  * A relay of a signed tx is stale (expired Solana blockhash, EVM nonce/price problem). Hardened contract rules:
  *  - wait until `resign_allowed_after_ms` (5 min after the last request), never re-sign right away;
  *  - first confirm the old signature never landed (Solana getSignatureStatuses / EVM tx lookup);
- *  - EVM: both fees = max(fresh, 1.1 x last), inside 21000..100000 gas and 100 gwei;
+ *  - EVM: as a keeper (contract or vault keeper), fresh honest fees (contract v2 second review G1: a keeper may re-sign at
+ *    any fee, the nonce is pinned); otherwise both fees = max(fresh, 1.1 x last), held at the chain cap;
  *  - Solana: the call must come from the keeper account (set_keeper), which is the account this backend signs with.
  */
 async function handleStale(deps: KeeperDeps, v: VaultView, index: number, chain: ChainName, why: string, out: ActionRecord[]): Promise<StaleResult> {
@@ -165,8 +166,11 @@ async function handleStale(deps: KeeperDeps, v: VaultView, index: number, chain:
     }
     let args = await stepArgsFor(deps, v, chain, index);
     if (chain !== 'solana' && args.evm && (p.status === 'signed' || p.status === 'broadcast')) {
-      // max(fresh, 1.1 x last), held at the chain cap: the contract takes a fee at the cap as a bump (second review F4).
-      args = { evm: bumpedEvmArgs(args.evm, track, chain) };
+      // A keeper re-signs at the fresh (honest) fees, even below the last request: an heir or a stranger who signed first
+      // cannot lock the payout above an honest fee (second review G1). A non-keeper must bump: max(fresh, 1.1 x last),
+      // held at the chain cap (the contract takes a fee at the cap as a bump, F4).
+      const keeper = backend.isKeeperFor ? await backend.isKeeperFor(v).catch(() => false) : false;
+      args = { evm: keeper ? clampEvm(args.evm, chain) : bumpedEvmArgs(args.evm, track, chain) };
     }
     deps.resigns.set(key, n + 1);
     log.warn('resign', `${label} signed tx is stale (${why}); resign_foreign${args.evm ? ` fees ${args.evm.max_fee_per_gas}/${args.evm.max_priority_fee_per_gas}` : ''}`);

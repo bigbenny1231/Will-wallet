@@ -16,6 +16,12 @@ export interface Backend {
   agentPay(args: AgentPayArgs): Promise<TxResult>;
   /** View: last signing request, last EVM fees and when a re-sign becomes legal. */
   getSignTrack(tokenId: string, index: number): Promise<SignTrack>;
+  /**
+   * Whether this backend's account is a keeper for `v` (the contract keeper or the vault keeper). Contract v2 second
+   * review G1: a keeper may re-sign a signed EVM payout at any fee, so it sends honest fees instead of a 1.1x bump.
+   * Optional: a backend without it is treated as a non-keeper.
+   */
+  isKeeperFor?(v: VaultView): Promise<boolean>;
 }
 
 type RpcProvider = InstanceType<typeof providers.JsonRpcProvider>;
@@ -140,6 +146,19 @@ export class NearBackend implements Backend {
   }
   resignForeign(tokenId: string, index: number, args: StepArgs) {
     return this.call('resign_foreign', { token_id: tokenId, index, args }, GAS.resignForeign);
+  }
+  private configKeeper?: Promise<string | null>;
+  async isKeeperFor(v: VaultView): Promise<boolean> {
+    const me = this.account.accountId;
+    if (v.keeper_id === me) return true;
+    // the contract keeper rarely changes; read it once per process (a failed read is retried next time)
+    this.configKeeper ??= this.view<{ keeper?: string | null }>('get_config', {}).then((c) => c?.keeper ?? null);
+    try {
+      return (await this.configKeeper) === me;
+    } catch {
+      this.configKeeper = undefined;
+      return false;
+    }
   }
   async getSignTrack(tokenId: string, index: number): Promise<SignTrack> {
     const t = await this.view<Record<string, unknown>>('get_sign_track', { token_id: tokenId, index });

@@ -7,8 +7,8 @@ import { useWallet } from "../lib/wallet";
 import { usePoll, useNow } from "../lib/usePoll";
 import { bpsToPct, expectedShare, fmtDuration, fmtInterval, fmtTime, nearToYocto, shortAccount, yoctoToNear } from "../lib/format";
 import { MIN_DEPOSIT_YOCTO, claimCall, depositCall, executeStepCall, markBroadcastCall, nftTransferCall, ownerHeartbeatCall, pokeCall } from "../lib/calls";
-import { missingHeirsNote, useMissingAccounts } from "../lib/accounts";
-import { broadcastForeign, currentForeign, stepArgsFor } from "../lib/chains";
+import { missingHeirsNote, useContractRecipients, useMissingAccounts } from "../lib/accounts";
+import { broadcastForeign, contractRecipientsNote, currentForeign, stepArgsFor } from "../lib/chains";
 import { sourceAddressFor } from "../lib/derive";
 import { guestAvailable } from "../lib/guest";
 import { lastEvent, step1AmountFor } from "../lib/logparse";
@@ -38,6 +38,8 @@ export default function Vault() {
   const v = vault.data;
   // Heirs whose account does not exist yet (RPC view_account): a warning while the vault is live.
   const missingHeirs = useMissingAccounts(v && (v.state === "Alive" || v.state === "Warning") ? v.heirs.map((h) => h.account_id) : []);
+  // EVM payout recipients with code: a warning while the vault is live (contract v2 second review G1).
+  const contractTo = useContractRecipients(v && (v.state === "Alive" || v.state === "Warning") ? v.foreign : []);
   if (!vault.loaded) return <p className="wrap py-24 text-text-2">Loading vault {id}…</p>;
   // `undefined` means no read has succeeded yet (the RPC is rate limited or down); only `null` means the contract
   // answered that there is no such vault. The poll keeps retrying, so this clears by itself. SECURITY_REVIEW_3 D-4.
@@ -277,6 +279,7 @@ export default function Vault() {
           ))}
         </ul>
         {missingHeirsNote(missingHeirs) && <p className="mt-4 border-l border-warn pl-4 text-[15px] text-warn">{missingHeirsNote(missingHeirs)}</p>}
+        {contractRecipientsNote(contractTo) && <p className="mt-4 border-l border-warn pl-4 text-[15px] text-warn">{contractRecipientsNote(contractTo)}</p>}
         {v.foreign.length > 0 && (
           <p className="mt-4 text-[15px] text-text-2">
             Also {v.foreign.length} foreign payout{v.foreign.length === 1 ? "" : "s"}, listed under settlement. Source addresses:{" "}

@@ -207,9 +207,10 @@ describe('relay failures', () => {
     expect(v.foreign[0].signed_tx!.endsWith('r')).toBe(true);
   });
 
-  it('EVM re-sign waits, then sends max(fresh, 1.1 x last) for both fees', async () => {
+  it('EVM re-sign as a non-keeper operator waits, then sends max(fresh, 1.1 x last) for both fees', async () => {
     const clock = { t: 1_000_000 };
     const backend = fresh(clock, { foreign: 'base' });
+    backend.callerIsKeeper = false;
     await backend.getVaults();
     clock.t += 25_000;
     const chains = mockChains();
@@ -228,6 +229,31 @@ describe('relay failures', () => {
     const sent = resign.mock.calls[0][2].evm!;
     expect(sent.max_fee_per_gas).toBe('1650000000'); // 1.1 x 1.5 gwei
     expect(sent.max_priority_fee_per_gas).toBe('1100000');
+    expect(sent.gas_limit).toBe('21000');
+    expect((await backend.getVault('1')).foreign[0].status).toBe('broadcast');
+  });
+
+  it('EVM re-sign as the keeper sends the fresh honest fees, no bump (contract v2 second review G1)', async () => {
+    const clock = { t: 1_000_000 };
+    const backend = fresh(clock, { foreign: 'base' });
+    await backend.getVaults();
+    clock.t += 25_000;
+    const chains = mockChains();
+    let n = 0;
+    chains.broadcastEvm = async (raw) => {
+      if (++n <= 2) throw new Error('eth_sendRawTransaction: replacement transaction underpriced');
+      return `mock0xevm${raw.slice(-6)}`;
+    };
+    const resign = vi.spyOn(backend, 'resignForeign');
+    const deps = makeDeps({ backend, chains, contractId: 'c', now: () => clock.t, log: quiet });
+    await tickOnce(deps);
+    expect(resign).not.toHaveBeenCalled();
+    clock.t += 310_000;
+    await tickOnce(deps);
+    expect(resign).toHaveBeenCalledTimes(1);
+    const sent = resign.mock.calls[0][2].evm!;
+    expect(sent.max_fee_per_gas).toBe('1500000000'); // fresh, not 1.1 x last
+    expect(sent.max_priority_fee_per_gas).toBe('1000000');
     expect(sent.gas_limit).toBe('21000');
     expect((await backend.getVault('1')).foreign[0].status).toBe('broadcast');
   });

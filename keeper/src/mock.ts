@@ -304,6 +304,9 @@ export class MockBackend implements Backend {
       resign_allowed_after_ms: now + 300_000,
     });
   }
+  async isKeeperFor(): Promise<boolean> {
+    return this.callerIsKeeper;
+  }
   async getSignTrack(tokenId: string, index: number): Promise<SignTrack> {
     return this.tracks.get(`${tokenId}:${index}`) ?? { last_request_ms: 0, inflight: false, max_fee_per_gas: '0', max_priority_fee_per_gas: '0', resign_allowed_after_ms: 300_000 };
   }
@@ -336,7 +339,8 @@ export class MockBackend implements Backend {
         if (BigInt(e.max_fee_per_gas) > 100_000_000_000n) throw new Error('max_fee_per_gas above cap');
         // second review F4: a fee at the cap counts as a bump
         const bumped = (n: string, last: string) => BigInt(n) >= 100_000_000_000n || BigInt(n) * 100n >= BigInt(last) * 110n;
-        if (hasSig && t && !(bumped(e.max_fee_per_gas, t.max_fee_per_gas) && bumped(e.max_priority_fee_per_gas, t.max_priority_fee_per_gas)))
+        // second review G1: a keeper may re-sign at any fee; only non-keepers ratchet
+        if (hasSig && t && !this.callerIsKeeper && !(bumped(e.max_fee_per_gas, t.max_fee_per_gas) && bumped(e.max_priority_fee_per_gas, t.max_priority_fee_per_gas)))
           throw new Error('re-sign of a signed evm payout must raise both fees by >= 10% (or to the chain cap)');
         if (p.status === 'broadcast' && !cooled) throw new Error('resign cooldown: wait 5 min after the last request');
       }

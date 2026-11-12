@@ -26,3 +26,33 @@ describe("heir accounts that do not exist (view_account)", () => {
     expect(isImplicitAccount("sarah.testnet")).toBe(false);
   });
 });
+
+describe("EVM payout recipients that are contracts (eth_getCode, contract v2 second review G1)", () => {
+  it("flags only EVM recipients with code, once each; Solana, bad addresses and RPC errors raise no warning", async () => {
+    const { contractRecipients, contractRecipientsNote } = await import("./chains");
+    const safe = "0x" + "ab".repeat(20);
+    const eoa = "0x" + "cd".repeat(20);
+    const boom = "0x" + "ef".repeat(20);
+    const asked: string[] = [];
+    const getCode = async (chain: string, to: string) => {
+      asked.push(`${chain}:${to}`);
+      if (to === boom) throw new Error("rpc down");
+      return to === safe ? "0x6080" : "0x";
+    };
+    const found = await contractRecipients(
+      [
+        { chain: "base", to: safe },
+        { chain: "base", to: ` ${safe} ` },
+        { chain: "monad", to: eoa },
+        { chain: "base", to: boom },
+        { chain: "solana", to: "8opHzTAnfzRpPEx21XtnrVTX28YQuCpAjcn1PczScKh" },
+        { chain: "base", to: "0x123" },
+      ],
+      getCode,
+    );
+    expect(found).toEqual([{ chain: "base", to: safe }]);
+    expect(asked.length).toBe(3);
+    expect(contractRecipientsNote([])).toBeNull();
+    expect(contractRecipientsNote(found)).toMatch(/^This payout recipient is a contract: 0xabab…abab \(base\)\. .*50,000 gas/);
+  });
+});
