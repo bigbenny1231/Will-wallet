@@ -38,6 +38,13 @@ jobs:
         working-directory: keeper
         run: npm ci
 
+      # The site's showcase vault: one owner heartbeat a day keeps it Alive (scripts/ci/showcase-beat.sh).
+      - name: Showcase heartbeat
+        continue-on-error: true
+        env:
+          KEEPER_SEED: ${{ secrets.KEEPER_SEED }}
+        run: ./scripts/ci/showcase-beat.sh
+
       # Read-only view call. Sets outputs `work` (true/false) and `count`. No account, no key, no transaction.
       - name: Check for vaults that are past their deadline or Triggered
         id: due

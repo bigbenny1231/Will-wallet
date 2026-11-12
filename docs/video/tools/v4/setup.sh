@@ -18,7 +18,7 @@ $TX call "$O" "$C" add_pulse_key "{\"token_id\":\"$T\",\"public_key\":\"$PUB\"}"
 DER=$(cd keeper && npx tsx src/cli.ts derive --token "$T" --json)
 j() { echo "$DER" | node -e "console.log(JSON.parse(require('fs').readFileSync(0)).$1.address)"; }
 B=$(j base); M=$(j monad); SO=$(j solana)
-$TX call "$O" "$C" set_foreign_payouts "{\"token_id\":\"$T\",\"payouts\":[{\"chain\":\"base\",\"to\":\"0xcA024adC7cac111339Fe077C739F8085aE705F2F\",\"amount\":\"500000000000000\",\"from_address\":\"$B\"},{\"chain\":\"monad\",\"to\":\"0x360d02320ebff8439fe0d804e68dfc6976230e13\",\"amount\":\"10000000000000000\",\"from_address\":\"$M\"},{\"chain\":\"solana\",\"to\":\"CFdWXa1ean7bBoewSv2SZESrDpWSxeoN1hfLrqaqZQUr\",\"amount\":\"10000000\",\"from_address\":\"$SO\"}]}" 50 1y | tee -a "$S/setup.out"
+$TX call "$O" "$C" set_foreign_payouts "{\"token_id\":\"$T\",\"payouts\":[{\"chain\":\"base\",\"to\":\"0xfd151ad02f573689f235f56059ce6e2f3b64dd89\",\"amount\":\"500000000000000\",\"from_address\":\"$B\"},{\"chain\":\"monad\",\"to\":\"0xfd151ad02f573689f235f56059ce6e2f3b64dd89\",\"amount\":\"10000000000000000\",\"from_address\":\"$M\"},{\"chain\":\"solana\",\"to\":\"HpEHvLpa9pMNiDCQDnVMSomCx4bmJuXX8sKqtKGg2uWr\",\"amount\":\"10000000\",\"from_address\":\"$SO\"}]}" 50 1y | tee -a "$S/setup.out"
 echo "  base $B  monad $M  solana $SO" | tee -a "$S/setup.out"
 G=dmw-demo-guardian-$SFX.testnet
 FUNDER=$(ls keys/dmw-demo-funder-*.testnet.json 2>/dev/null | head -1 | xargs -r basename | sed 's/\.json$//')

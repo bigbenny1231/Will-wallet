@@ -83,7 +83,7 @@ say "foreign payouts (Base 0.0005 ETH, Solana 0.01 SOL)"
 DER=$(cd keeper && npx tsx src/cli.ts derive --token $TOKEN --json)
 BASE_FROM=$(echo "$DER" | node -e "console.log(JSON.parse(require('fs').readFileSync(0,'utf8')).base.address)")
 SOL_FROM=$(echo "$DER" | node -e "console.log(JSON.parse(require('fs').readFileSync(0,'utf8')).solana.address)")
-$TX call $OWNER $C set_foreign_payouts "{\"token_id\":\"$TOKEN\",\"payouts\":[{\"chain\":\"base\",\"to\":\"0xcA024adC7cac111339Fe077C739F8085aE705F2F\",\"amount\":\"500000000000000\",\"from_address\":\"$BASE_FROM\"},{\"chain\":\"solana\",\"to\":\"CFdWXa1ean7bBoewSv2SZESrDpWSxeoN1hfLrqaqZQUr\",\"amount\":\"10000000\",\"from_address\":\"$SOL_FROM\"}]}" 50 1y | grep -E '^tx |result'
+$TX call $OWNER $C set_foreign_payouts "{\"token_id\":\"$TOKEN\",\"payouts\":[{\"chain\":\"base\",\"to\":\"0xfd151ad02f573689f235f56059ce6e2f3b64dd89\",\"amount\":\"500000000000000\",\"from_address\":\"$BASE_FROM\"},{\"chain\":\"solana\",\"to\":\"HpEHvLpa9pMNiDCQDnVMSomCx4bmJuXX8sKqtKGg2uWr\",\"amount\":\"10000000\",\"from_address\":\"$SOL_FROM\"}]}" 50 1y | grep -E '^tx |result'
 echo "  base source   $BASE_FROM"; echo "  solana source $SOL_FROM"
 
 # 7. the agent guard rails: one allowed, one denied

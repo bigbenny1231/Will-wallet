@@ -126,6 +126,8 @@ jobs:
           sha256sum contracts/release/dmw.wasm | tee >(eval "$SAVE" >> "$OUT/deploy.log")
       - name: Showcase vault
         if: inputs.task == 'all'
+        env:
+          KEEPER_SEED: ${{ secrets.KEEPER_SEED }}
         run: |
           set -o pipefail
           ( while sleep 0.2; do ./scripts/ci/mask.sh; done ) & W=$!

@@ -16,6 +16,7 @@
 //   node scripts/near-admin.mjs derive-keeper                    -> the long-lived keeper: derives its account id and
 //                                                                    key from the KEEPER_SEED secret (env), saves the key
 //                                                                    to keys/<id>.json, prints only the account id
+//   node scripts/near-admin.mjs derive-account <role>            -> the same for another long-lived account (showcase)
 //   node scripts/near-admin.mjs balance <acct>                   -> available NEAR (decimal), 0 if the account is missing
 //   node scripts/near-admin.mjs sweep <acct> <beneficiary>       -> deletes <acct>, its whole balance goes to <beneficiary>
 import { createRequire } from 'node:module';
@@ -58,15 +59,19 @@ function b58(buf) {
 // The long-lived keeper (v3). Its key is never stored anywhere but the KEEPER_SEED repository secret: every run derives
 // the same ed25519 key and the same account id from it (HKDF-SHA256, domain-separated labels), so the key cannot be lost
 // with a runner, nobody has to copy a private key around, and replacing the secret replaces the keeper.
-function deriveKeeper() {
+// Other long-lived accounts come from the same secret under their own labels (role "showcase": the owner of the
+// site's showcase vault, which the hosted keeper keeps alive with a daily heartbeat).
+function deriveKeeper(role = 'keeper') {
+  if (!/^[a-z]+$/.test(role)) throw new Error(`derive: bad role ${role}`);
   const seed = process.env.KEEPER_SEED || '';
-  if (seed.length < 32) throw new Error('derive-keeper: KEEPER_SEED must be set and at least 32 characters long');
+  if (seed.length < 32) throw new Error('derive: KEEPER_SEED must be set and at least 32 characters long');
   const ikm = Buffer.from(seed, 'utf8');
-  const sk = Buffer.from(hkdfSync('sha256', ikm, 'dmw-keeper', 'ed25519 secret key v1', 32));
-  const tag = Buffer.from(hkdfSync('sha256', ikm, 'dmw-keeper', 'account id v1', 4)).toString('hex');
+  const pre = role === 'keeper' ? '' : `${role} `;
+  const sk = Buffer.from(hkdfSync('sha256', ikm, 'dmw-keeper', `${pre}ed25519 secret key v1`, 32));
+  const tag = Buffer.from(hkdfSync('sha256', ikm, 'dmw-keeper', `${pre}account id v1`, 4)).toString('hex');
   const der = Buffer.concat([Buffer.from('302e020100300506032b657004220420', 'hex'), sk]);
   const pub = Buffer.from(createPublicKey(createPrivateKey({ key: der, format: 'der', type: 'pkcs8' })).export({ format: 'jwk' }).x, 'base64url');
-  const id = `dmw-keeper-${tag}.testnet`;
+  const id = `dmw-${role}-${tag}.testnet`;
   return { id, public_key: `ed25519:${b58(pub)}`, private_key: `ed25519:${b58(Buffer.concat([sk, pub]))}` };
 }
 function saveKey(name, publicKey, privateKey) {
@@ -162,8 +167,8 @@ try {
     if (full.length) process.exitCode = 1;
   } else if (cmd === 'keys') {
     console.log(JSON.stringify(await provider.viewAccessKeyList(a[0]), null, 2));
-  } else if (cmd === 'derive-keeper') {
-    const k = deriveKeeper();
+  } else if (cmd === 'derive-keeper' || cmd === 'derive-account') {
+    const k = deriveKeeper(cmd === 'derive-keeper' ? 'keeper' : a[0]);
     saveKey(k.id, k.public_key, k.private_key);
     console.log(k.id);
   } else if (cmd === 'balance') {
