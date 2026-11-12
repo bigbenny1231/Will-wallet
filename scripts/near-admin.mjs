@@ -13,7 +13,13 @@
 //   node scripts/near-admin.mjs fund <payer> <name>.testnet [near]  -> creates a top-level .testnet account paid by <payer>
 //                                                                    through the `testnet` registrar (no faucet)
 //   node scripts/near-admin.mjs lock <acct>                      -> deletes the account's own full-access key (irreversible)
+//   node scripts/near-admin.mjs derive-keeper                    -> the long-lived keeper: derives its account id and
+//                                                                    key from the KEEPER_SEED secret (env), saves the key
+//                                                                    to keys/<id>.json, prints only the account id
+//   node scripts/near-admin.mjs balance <acct>                   -> available NEAR (decimal), 0 if the account is missing
+//   node scripts/near-admin.mjs sweep <acct> <beneficiary>       -> deletes <acct>, its whole balance goes to <beneficiary>
 import { createRequire } from 'node:module';
+import { hkdfSync, createPrivateKey, createPublicKey } from 'node:crypto';
 import { readFileSync, writeFileSync, mkdirSync, existsSync, chmodSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -41,8 +47,39 @@ function loadKey(acct) {
 function account(acct, key = loadKey(acct)) {
   return new Account(acct, provider, new KeyPairSigner(KeyPair.fromString(key)));
 }
+// Base58 (Bitcoin alphabet), the encoding of NEAR ed25519 keys.
+const B58 = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+function b58(buf) {
+  let n = BigInt('0x' + (Buffer.from(buf).toString('hex') || '0')); let out = '';
+  while (n > 0n) { out = B58[Number(n % 58n)] + out; n /= 58n; }
+  for (const b of buf) { if (b !== 0) break; out = '1' + out; }
+  return out;
+}
+// The long-lived keeper (v3). Its key is never stored anywhere but the KEEPER_SEED repository secret: every run derives
+// the same ed25519 key and the same account id from it (HKDF-SHA256, domain-separated labels), so the key cannot be lost
+// with a runner, nobody has to copy a private key around, and replacing the secret replaces the keeper.
+function deriveKeeper() {
+  const seed = process.env.KEEPER_SEED || '';
+  if (seed.length < 32) throw new Error('derive-keeper: KEEPER_SEED must be set and at least 32 characters long');
+  const ikm = Buffer.from(seed, 'utf8');
+  const sk = Buffer.from(hkdfSync('sha256', ikm, 'dmw-keeper', 'ed25519 secret key v1', 32));
+  const tag = Buffer.from(hkdfSync('sha256', ikm, 'dmw-keeper', 'account id v1', 4)).toString('hex');
+  const der = Buffer.concat([Buffer.from('302e020100300506032b657004220420', 'hex'), sk]);
+  const pub = Buffer.from(createPublicKey(createPrivateKey({ key: der, format: 'der', type: 'pkcs8' })).export({ format: 'jwk' }).x, 'base64url');
+  const id = `dmw-keeper-${tag}.testnet`;
+  return { id, public_key: `ed25519:${b58(pub)}`, private_key: `ed25519:${b58(Buffer.concat([sk, pub]))}` };
+}
+function saveKey(name, publicKey, privateKey) {
+  // Full-access keys: owner-only directory and file (0700 / 0600), never the umask default (AUDIT_FINAL_OFFCHAIN F-01).
+  mkdirSync(KEYS, { recursive: true, mode: 0o700 }); chmodSync(KEYS, 0o700);
+  const file = join(KEYS, `${name}.json`);
+  writeFileSync(file, JSON.stringify({ account_id: name, public_key: publicKey, private_key: privateKey }, null, 2), { mode: 0o600 });
+  chmodSync(file, 0o600);
+}
 async function create(name) {
-  const kp = KeyPair.fromRandom('ed25519');
+  // A key already saved for this name (the derived keeper) is used as is; otherwise a fresh random key.
+  const saved = join(KEYS, `${name}.json`);
+  const kp = existsSync(saved) ? KeyPair.fromString(JSON.parse(readFileSync(saved, 'utf8')).private_key) : KeyPair.fromRandom('ed25519');
   const res = await fetch('https://helper.nearprotocol.com/account', {
     method: 'POST', headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ newAccountId: name, newAccountPublicKey: kp.getPublicKey().toString() }),
@@ -125,6 +162,28 @@ try {
     if (full.length) process.exitCode = 1;
   } else if (cmd === 'keys') {
     console.log(JSON.stringify(await provider.viewAccessKeyList(a[0]), null, 2));
+  } else if (cmd === 'derive-keeper') {
+    const k = deriveKeeper();
+    saveKey(k.id, k.public_key, k.private_key);
+    console.log(k.id);
+  } else if (cmd === 'balance') {
+    // Available balance in NEAR (amount minus the storage stake), "0" when the account does not exist.
+    let out = '0';
+    try {
+      const v = await provider.query({ request_type: 'view_account', finality: 'final', account_id: a[0] });
+      const storage = BigInt(v.storage_usage) * 10n ** 19n;
+      const avail = BigInt(v.amount) > storage ? BigInt(v.amount) - storage : 0n;
+      out = (Number(avail / 10n ** 18n) / 1e6).toFixed(6);
+    } catch (e) { if (!/does not exist|UNKNOWN_ACCOUNT/i.test(String(e?.message || e))) throw e; }
+    console.log(out);
+  } else if (cmd === 'sweep') {
+    // Delete a throwaway account and send its whole balance to <beneficiary> (how the keeper is topped up from a fresh
+    // faucet account). Refuses the beneficiary itself and anything that holds a contract.
+    const [acct, to] = a;
+    if (!acct || !to || acct === to) throw new Error('sweep <acct> <beneficiary>: two different accounts');
+    const v = await provider.query({ request_type: 'view_account', finality: 'final', account_id: acct });
+    if (v.code_hash && v.code_hash !== '11111111111111111111111111111111') throw new Error(`sweep: ${acct} holds a contract; refusing`);
+    show(await account(acct).deleteAccount(to));
   } else if (cmd === 'genkey') {
     const kp = KeyPair.fromRandom('ed25519'); console.log(JSON.stringify({ public_key: kp.getPublicKey().toString(), private_key: kp.toString() }));
   } else { console.error('unknown command'); process.exit(2); }

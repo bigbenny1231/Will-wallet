@@ -16,8 +16,10 @@ name: testnet
 # in contracts/dmw/Cargo.toml) of the dispatched commit and commit it to the same branch as contracts/release/dmw.wasm,
 # so the deployed code hash is checkable by anyone from the source commit named in that commit's message.
 #
-# Keys. No key leaves the runner: every account here is a throwaway testnet faucet account whose key lives only in
-# this job's keys/ folder and is masked in the log the moment it exists (scripts/ci/mask.sh). The contract account
+# Keys. No key leaves the runner. The contract keeper is the long-lived account derived from the KEEPER_SEED repository
+# secret (scripts/near-admin.mjs derive-keeper): the same account the scheduled keeper (keeper.yml) signs with, so it
+# keeps settling vaults after this run ends. Every other account is a throwaway testnet faucet account. All keys live
+# only in this job's keys/ folder and are masked in the log the moment they exist (scripts/ci/mask.sh). The contract account
 # keeps no full-access key after setup, so nobody (this workflow included) can change its code afterwards; a fix is a
 # fresh deploy. Non-secret results (tx links, logs, video, stills) are pushed to the branch `ci/testnet-results` under
 # results/<run id>/, after a check that no private key is among them.
@@ -67,6 +69,17 @@ jobs:
           (cd agent && npm ci --no-audit --no-fund --loglevel=error)
           mkdir -p "$OUT"
 
+      - name: The long-lived keeper secret is set
+        if: inputs.task == 'all' || inputs.task == 'record' || inputs.task == 'finish'
+        env:
+          KEEPER_SEED: ${{ secrets.KEEPER_SEED }}
+        run: |
+          if [ "${#KEEPER_SEED}" -lt 32 ]; then
+            echo "::error::Repository secret KEEPER_SEED is missing or shorter than 32 characters (Settings > Secrets and variables > Actions)."
+            exit 1
+          fi
+          echo "KEEPER_SEED is set (${#KEEPER_SEED} characters)"
+
       # ---------------- release build ----------------
       - name: Reproducible release build, committed to this branch
         if: inputs.task == 'release' || inputs.task == 'all'
@@ -97,6 +110,9 @@ jobs:
       # ---------------- deploy ----------------
       - name: Deploy the release build to a fresh account
         if: inputs.task == 'all'
+        env:
+          KEEPER_SEED: ${{ secrets.KEEPER_SEED }}
+          REQUIRE_KEEPER_SEED: '1'
         run: |
           set -o pipefail
           # mask each key the moment it exists: run deploy.sh with a watcher that masks new key files
@@ -145,6 +161,13 @@ jobs:
           node scripts/near-admin.mjs sub $A heir 0.5; node scripts/near-admin.mjs sub $A dao 1.5; ./scripts/ci/mask.sh; sleep 3
           ./contracts/attack-c2.sh "$C" $A heir.$A dao.$A 2>&1 | tee >(eval "$SAVE" > "$OUT/attack-c2.log")
 
+      - name: Leave a vault for the scheduled keeper (nothing in this run drives it)
+        if: inputs.task == 'all'
+        run: |
+          set -o pipefail
+          C=$(sed -n 's/^DMW_CONTRACT=//p' .env)
+          ./scripts/ci/sentinel.sh "$C" 2>&1 | tee >(eval "$SAVE" > "$OUT/sentinel.log")
+
       # ---------------- video ----------------
       - name: Video tools (ffmpeg, Playwright Chromium, dashboard build)
         if: ${{ !cancelled() && (inputs.task == 'all' || inputs.task == 'record' || inputs.task == 'finish' || inputs.task == 'edit') }}
@@ -159,6 +182,9 @@ jobs:
         with: { name: dmw-raw, path: /tmp/v4, run-id: '${{ inputs.raw_run }}', github-token: '${{ github.token }}' }
       - name: Record the demo run
         if: ${{ !cancelled() && (inputs.task == 'all' || inputs.task == 'record' || inputs.task == 'finish') }}
+        env:
+          KEEPER_SEED: ${{ secrets.KEEPER_SEED }}
+          REQUIRE_KEEPER_SEED: '1'
         run: |
           set -o pipefail
           ( while sleep 0.2; do ./scripts/ci/mask.sh; done ) & W=$!

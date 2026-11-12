@@ -1,8 +1,10 @@
-name: guest-sweep
+name: keeper
 
-# Settles abandoned guest vaults on the public testnet contract: vaults whose owner is a throwaway
-# `dmw-guest-*` account made by the dashboard's guest mode. No other vault is touched (keeper --owner-prefix).
-# Details: keeper/README.md, "Hosted guest sweep".
+# The hosted keeper for the live testnet contract. Every 10 minutes a read-only check looks for vaults that are past
+# their deadline or Triggered; when there is one, the keeper pokes it and runs its steps until nothing is due.
+# It signs as the contract keeper: the long-lived account derived from the KEEPER_SEED repository secret
+# (scripts/near-admin.mjs derive-keeper), the same account the deploy names in `new`. Its key exists only in that
+# secret and in the runner's memory while a job runs. Details: keeper/README.md, "Hosted keeper".
 on:
   schedule:
     # Every 10 minutes, a few minutes off the hour (the top of the hour is the busiest time for scheduled runs).
@@ -11,16 +13,17 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
-# One sweep at a time. A run that starts while another is going waits for it; it is not cancelled.
+# One keeper at a time. A run that starts while another is going waits for it; it is not cancelled.
 concurrency:
-  group: guest-sweep
+  group: keeper
   cancel-in-progress: false
 
 jobs:
-  sweep:
+  keeper:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 12
     env:
       # keeper/src/config.ts reads the process environment first; there is no .env file on the runner.
       NEAR_NETWORK: testnet
@@ -36,39 +39,47 @@ jobs:
         run: npm ci
 
       # Read-only view call. Sets outputs `work` (true/false) and `count`. No account, no key, no transaction.
-      - name: Pre-check for guest vaults that are past their deadline or Triggered
+      - name: Check for vaults that are past their deadline or Triggered
         id: due
         working-directory: keeper
-        run: npx tsx src/cli.ts due --owner-prefix dmw-guest- --github-output
+        run: npx tsx src/cli.ts due --github-output
 
-      - name: Sweep guest vaults
+      # A testnet.yml run (deploy or demo recording) drives its own vaults with the same keeper account; two signers
+      # on one key would race for nonces, so the hosted keeper waits for the next slot.
+      - name: Yield to a running testnet job
+        id: free
         if: steps.due.outputs.work == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          n=$(gh run list -R "$GITHUB_REPOSITORY" --workflow testnet.yml --status in_progress --json databaseId -q 'length' || echo 0)
+          if [ "${n:-0}" != 0 ]; then echo "a testnet run is in progress; the next keeper slot will pick these vaults up"; echo "go=false" >> "$GITHUB_OUTPUT"
+          else echo "go=true" >> "$GITHUB_OUTPUT"; fi
+
+      - name: Keep
+        if: steps.due.outputs.work == 'true' && steps.free.outputs.go == 'true'
         shell: bash
         env:
-          # Secrets cannot be tested in `if:`, so both are passed in and checked in the script. Unset secrets are empty.
-          SECRET_KEEPER_ACCOUNT_ID: ${{ secrets.KEEPER_ACCOUNT_ID }}
-          SECRET_KEEPER_PRIVATE_KEY: ${{ secrets.KEEPER_PRIVATE_KEY }}
+          # Secrets cannot be tested in `if:`, so the seed is passed in and checked here. An unset secret is empty.
+          KEEPER_SEED: ${{ secrets.KEEPER_SEED }}
         run: |
           set -euo pipefail
-          if [ -n "$SECRET_KEEPER_ACCOUNT_ID" ] && [ -n "$SECRET_KEEPER_PRIVATE_KEY" ]; then
-            echo "keeper account: from the repository secrets"
-            export KEEPER_ACCOUNT_ID="$SECRET_KEEPER_ACCOUNT_ID"
-            export KEEPER_PRIVATE_KEY="$SECRET_KEEPER_PRIVATE_KEY"
+          . scripts/lib.sh
+          if [ "${#KEEPER_SEED}" -ge 32 ]; then
+            name="$(node scripts/near-admin.mjs derive-keeper)"
+            echo "keeper account: $name (derived from KEEPER_SEED)"
           else
+            # Without the secret the keeper still works (poke and the steps are open to any account), only not as the
+            # contract keeper, so step 3 waits out its first hour.
+            echo "::warning::KEEPER_SEED is not set; keeping with a one-off faucet account instead of the contract keeper"
             name="dmw-sweep-$(openssl rand -hex 5).testnet"
-            echo "keeper account: one-off testnet faucet account $name"
             node scripts/near-admin.mjs create "$name"
-            # Mask the new private key (with and without its ed25519: prefix) before anything else runs.
-            node -e 'const k = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")).private_key; console.log("::add-mask::" + k); console.log("::add-mask::" + k.replace(/^ed25519:/, ""));' "keys/$name.json"
-            KEEPER_PRIVATE_KEY="$(node -e 'process.stdout.write(JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")).private_key)' "keys/$name.json")"
-            export KEEPER_ACCOUNT_ID="$name" KEEPER_PRIVATE_KEY
-            # Give the RPC node a moment to see the new account (up to 20 s).
-            for _ in 1 2 3 4 5 6 7 8 9 10; do
-              seen="$(curl -s "$NEAR_RPC" -H 'content-type: application/json' \
-                -d "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"query\",\"params\":{\"request_type\":\"view_account\",\"finality\":\"final\",\"account_id\":\"$name\"}}" || true)"
-              case "$seen" in *'"amount"'*) break ;; esac
-              sleep 2
-            done
           fi
+          # Mask the private key (with and without its ed25519: prefix) before anything else runs.
+          node -e 'const k = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")).private_key; console.log("::add-mask::" + k); console.log("::add-mask::" + k.replace(/^ed25519:/, ""));' "keys/$name.json"
+          for _ in $(seq 10); do account_exists "$name" && break; sleep 2; done
+          [ "${#KEEPER_SEED}" -ge 32 ] && keeper_topup "$name"
+          KEEPER_PRIVATE_KEY="$(node -e 'process.stdout.write(JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")).private_key)' "keys/$name.json")"
+          export KEEPER_ACCOUNT_ID="$name" KEEPER_PRIVATE_KEY
           cd keeper
-          npx tsx src/cli.ts keeper --until-idle --max-seconds 240 --owner-prefix dmw-guest- --poll 5
+          npx tsx src/cli.ts keeper --until-idle --max-seconds 480 --poll 5

@@ -42,6 +42,28 @@ account_exists() {
 
 # Make sure .env has a funded keeper account (KEEPER_ACCOUNT_ID / KEEPER_PRIVATE_KEY); create one via the faucet if not.
 ensure_keeper() {
+  # v3: with KEEPER_SEED set (the repository secret in CI), the keeper is the long-lived account derived from it
+  # (scripts/near-admin.mjs derive-keeper). It is created through the faucet the first time and topped up after.
+  if [ -n "${KEEPER_SEED:-}" ]; then
+    local k
+    k=$(node scripts/near-admin.mjs derive-keeper) || die "could not derive the keeper from KEEPER_SEED"
+    if ! account_exists "$k"; then
+      say "keeper account $k (derived from KEEPER_SEED; first use, testnet faucet)"
+      node scripts/near-admin.mjs create "$k" || die "faucet could not create $k"
+      for _ in $(seq 15); do account_exists "$k" && break; sleep 2; done
+    else
+      say "keeper account $k (derived from KEEPER_SEED)"
+    fi
+    # The account must hold the derived key: anything else means the name is not ours.
+    local pub
+    pub=$(node -e "console.log(JSON.parse(require('fs').readFileSync(process.argv[1],'utf8')).public_key)" "keys/$k.json")
+    node scripts/near-admin.mjs keys "$k" | grep -qF "\"$pub\"" || die "$k does not hold the key derived from KEEPER_SEED"
+    set_env KEEPER_ACCOUNT_ID "$k"
+    set_env KEEPER_PRIVATE_KEY "$(key_of "$k")"
+    keeper_topup "$k"
+    return 0
+  fi
+  [ "${REQUIRE_KEEPER_SEED:-0}" = 1 ] && die "KEEPER_SEED is not set: the live deploy needs the long-lived keeper (repository secret KEEPER_SEED)"
   if [ -n "${KEEPER_ACCOUNT_ID:-}" ] && [ -n "${KEEPER_PRIVATE_KEY:-}" ]; then return 0; fi
   local k="dmw-keeper-$(rand_hex 3).testnet"
   say "keeper account $k (testnet faucet)"
@@ -49,6 +71,23 @@ ensure_keeper() {
   set_env KEEPER_ACCOUNT_ID "$k"
   set_env KEEPER_PRIVATE_KEY "$(key_of "$k")"
   KEEPER_CREATED=1
+}
+
+# Keep the long-lived keeper able to pay gas: below KEEPER_MIN_NEAR (default 4) it gets a fresh faucet account's whole
+# balance (`sweep` deletes that account into the keeper). Best effort: a faucet refusal is reported, not fatal.
+keeper_topup() {
+  local k=$1 bal t
+  bal=$(node scripts/near-admin.mjs balance "$k" 2>/dev/null || echo 0)
+  echo "  keeper balance: $bal NEAR"
+  awk -v b="$bal" -v m="${KEEPER_MIN_NEAR:-4}" 'BEGIN{exit !(b+0 < m+0)}' || return 0
+  t="dmw-topup-$(rand_hex 4).testnet"
+  if node scripts/near-admin.mjs create "$t" >/dev/null 2>&1; then
+    for _ in $(seq 15); do account_exists "$t" && break; sleep 2; done
+    node scripts/near-admin.mjs sweep "$t" "$k" | grep -E '^tx ' || true
+    echo "  keeper topped up: $(node scripts/near-admin.mjs balance "$k" 2>/dev/null || echo ?) NEAR"
+  else
+    echo "  keeper top-up skipped: the faucet refused a new account (it allows about 10 per IP per 12 h)"
+  fi
 }
 
 # Make KEEPER_ACCOUNT_ID the contract keeper. Contract v2 takes the keeper in `new` (deploy.sh passes it), so this is
