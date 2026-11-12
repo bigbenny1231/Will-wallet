@@ -1,6 +1,6 @@
 # Generates src/settlement-sequence.svg
 X={'k':105,'d':320,'o':525,'s':725,'c':905}
-names=[('k','Keeper','off-chain CLI'),('d','dmw contract','dmw-x8cx.testnet'),('o','omni-transaction','in-contract lib'),('s','v1.signer','MPC network'),('c','Foreign chain','Base Sol Monad')]
+names=[('k','Keeper','off-chain CLI'),('d','dmw contract','NEAR testnet'),('o','omni-transaction','in-contract lib'),('s','v1.signer','MPC network'),('c','Foreign chain','Base Sol Monad')]
 out=[];y=0
 def bgtext(x,yy,txt,cls,anchor='middle',w=None):
     est=w or len(txt)*(7.9 if 'm' in cls.split() else 6.7)

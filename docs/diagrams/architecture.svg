@@ -40,7 +40,7 @@ text{font-family:'Inter Tight',system-ui,sans-serif;fill:#EDE7DC}
 <line x1="30" y1="100" x2="970" y2="100" class="hair"/>
 
 <text x="30" y="126" class="lab">WHO CAN ACT</text>
-<text x="330" y="126" class="lab">CONTRACT  dmw-x8cx.testnet</text>
+<text x="330" y="126" class="lab">CONTRACT  dmw on NEAR testnet</text>
 <text x="760" y="126" class="lab">WHAT IT SETTLES</text>
 
 <!-- actors -->
@@ -173,5 +173,5 @@ text{font-family:'Inter Tight',system-ui,sans-serif;fill:#EDE7DC}
 <g>
  <line x1="690" y1="760" x2="720" y2="760" class="arrow"/><text x="728" y="764" class="sm">live on testnet</text>
 </g>
-<text x="30" y="764" class="sm">Testnet only. Not a will. Not audited. dmw: near-sdk 5, v1.signer-prod.testnet.</text>
+<text x="30" y="764" class="sm">NEAR testnet. Not a will. No full-access key. dmw: near-sdk 5, v1.signer-prod.testnet.</text>
 </svg>

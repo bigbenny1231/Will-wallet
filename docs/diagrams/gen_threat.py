@@ -47,15 +47,15 @@ for name,role,can,cannot,mit in rows:
     out.append(f'<line x1="30" y1="{y}" x2="970" y2="{y}" class="hair"/>')
     y+=12
 y+=10
-out.append(f'<rect x="30" y="{y}" width="940" height="74" class="panel" rx="4"/><rect x="30" y="{y}" width="3" height="74" fill="#FF4D4D"/>')
-out.append(f'<text x="50" y="{y+28}" class="lab" style="fill:#FF4D4D">RESIDUAL TRUST, TESTNET</text>')
-out.append(f'<text x="50" y="{y+50}" class="b" style="font-size:14.5px">The deployer FullAccess key can redeploy the contract and so move any vault (I-1). Mainnet: remove the key or gate upgrades behind a DAO.</text>')
-out.append(f'<text x="50" y="{y+67}" class="sm" style="font-size:13px">Also: a Solana payout already signed can only be re-signed by the owner or keeper (M-3). Not audited.</text>')
+out.append(f'<rect x="30" y="{y}" width="940" height="74" class="panel" rx="4"/><rect x="30" y="{y}" width="3" height="74" fill="#3DDC84"/>')
+out.append(f'<text x="50" y="{y+28}" class="lab" style="fill:#3DDC84">NO FULL-ACCESS KEY</text>')
+out.append(f'<text x="50" y="{y+50}" class="b" style="font-size:14.5px">The contract account has no full-access key, so nobody, its authors included, can deploy new code or move a vault outside the rules.</text>')
+out.append(f'<text x="50" y="{y+67}" class="sm" style="font-size:13px">A Solana payout that is already signed can be re-signed only by a keeper (M-3, F1).</text>')
 y+=74+40
 H=int(y+30)
 svg=f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 {H}" width="1000" height="{H}" role="img" aria-labelledby="t d">
 <title id="t">Threat model</title>
-<desc id="d">Five attackers, what each can and cannot do, and the mitigations from the security review, with the deployer key as residual trust.</desc>
+<desc id="d">Five attackers, what each can and cannot do, and the mitigations from the security review, and the contract account, which has no full-access key.</desc>
 <style>/*STYLE*/</style>
 <rect width="1000" height="{H}" fill="#0B0C0F"/>
 <text x="30" y="58" class="title">Threat model, <tspan class="it">by who holds what</tspan></text>

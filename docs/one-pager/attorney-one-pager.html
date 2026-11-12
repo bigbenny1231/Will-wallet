@@ -44,7 +44,7 @@ footer{margin-top:auto;padding-top:7pt;border-top:1.5px solid var(--ink);display
 <p>It is non-custodial. No party, including the developers, holds the client&#8217;s keys or can move assets outside the configured plan. The plan is public on-chain, so a fiduciary can read exactly what was configured.</p></div></section>
 
 <section><span class="sc">What it is not</span><div>
-<p>Not a will, trust, codicil or beneficiary designation, and it has no legal effect of its own. Not a custodian, escrow agent or fiduciary. It does not detect death: it acts on the absence of heartbeats, so the interval and grace period should suit the client&#8217;s circumstances. Assets must sit at the vault&#8217;s derived addresses to be included. Testnet only today; not yet audited.</p></div></section>
+<p>Not a will, trust, codicil or beneficiary designation, and it has no legal effect of its own. Not a custodian, escrow agent or fiduciary. It does not detect death: it acts on the absence of heartbeats, so the interval and grace period should suit the client&#8217;s circumstances. Assets must sit at the vault&#8217;s derived addresses to be included. It runs on NEAR testnet today, and there has been no third-party audit.</p></div></section>
 
 <section><span class="sc">Referencing it in a trust</span><div>
 <aside class="clause"><span class="tag">Sample. Review with counsel.</span>
@@ -56,11 +56,11 @@ footer{margin-top:auto;padding-top:7pt;border-top:1.5px solid var(--ink);display
 <li>Nothing executes while heartbeats arrive. Settlement opens only after the interval and the grace period have both passed.</li>
 <li>Anyone may run settlement, and no one may redirect it: the contract builds every transaction from the stored plan.</li>
 <li>Keys for other chains do not exist until the trigger; NEAR&#8217;s MPC network signs at settlement. The pulse and agent keys are deleted during settlement.</li>
-<li>An independent code review found 1 Critical and 3 High issues, all fixed with regression tests. On testnet the deployer can still redeploy the contract; a mainnet release would remove that.</li>
+<li>Every Critical and High finding of the code reviews was fixed, each contract fix with a named regression test. The contract account has no full-access key, so nobody, its authors included, can change the code.</li>
 </ol></div></section>
 
 <section style="border-bottom:0"><span class="sc">Contact</span><div>
 <p>For a briefing or a sample configuration: <span class="ph">[name, title]</span> <span class="ph">[email address]</span> <span class="ph">[telephone]</span></p></div></section>
 
-<footer><span>deadmanswallet.dev &middot; Source and security review in the repository (docs/SECURITY_REVIEW.md)</span><span>Draft for review with counsel &middot; 2026-11-07</span></footer>
+<footer><span>Source and security record in the repository (README, Security model)</span><span>Draft for review with counsel &middot; 2026-11-12</span></footer>
 </div></body></html>
