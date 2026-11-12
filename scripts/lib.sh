@@ -109,5 +109,10 @@ register_keeper() {
     node scripts/near-admin.mjs call "$cur" "$c" set_keeper "{\"account_id\":\"$KEEPER_ACCOUNT_ID\"}" 30 $yocto | grep -E '^tx ' || true
   else
     echo "  (cannot set the keeper from here: the current keeper ${cur:-<none>} or a separate contract owner must call set_keeper {\"account_id\":\"$KEEPER_ACCOUNT_ID\"})"
+    return 0
+  fi
+  # v3: set_keeper only proposes; the proposed keeper takes the role with accept_keeper (1 yoctoNEAR)
+  if node scripts/near-admin.mjs view "$c" get_config '{}' 2>/dev/null | grep -q '"pending_keeper"'; then
+    node scripts/near-admin.mjs call "$KEEPER_ACCOUNT_ID" "$c" accept_keeper '{}' 30 1y | grep -E '^tx ' || true
   fi
 }

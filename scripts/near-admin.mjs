@@ -63,8 +63,12 @@ function b58(buf) {
 // site's showcase vault, which the hosted keeper keeps alive with a daily heartbeat).
 function deriveKeeper(role = 'keeper') {
   if (!/^[a-z]+$/.test(role)) throw new Error(`derive: bad role ${role}`);
-  const seed = process.env.KEEPER_SEED || '';
-  if (seed.length < 32) throw new Error('derive: KEEPER_SEED must be set and at least 32 characters long');
+  // The keeper admin (role "admin") comes from its own secret, KEEPER_ADMIN_SEED, which only the deploy and the admin
+  // task read; the scheduled keeper never sees it, so a leak of the keeper's seed does not reach the admin.
+  const name = role === 'admin' ? 'KEEPER_ADMIN_SEED' : 'KEEPER_SEED';
+  const seed = process.env[name] || '';
+  if (seed.length < 32) throw new Error(`derive: ${name} must be set and at least 32 characters long`);
+  if (role === 'admin' && seed === (process.env.KEEPER_SEED || '')) throw new Error('derive: KEEPER_ADMIN_SEED must differ from KEEPER_SEED');
   const ikm = Buffer.from(seed, 'utf8');
   const pre = role === 'keeper' ? '' : `${role} `;
   const sk = Buffer.from(hkdfSync('sha256', ikm, 'dmw-keeper', `${pre}ed25519 secret key v1`, 32));

@@ -64,7 +64,7 @@ echo "\$ $TX call-with-key $C <pulse-private-key> $C heartbeat '{\"token_id\":\"
 $TX call-with-key "$C" "$PULSE_SK" "$C" heartbeat "{\"token_id\":\"$TOKEN\"}" 10
 
 echo; echo "## poke too early"
-run $TX call "$H1" "$C" poke "{\"token_id\":\"$TOKEN\"}" 30 || echo "(not_due as expected)"
+run $TX call "$H1" "$C" poke "{\"token_id\":\"$TOKEN\"}" 60 || echo "(not_due as expected)"
 
 echo; echo "## owner goes silent; wait until trigger_at_ms"
 while :; do
@@ -74,7 +74,7 @@ while :; do
 done
 
 echo; echo "## poke (heir earns the bounty)"
-run $TX call "$H1" "$C" poke "{\"token_id\":\"$TOKEN\"}" 30
+run $TX call "$H1" "$C" poke "{\"token_id\":\"$TOKEN\"}" 60
 echo; echo "## heartbeat after trigger is rejected"
 $TX call-with-key "$C" "$PULSE_SK" "$C" heartbeat "{\"token_id\":\"$TOKEN\"}" 10 || echo "(vault_triggered as expected)"
 
@@ -92,7 +92,7 @@ ks=[k['public_key'] for k in json.load(sys.stdin)['keys']]
 print('pulse present:', '$PULSE_PK' in ks, ' agent present:', '$AGENT_PK' in ks)"
 
 echo; echo "## claim reserve as new Will NFT owner ($H1)"
-run $TX call "$H1" "$C" claim "{\"token_id\":\"$TOKEN\"}" 30
+run $TX call "$H1" "$C" claim "{\"token_id\":\"$TOKEN\"}" 60
 
 echo; echo "## final get_vault"
 run $NA view "$C" get_vault "{\"token_id\":\"$TOKEN\"}"

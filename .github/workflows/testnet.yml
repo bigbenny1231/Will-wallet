@@ -41,7 +41,7 @@ on:
         required: false
         default: ''
       admin:
-        description: 'admin: propose-keeper <account> | propose-mpc <account> | execute | cancel'
+        description: 'admin: propose-keeper <account> | propose-mpc <account> | set-admin <account> | execute | cancel'
         required: false
         default: ''
 
@@ -75,16 +75,25 @@ jobs:
           (cd agent && npm ci --no-audit --no-fund --loglevel=error)
           mkdir -p "$OUT"
 
-      - name: The long-lived keeper secret is set
+      - name: The long-lived keeper and keeper-admin secrets are set
         if: inputs.task == 'all' || inputs.task == 'record' || inputs.task == 'finish'
         env:
           KEEPER_SEED: ${{ secrets.KEEPER_SEED }}
+          KEEPER_ADMIN_SEED: ${{ secrets.KEEPER_ADMIN_SEED }}
+          TASK_INPUT: ${{ inputs.task }}
         run: |
           if [ "${#KEEPER_SEED}" -lt 32 ]; then
             echo "::error::Repository secret KEEPER_SEED is missing or shorter than 32 characters (Settings > Secrets and variables > Actions)."
             exit 1
           fi
           echo "KEEPER_SEED is set (${#KEEPER_SEED} characters)"
+          if [ "$TASK_INPUT" = all ]; then
+            if [ "${#KEEPER_ADMIN_SEED}" -lt 32 ] || [ "$KEEPER_ADMIN_SEED" = "$KEEPER_SEED" ]; then
+              echo "::error::Repository secret KEEPER_ADMIN_SEED is missing, shorter than 32 characters, or equal to KEEPER_SEED."
+              exit 1
+            fi
+            echo "KEEPER_ADMIN_SEED is set (${#KEEPER_ADMIN_SEED} characters)"
+          fi
 
       # ---------------- release build ----------------
       - name: Reproducible release build, committed to this branch
@@ -121,6 +130,7 @@ jobs:
         if: inputs.task == 'admin'
         env:
           KEEPER_SEED: ${{ secrets.KEEPER_SEED }}
+          KEEPER_ADMIN_SEED: ${{ secrets.KEEPER_ADMIN_SEED }}
           ADMIN_INPUT: ${{ inputs.admin }}
         run: |
           set -euo pipefail
@@ -130,9 +140,10 @@ jobs:
           case "$act" in
             propose-keeper) M=propose_keeper; J="{\"account_id\":\"$arg\"}";;
             propose-mpc)    M=propose_mpc_signer; J="{\"account_id\":\"$arg\"}";;
+            set-admin)      M=set_keeper_admin; J="{\"account_id\":\"$arg\"}";;
             execute)        M=execute_admin_proposal; J='{}';;
             cancel)         M=cancel_admin_proposal; J='{}';;
-            *) echo "::error::admin input must be propose-keeper <account> | propose-mpc <account> | execute | cancel"; exit 1;;
+            *) echo "::error::admin input must be propose-keeper <account> | propose-mpc <account> | set-admin <account> | execute | cancel"; exit 1;;
           esac
           case "$arg" in *[!a-z0-9._-]*) echo "::error::bad account id"; exit 1;; esac
           D=1y; [ "$act" = execute ] && D=0
@@ -144,6 +155,7 @@ jobs:
         if: inputs.task == 'all'
         env:
           KEEPER_SEED: ${{ secrets.KEEPER_SEED }}
+          KEEPER_ADMIN_SEED: ${{ secrets.KEEPER_ADMIN_SEED }}
           REQUIRE_KEEPER_SEED: '1'
         run: |
           set -o pipefail
@@ -172,9 +184,14 @@ jobs:
           set -o pipefail
           C=$(sed -n 's/^DMW_CONTRACT=//p' .env); K=$(sed -n 's/^KEEPER_ACCOUNT_ID=//p' .env)
           # The lock is irreversible, so first check the contract keeper is the long-lived account (review H-2)
-          CK=$(node scripts/near-admin.mjs view "$C" get_config '{}' | node -e 'console.log(JSON.parse(require("fs").readFileSync(0,"utf8")).keeper||"")')
-          echo "contract keeper: $CK (expected $K)" | tee >(eval "$SAVE" > "$OUT/lock.log")
+          CFG=$(node scripts/near-admin.mjs view "$C" get_config '{}')
+          cfg() { echo "$CFG" | node -e 'const j=JSON.parse(require("fs").readFileSync(0,"utf8")); const v=j[process.argv[1]]; console.log(v==null?"":typeof v==="object"?JSON.stringify(v):v)' "$1"; }
+          CK=$(cfg keeper); KA=$(cfg keeper_admin); PK=$(cfg pending_keeper); AP=$(cfg admin_proposal)
+          echo "contract keeper: $CK (expected $K); keeper admin: ${KA:-none}; pending keeper: ${PK:-none}; admin proposal: ${AP:-none}" | tee >(eval "$SAVE" > "$OUT/lock.log")
           [ -n "$K" ] && [ "$CK" = "$K" ] || { echo "::error::contract keeper is not the long-lived keeper; not locking"; exit 1; }
+          [ -n "$KA" ] && [ "$KA" != "$K" ] && [ "$KA" != "$C" ] || { echo "::error::no separate keeper admin; a compromised keeper could never be replaced; not locking"; exit 1; }
+          node scripts/near-admin.mjs keys "$KA" | grep -q '"public_key"' || { echo "::error::keeper admin $KA has no access key; not locking"; exit 1; }
+          [ -z "$PK" ] && [ -z "$AP" ] || { echo "::error::a keeper hand-over or admin proposal is pending; not locking"; exit 1; }
           node scripts/near-admin.mjs keys "$K" | grep -q '"public_key"' || { echo "::error::$K has no access key; not locking"; exit 1; }
           node scripts/near-admin.mjs lock "$C" 2>&1 | tee >(eval "$SAVE" >> "$OUT/lock.log")
           node scripts/near-admin.mjs keys "$C" | tee >(eval "$SAVE" >> "$OUT/lock.log")

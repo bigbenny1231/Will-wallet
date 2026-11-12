@@ -61,18 +61,22 @@ fi
 ensure_keeper
 if CFG=$($ADMIN view "$ACCOUNT" get_config '{}' 2>/dev/null); then
   echo "$CFG" | grep -q '"mpc_signer"' || die "$ACCOUNT runs a v1 contract; v2 changed the storage layout. Deploy to a fresh account: NEW=1 make deploy"
+  echo "$CFG" | grep -q '"admin_timelock_ms"' || die "$ACCOUNT runs a v2 contract; v3 changed the storage layout. Deploy to a fresh account: NEW=1 make deploy"
   say "redeploying code to $ACCOUNT (already initialised, state is kept)"
   $ADMIN deploy "$ACCOUNT" "$WASM"
   say "keeper"
   register_keeper "$ACCOUNT"
 else
-  # v3: with KEEPER_SEED set, the keeper admin is the long-lived account derived from it (role "admin"). Its only
-  # power is a 48 h timelocked proposal to replace the keeper or the MPC signer (testnet.yml task=admin).
+  # v3: the keeper admin is the long-lived account derived from the KEEPER_ADMIN_SEED secret (separate from the
+  # keeper's). Its only power is a 48 h timelocked proposal to replace the keeper, the MPC signer or itself
+  # (testnet.yml task=admin). CI (REQUIRE_KEEPER_SEED=1) refuses to deploy without it.
   ADMIN_ID=""
-  if [ -n "${KEEPER_SEED:-}" ]; then
+  if [ -n "${KEEPER_ADMIN_SEED:-}" ]; then
     ADMIN_ID=$($ADMIN derive-account admin) || die "could not derive the keeper admin"
     account_exists "$ADMIN_ID" || { $ADMIN create "$ADMIN_ID" || die "faucet could not create $ADMIN_ID"; }
-    say "keeper admin $ADMIN_ID (derived from KEEPER_SEED)"
+    say "keeper admin $ADMIN_ID (derived from KEEPER_ADMIN_SEED)"
+  elif [ "${REQUIRE_KEEPER_SEED:-0}" = 1 ]; then
+    die "KEEPER_ADMIN_SEED is not set: the contract would have no keeper admin, so a compromised keeper could never be replaced"
   fi
   INIT="{\"owner_id\":\"$OWNER\",\"keeper_id\":\"$KEEPER_ACCOUNT_ID\"${ADMIN_ID:+,\"keeper_admin\":\"$ADMIN_ID\"}${DMW_MPC_SIGNER:+,\"mpc_signer\":\"$DMW_MPC_SIGNER\"}}"
   say "deploying to $ACCOUNT and calling new($INIT) in the same transaction"

