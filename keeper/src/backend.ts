@@ -1,5 +1,6 @@
 // The keeper talks to a vault through this interface; NearBackend is the real one, MockBackend lives in mock.ts.
 import { Account, KeyPair, KeyPairSigner, providers } from 'near-api-js';
+import type { ContractConfig } from './step3.js';
 import type { AgentPayArgs, SignTrack, StepArgs, TxResult, VaultView } from './types.js';
 import { withRetry } from './util.js';
 
@@ -22,6 +23,10 @@ export interface Backend {
    * Optional: a backend without it is treated as a non-keeper.
    */
   isKeeperFor?(v: VaultView): Promise<boolean>;
+  /** The NEAR account this backend signs with (optional: without it the step III window is not checked locally). */
+  readonly accountId?: string;
+  /** `get_config` fields the keeper uses (keeper, owner_id, step3_open_after_ms). Optional, like `accountId`. */
+  getConfig?(): Promise<ContractConfig>;
 }
 
 type RpcProvider = InstanceType<typeof providers.JsonRpcProvider>;
@@ -147,16 +152,32 @@ export class NearBackend implements Backend {
   resignForeign(tokenId: string, index: number, args: StepArgs) {
     return this.call('resign_foreign', { token_id: tokenId, index, args }, GAS.resignForeign);
   }
-  private configKeeper?: Promise<string | null>;
+  get accountId(): string {
+    return this.account.accountId;
+  }
+  private config?: { at: number; p: Promise<ContractConfig> };
+  /** get_config, cached for a minute (the contract keeper can be handed over; a failed read is retried next time). */
+  async getConfig(): Promise<ContractConfig> {
+    if (!this.config || Date.now() - this.config.at > 60_000) {
+      const p = this.view<Record<string, unknown>>('get_config', {}).then((c) => ({
+        owner_id: typeof c?.owner_id === 'string' ? c.owner_id : null,
+        keeper: typeof c?.keeper === 'string' ? c.keeper : null,
+        // absent on a v1 contract: no window
+        step3_open_after_ms: Number(c?.step3_open_after_ms ?? 0) || 0,
+      }));
+      this.config = { at: Date.now(), p };
+      p.catch(() => {
+        if (this.config?.p === p) this.config = undefined;
+      });
+    }
+    return this.config.p;
+  }
   async isKeeperFor(v: VaultView): Promise<boolean> {
     const me = this.account.accountId;
     if (v.keeper_id === me) return true;
-    // the contract keeper rarely changes; read it once per process (a failed read is retried next time)
-    this.configKeeper ??= this.view<{ keeper?: string | null }>('get_config', {}).then((c) => c?.keeper ?? null);
     try {
-      return (await this.configKeeper) === me;
+      return (await this.getConfig()).keeper === me;
     } catch {
-      this.configKeeper = undefined;
       return false;
     }
   }

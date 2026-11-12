@@ -6,7 +6,8 @@ import { deriveCommand } from './commands/derive.js';
 import { dueCommand } from './commands/due.js';
 import { pulseCommand } from './commands/pulse.js';
 import { loadConfig, need } from './config.js';
-import { agentBackend, getChains, keeperBackend, pulseBackend } from './factory.js';
+import { agentBackend, funderFromEnv, getChains, keeperBackend, pulseBackend } from './factory.js';
+import { funderCommand, fundSourcesCommand } from './commands/fund.js';
 import { consoleLogger, makeDeps, runKeeper } from './keeperLoop.js';
 import { countdown, formatDuration } from './machine.js';
 import { MockBackend } from './mock.js';
@@ -115,6 +116,7 @@ program
   .option('--max-seconds <n>', 'stop cleanly after this many seconds (exit 0; the next run continues)')
   .option('--token <ids>', 'only drive these vault token ids (comma separated); default: every vault')
   .option('--owner-prefix <prefix>', 'only drive vaults whose owner_id starts with this prefix (with --token, both must match)')
+  .option('--fund-sources', 'top up foreign payout sources from the KEEPER_SEED funder before step III and on an unfunded relay (or DMW_FUND_SOURCES=1)')
   .action((o) =>
     run(async () => {
       const cfg = loadConfig();
@@ -124,6 +126,8 @@ program
       const ac = new AbortController();
       process.once('SIGINT', () => ac.abort());
       process.once('SIGTERM', () => ac.abort());
+      const funder = o.fundSources || process.env.DMW_FUND_SOURCES === '1' ? funderFromEnv(cfg, consoleLogger).funder : undefined;
+      if (funder) consoleLogger.info('fund', `funding payout sources from ${funder.evmAddress} (Base, Monad) and ${funder.solanaAddress} (Solana), capped by FUND_CAP_* and FUND_RUN_CAP_*`);
       const deps = makeDeps({
         backend: keeperBackend(cfg),
         chains: getChains(cfg),
@@ -131,6 +135,7 @@ program
         only: tokenSet(o.token),
         ownerPrefix,
         notifier: notifierFromEnv(process.env, cfg.contract, consoleLogger),
+        funder,
       });
       const r = await runKeeper(deps, { pollS, once: !!o.once, untilIdle: !!o.untilIdle, maxSeconds, signal: ac.signal });
       // A run that hit the time limit without ever reading the vault list did no sweeping at all: say so with exit 1.
@@ -157,6 +162,43 @@ program
         json: !!o.json,
         githubOutput,
       });
+    }),
+  );
+
+/** Progress lines of a command whose summary goes to stdout: on stderr, so `--json` output stays clean. */
+const stderrLogger = {
+  ok: (t: string, m: string) => process.stderr.write(`${t.padEnd(9)} ${termSafe(m)}\n`),
+  warn: (t: string, m: string) => process.stderr.write(`${t.padEnd(9)} ${termSafe(m)}\n`),
+  err: (t: string, m: string) => process.stderr.write(`${t.padEnd(9)} ${termSafe(m)}\n`),
+  info: (t: string, m: string) => process.stderr.write(`${t.padEnd(9)} ${termSafe(m)}\n`),
+};
+
+program
+  .command('funder')
+  .description('print the funder wallet derived from KEEPER_SEED: its Base/Monad EVM address and Solana address with balances (never the keys)')
+  .option('--json', 'machine-readable output')
+  .action((o) =>
+    run(async () => {
+      const cfg = loadConfig();
+      const { funder, rpc, caps } = funderFromEnv(cfg, stderrLogger);
+      await funderCommand({ funder, rpc, caps, json: !!o.json });
+    }),
+  );
+
+program
+  .command('fund-sources')
+  .description("top up a vault's foreign payout source addresses from the funder: exactly the shortfall, capped; exit 1 if any source is left short")
+  .requiredOption('--token <id>', 'vault token id')
+  .option('--dry-run', 'only print what would be sent')
+  .option('--json', 'machine-readable output')
+  .action((o) =>
+    run(async () => {
+      const cfg = loadConfig();
+      const [tokenId] = [...(tokenSet(o.token) ?? [])];
+      if (!tokenId || String(o.token).includes(',')) throw new Error('--token takes one vault token id');
+      const { funder } = funderFromEnv(cfg, stderrLogger);
+      const r = await fundSourcesCommand({ backend: viewBackend(cfg), chains: getChains(cfg), contract: need(cfg.contract, 'DMW_CONTRACT'), tokenId, funder, dryRun: !!o.dryRun, json: !!o.json });
+      if (!r.ok) process.exitCode = 1;
     }),
   );
 

@@ -6,6 +6,7 @@ import type { Backend } from './backend.js';
 import type { Chains } from './chainsApi.js';
 import { KEEPER_DIR } from './config.js';
 import { bpsShare, deriveState, isDue, triggerAtMs } from './machine.js';
+import { isOperator, step3ProgressMs, type ContractConfig } from './step3.js';
 import type { AgentPayArgs, SignTrack, StepArgs, TxResult, VaultView } from './types.js';
 
 const NEAR = 10n ** 24n;
@@ -137,9 +138,12 @@ export function mockExecuteStep(v: VaultView, now: number, args?: StepArgs): { l
         p.status = 'signed';
         p.signed_tx = p.chain !== 'solana' ? `0xmocksigned${v.foreign_index}` : Buffer.from(`mocksigned${v.foreign_index}`).toString('base64');
         v.foreign_index += 1;
-        push(v, now, 'step_3', `signed payout ${v.foreign_index - 1} (${p.chain})`);
+        push(v, now, 'foreign_signed', `#${v.foreign_index - 1} signed (${p.chain})`);
       }
-      if (v.foreign_index >= v.foreign.length) v.step = 4;
+      if (v.foreign_index >= v.foreign.length) {
+        v.step = 4;
+        push(v, now, 'step_3', 'foreign payouts done');
+      }
       break;
     }
     case 4: {
@@ -307,6 +311,17 @@ export class MockBackend implements Backend {
   async isKeeperFor(): Promise<boolean> {
     return this.callerIsKeeper;
   }
+  /**
+   * Tests set this to the caller's account id. Then the mock enforces the contract's step III window (only an
+   * operator signs during the first `config.step3_open_after_ms` of each payout) and the keeper checks it too.
+   * Unset (the default): no window, as before.
+   */
+  accountId?: string;
+  config: ContractConfig & { contract: string } = { contract: 'dmw-mock.testnet', owner_id: 'dmw-mock.testnet', keeper: null, step3_open_after_ms: 3_600_000 };
+  async getConfig(): Promise<ContractConfig> {
+    const { contract: _c, ...c } = this.config;
+    return c;
+  }
   async getSignTrack(tokenId: string, index: number): Promise<SignTrack> {
     return this.tracks.get(`${tokenId}:${index}`) ?? { last_request_ms: 0, inflight: false, max_fee_per_gas: '0', max_priority_fee_per_gas: '0', resign_allowed_after_ms: 300_000 };
   }
@@ -314,7 +329,14 @@ export class MockBackend implements Backend {
     const before = this.load().vaults[tokenId];
     const idx = before && before.step === 3 ? before.foreign_index : -1;
     const chain = before?.foreign[idx]?.chain;
-    const { result, hash } = this.mutate(tokenId, (v, now) => mockExecuteStep(v, now, args));
+    const { result, hash } = this.mutate(tokenId, (v, now) => {
+      if (this.accountId !== undefined && v.state === 'Triggered' && v.step === 3 && v.foreign_index < v.foreign.length) {
+        const start = step3ProgressMs(v) ?? 0;
+        if (!isOperator(this.accountId, v, this.config, this.config.contract) && now < start + (this.config.step3_open_after_ms ?? 0))
+          throw new Error('Smart contract panicked: step 3: during the first hour only the keeper, the vault owner or an heir may sign a payout');
+      }
+      return mockExecuteStep(v, now, args);
+    });
     if (chain) this.track(tokenId, idx, args, chain, this.clock());
     return { hash, logs: result.logs, returnValue: result.step };
   }

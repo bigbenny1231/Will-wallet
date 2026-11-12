@@ -64,7 +64,7 @@ export interface EvmStepArgs {
 /** No RPC call may hold a bounded run (`--max-seconds`) open: every request gives up after this long. */
 const RPC_TIMEOUT_MS = 15_000;
 
-async function rpc<T>(url: string, method: string, params: unknown[]): Promise<T> {
+export async function rpc<T>(url: string, method: string, params: unknown[]): Promise<T> {
   const r = await fetch(url, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
