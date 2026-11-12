@@ -6,6 +6,7 @@ import type { Notifier } from './notify.js';
 import type { ChainName, StepArgs, TxResult, VaultView } from './types.js';
 import { MAX_RESIGNS, RELAY_COOLDOWN, classifyRelayError } from './relay.js';
 import { bumpedEvmArgs, clampEvm, msUntilResign, payoutTxId } from './resign.js';
+import { vaultPaths } from './chains/derive.js';
 import { errMsg, foreignTxLink, logErr, logInfo, logOk, logWarn, nearTxLink, sleep } from './util.js';
 
 export interface Logger {
@@ -56,18 +57,23 @@ export interface ActionRecord {
   ok: boolean;
 }
 
-/** `from_address` is free text the owner wrote (the contract only caps its length and never signs with it). */
+/** Before signing, `from_address` is free text the owner wrote; contract v2 overwrites it with the derived address. */
 const EVM_ADDRESS = /^0x[0-9a-fA-F]{40}$/;
 
 /**
- * The address an EVM payout is sent from. The stored `from_address` is used only when it is a well-formed EVM
- * address; anything else (a typo, or text put there on purpose) falls back to the derived address, so a bad
- * value cannot make `eth_getTransactionCount` fail and leave the vault stuck in step 3 (SECURITY_REVIEW_3 K-1).
+ * The address an EVM payout is sent from: the address derived from the vault's own `derivation_paths`
+ * (authoritative). The stored `from_address` is only a fallback when derivation fails, and only when it is a
+ * well-formed EVM address, so a bad value cannot make `eth_getTransactionCount` fail and leave the vault stuck in
+ * step 3 (SECURITY_REVIEW_3 K-1).
  */
 export async function evmSourceAddress(deps: Pick<KeeperDeps, 'chains' | 'contractId'>, v: VaultView, chain: 'base' | 'monad', index: number): Promise<string> {
-  const stored = v.foreign[index]?.from_address ?? '';
-  if (EVM_ADDRESS.test(stored)) return stored;
-  return (await deps.chains.deriveAddresses(deps.contractId, v.token_id))[chain];
+  try {
+    return (await deps.chains.deriveAddresses(deps.contractId, vaultPaths(v)))[chain];
+  } catch (e) {
+    const stored = v.foreign[index]?.from_address ?? '';
+    if (EVM_ADDRESS.test(stored)) return stored;
+    throw e;
+  }
 }
 
 export async function stepArgsFor(deps: KeeperDeps, v: VaultView, chain: ChainName, index: number): Promise<StepArgs> {
@@ -339,7 +345,7 @@ export async function driveVaultView(deps: KeeperDeps, initial: VaultView): Prom
               const prev = deps.relayBlock.get(key);
               deps.relayBlock.set(key, { until: deps.now() + RELAY_COOLDOWN.unfunded, reason: 'unfunded' });
               // Report the address that really has to be funded: the derived one. The owner-written `from_address` is shown only if derivation fails.
-              const from = await deps.chains.deriveAddresses(deps.contractId, id).then((a) => (action.chain === 'solana' ? a.solana : a[action.chain])).catch(() => p.from_address || 'the derived address');
+              const from = await deps.chains.deriveAddresses(deps.contractId, vaultPaths(v)).then((a) => (action.chain === 'solana' ? a.solana : a[action.chain])).catch(() => p.from_address || 'the derived address');
               if (prev?.reason === 'unfunded') log.info('relay', `${label} still unfunded; status stays ${p.status}, retry in ${RELAY_COOLDOWN.unfunded / 1000}s`);
               else log.warn('relay', `${label} NOT broadcast: source ${from} is unfunded (${errMsg(e)}). Status stays ${p.status}; fund it and the keeper will relay. Retry in ${RELAY_COOLDOWN.unfunded / 1000}s`);
               out.push({ kind: 'broadcast', tokenId: id, ok: false, detail: 'unfunded' });

@@ -47,9 +47,17 @@ export interface StepArgs {
 }
 
 export interface LogEntry {
+  /** Write order across both log rings (v2; absent on a v1 contract). */
+  seq?: number;
   ms: number;
   event: string;
   detail: string;
+}
+
+export interface DerivationPaths {
+  base: string;
+  monad: string;
+  solana: string;
 }
 
 export interface VaultView {
@@ -68,8 +76,19 @@ export interface VaultView {
   pulse_keys: string[];
   agent_keys: string[];
   policy: Policy;
+  /** Agent spend in the rolling 24 h window ending now (v2; a calendar-day bucket on v1). */
   daily_spent: string;
+  /** Oldest spend still counted in the rolling window (0 when none). */
   daily_window_start_ms: number;
+  /** v2: the spends inside the rolling window. */
+  spends?: { ms: number; amount: string }[];
+  /** v2: salted derivation paths of the vault's foreign source addresses (read these, never rebuild them). */
+  derivation_paths?: DerivationPaths;
+  /** v2: per-vault keeper set by the owner. */
+  keeper_id?: string | null;
+  /** v2: measured storage of the vault and the deposit that covers it. */
+  storage_bytes?: number;
+  storage_deposit?: string;
   dao_id: string | null;
   dao_proposal_id: number | null;
   step: number;

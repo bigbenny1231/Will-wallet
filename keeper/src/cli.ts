@@ -53,7 +53,8 @@ program
   .action((o) =>
     run(async () => {
       const cfg = loadConfig();
-      const r = await deriveCommand(getChains(cfg), need(cfg.contract, 'DMW_CONTRACT'), o.token).catch((e) => {
+      const vault = await viewBackend(cfg).getVault(o.token);
+      const r = await deriveCommand(getChains(cfg), need(cfg.contract, 'DMW_CONTRACT'), vault).catch((e) => {
         if (/not wired/.test(errMsg(e))) {
           console.error(pc.yellow(errMsg(e)));
           process.exit(2);

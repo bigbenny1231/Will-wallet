@@ -1,16 +1,17 @@
 // Interface to the foreign-chain helpers in src/chains/ (owned by another agent).
 //
 // Expected modules (any of the listed export names is accepted):
-//   chains/derive.ts   deriveAddresses(contractId, tokenId) -> { base | evm: string|{address}, solana: string|{address} }
+//   chains/derive.ts   deriveAddresses(contractId, paths) -> { base | evm: string|{address}, solana: string|{address} }
 //   chains/evm.ts      getEvmStepArgs(fromAddress) -> EvmStepArgs      broadcastEvm(rawHex) -> txHash
 //   chains/solana.ts   getSolanaStepArgs() -> { recent_blockhash }     broadcastSolana(rawBase64) -> signature
 //
 // Until those land, every method throws "not wired".
 import type { Config } from './config.js';
-import type { ChainName, EvmStepArgs } from './types.js';
+import type { ChainName, DerivationPaths, EvmStepArgs } from './types.js';
 
 export interface Chains {
-  deriveAddresses(contractId: string, tokenId: string): Promise<{ base: string; monad: string; solana: string }>;
+  /** Source addresses from the vault's derivation paths (`vaultPaths(view)`, never rebuilt from the token id). */
+  deriveAddresses(contractId: string, paths: DerivationPaths): Promise<{ base: string; monad: string; solana: string }>;
   /** `chain` selects the EVM chain (default base): its RPC and fee cap. */
   evmParams(fromAddress: string, chain?: 'base' | 'monad'): Promise<EvmStepArgs>;
   solanaParams(): Promise<{ recent_blockhash: string }>;
@@ -62,9 +63,9 @@ export function loadRealChains(cfg: Config): Chains {
   // Base keeps the configured RPC; other EVM chains pass their name (chains/evm.ts resolves RPC + MONAD_RPC override).
   const rpcFor = (chain: ChainName) => (chain === 'base' ? cfg.baseRpc : chain);
   return {
-    async deriveAddresses(contractId, tokenId) {
+    async deriveAddresses(contractId, paths) {
       const fn = await need<any>('derive', 'derive', ['deriveAddresses', 'deriveForVault', 'derive', 'deriveAll']);
-      const r = await fn(contractId, tokenId, cfg);
+      const r = await fn(contractId, paths, cfg);
       const base = addr(r.base ?? r.evm ?? r.baseAddress);
       return { base, monad: r.monad ? addr(r.monad) : base, solana: addr(r.solana ?? r.sol ?? r.solanaAddress) };
     },

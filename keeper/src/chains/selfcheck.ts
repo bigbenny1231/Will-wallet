@@ -1,7 +1,7 @@
 // npx tsx src/chains/selfcheck.ts  -- offline vectors + live derivation/RPC checks.
 import assert from 'node:assert/strict';
 import { keccak256, toHex, toChecksumAddress } from './codec.js';
-import { deriveAddresses, derivationPath } from './derive.js';
+import { deriveAddresses, derivationPath, legacyPaths, vaultPaths } from './derive.js';
 import { chainConfig, evmTxHash, getEvmStepArgs, broadcastEvm } from './evm.js';
 import { getSolanaStepArgs, solanaTxSignature, broadcastSolana } from './solana.js';
 
@@ -22,15 +22,18 @@ assert.equal(chainConfig('monad', {}).explorerTx('0xab'), 'https://testnet.monad
 assert.equal(chainConfig('base', {}).chainId, 84532);
 assert.equal(chainConfig('monad', { MONAD_RPC: 'http://x' }).rpc, 'http://x');
 assert.throws(() => chainConfig('solana'));
-assert.equal(derivationPath('monad', 7), 'monad-7');
-assert.equal(derivationPath('base', 7), 'base-7');
-assert.equal(derivationPath('solana', 7), 'sol-7');
+const salted = { base: 'base-7-00aa', monad: 'monad-7-00aa', solana: 'sol-7-00aa' };
+assert.equal(derivationPath('monad', salted), 'monad-7-00aa');
+assert.equal(derivationPath('base', salted), 'base-7-00aa');
+assert.equal(derivationPath('solana', salted), 'sol-7-00aa');
+assert.deepEqual(vaultPaths({ token_id: '7', derivation_paths: salted }), salted);
+assert.deepEqual(vaultPaths({ token_id: '7' }), { base: 'base-7', monad: 'monad-7', solana: 'sol-7' });
 console.log('offline vectors ok');
 
 if (!process.argv.includes('--offline')) {
   // (signature above cross-checked with the bs58 npm package)
   // chainsig.js deriveAddressAndPublicKey gave these for the probe contract (docs/chainsig-notes.md)
-  const d = await deriveAddresses('dmw-sig-4e3b1c65.testnet', 1);
+  const d = await deriveAddresses('dmw-sig-4e3b1c65.testnet', legacyPaths(1));
   assert.equal(d.base, '0xcA024adC7cac111339Fe077C739F8085aE705F2F');
   assert.equal(d.solana, 'CFdWXa1ean7bBoewSv2SZESrDpWSxeoN1hfLrqaqZQUr');
   assert.match(d.monad, /^0x[0-9a-fA-F]{40}$/);

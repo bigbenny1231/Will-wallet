@@ -124,7 +124,10 @@ export class NearBackend implements Backend {
     return v;
   }
   heartbeat(tokenId: string) {
-    return this.call('heartbeat', { token_id: tokenId }, GAS.heartbeat);
+    // Signed by a pulse key on the contract account: no deposit (a function-call key cannot attach one). Signed by
+    // the vault owner directly: exactly 1 yoctoNEAR (contract v2, finding F).
+    const deposit = this.account.accountId === this.contractId ? 0n : 1n;
+    return this.call('heartbeat', { token_id: tokenId }, GAS.heartbeat, deposit);
   }
   poke(tokenId: string) {
     return this.call('poke', { token_id: tokenId }, GAS.poke);

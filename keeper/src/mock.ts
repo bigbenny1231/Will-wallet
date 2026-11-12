@@ -73,7 +73,10 @@ export function mockCreate(now: number, o: MockOpts = {}): VaultView {
     agent_keys: ['ed25519:MockAgentKey'],
     policy: { per_tx_max: String(NEAR), daily_max: String(5n * NEAR), allowlist: ['api.provider.testnet'] },
     daily_spent: '0',
-    daily_window_start_ms: now,
+    daily_window_start_ms: 0,
+    spends: [],
+    derivation_paths: mockPaths(o.token_id ?? '1'),
+    keeper_id: null,
     dao_id: o.withDao ? 'estate-1.sputnik-v2.testnet' : null,
     dao_proposal_id: null,
     step: 0,
@@ -169,27 +172,43 @@ export function mockMarkBroadcast(v: VaultView, index: number, txHash: string, n
   push(v, now, 'broadcast', `${index} ${txHash}`);
 }
 
+/** Salted paths like contract v2 (fixed salt in the mock). */
+export const mockPaths = (tokenId: string) => ({
+  base: `base-${tokenId}-00000000000000a1`,
+  monad: `monad-${tokenId}-00000000000000a1`,
+  solana: `sol-${tokenId}-00000000000000a1`,
+});
+
+const DAY_MS = 86_400_000;
+
+/** Rolling 24 h window like contract v2: drop spends older than a day, refresh the derived view fields. */
+function rollWindow(v: VaultView, now: number): bigint {
+  v.spends = (v.spends ?? []).filter((s) => s.ms + DAY_MS > now);
+  const spent = v.spends.reduce((a, s) => a + BigInt(s.amount), 0n);
+  v.daily_spent = String(spent);
+  v.daily_window_start_ms = v.spends.length ? Math.min(...v.spends.map((s) => s.ms)) : 0;
+  return spent;
+}
+
 export function mockAgentPay(
   v: VaultView,
   now: number,
   receiver: string,
   amount: bigint,
 ): { allowed: boolean; reason?: string; logs: string[] } {
-  if (now - v.daily_window_start_ms >= 86_400_000) {
-    v.daily_window_start_ms = now;
-    v.daily_spent = '0';
-  }
+  const spent = rollWindow(v, now);
   const deny = (reason: string) => {
     push(v, now, 'agent_pay_denied', reason);
     return { allowed: false, reason, logs: [event('agent_pay_denied', { token_id: v.token_id, receiver_id: receiver, amount: String(amount), reason })] };
   };
   if (v.state === 'Triggered' || v.state === 'Settled') return deny('vault_not_alive');
   if (amount > BigInt(v.policy.per_tx_max)) return deny('over_per_tx_max');
-  if (BigInt(v.daily_spent) + amount > BigInt(v.policy.daily_max)) return deny('over_daily_max');
+  if (spent + amount > BigInt(v.policy.daily_max)) return deny('over_daily_max');
   if (v.policy.allowlist.length && !v.policy.allowlist.includes(receiver)) return deny('receiver_not_allowlisted');
   if (amount > BigInt(v.balance)) return deny('insufficient_balance');
   v.balance = String(BigInt(v.balance) - amount);
-  v.daily_spent = String(BigInt(v.daily_spent) + amount);
+  v.spends!.push({ ms: now, amount: String(amount) });
+  rollWindow(v, now);
   push(v, now, 'agent_pay_allowed', `${amount} -> ${receiver}`);
   return {
     allowed: true,
@@ -336,7 +355,8 @@ export function mockChains(): Chains {
   let nonce = 0;
   const sent = new Set<string>();
   return {
-    async deriveAddresses(_c, tokenId) {
+    async deriveAddresses(_c, paths) {
+      const tokenId = paths.base.split('-')[1] ?? '0';
       return { base: `0xMOCK${tokenId.padStart(36, '0')}`, monad: `0xMONAD${tokenId.padStart(35, '0')}`, solana: `MOCKsol${tokenId}` };
     },
     async evmParams() {

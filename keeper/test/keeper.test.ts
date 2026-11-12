@@ -6,7 +6,7 @@ import { agentDemo, planDemoCalls } from '../src/commands/agentDemo.js';
 import { daoArgs, nearCliCommand, validDaoName } from '../src/commands/dao.js';
 import { startPulse } from '../src/commands/pulse.js';
 import { driveVault, makeDeps, runKeeper, tickOnce, type Logger } from '../src/keeperLoop.js';
-import { MockBackend, mockChains } from '../src/mock.js';
+import { MockBackend, mockChains, mockPaths } from '../src/mock.js';
 import { bumpedEvmArgs, clampEvm, msUntilResign } from '../src/resign.js';
 import { seedBackend } from './helpers.js';
 import { backoffDelay, foreignTxLink, isTransient, nearTxLink, parseEvents, withRetry } from '../src/util.js';
@@ -243,7 +243,8 @@ describe('relay failures', () => {
     const deps = makeDeps({ backend, chains, contractId: 'c', now: () => clock.t, log: quiet });
     const r = await tickOnce(deps);
     expect(r.error).toBeUndefined();
-    expect(params).toHaveBeenCalledWith('0x000000000000000000000000000000000000d0ad', 'monad');
+    // the source is derived from the vault's monad path (v2), not the owner-typed from_address
+    expect(params).toHaveBeenCalledWith((await chains.deriveAddresses('c', mockPaths('1'))).monad, 'monad');
     expect(bcast.mock.calls[0][1]).toBe('monad');
     const v = await backend.getVault('1');
     expect(v.foreign[0].chain).toBe('monad');
@@ -266,10 +267,27 @@ describe('relay failures', () => {
       const deps = makeDeps({ backend, chains, contractId: 'c', now: () => clock.t, log: quiet });
       const r = await tickOnce(deps);
       expect(r.error, `from_address ${JSON.stringify(bad)}`).toBeUndefined();
-      const derived = (await chains.deriveAddresses('c', '1')).base;
+      const derived = (await chains.deriveAddresses('c', mockPaths('1'))).base;
       expect(chains.evmParams).toHaveBeenCalledWith(derived, 'base');
       expect((await backend.getVault('1')).state, `from_address ${JSON.stringify(bad)}`).toBe('Settled');
     }
+  });
+
+  it('v2: a well-formed but wrong owner-typed from_address is ignored; the address derived from derivation_paths is used', async () => {
+    const clock = { t: 1_000_000 };
+    const typed = '0x' + '12'.repeat(20);
+    const { backend } = seedBackend(clock, [{ foreign: 'base', patch: (v) => void (v.foreign[0].from_address = typed) }]);
+    await backend.getVaults();
+    clock.t += 25_000;
+    const chains = mockChains();
+    const derive = vi.spyOn(chains, 'deriveAddresses');
+    chains.evmParams = vi.fn(async () => ({ nonce: 0, max_fee_per_gas: '1500000000', max_priority_fee_per_gas: '1000000', gas_limit: '21000' }));
+    const deps = makeDeps({ backend, chains, contractId: 'c', now: () => clock.t, log: quiet });
+    await tickOnce(deps);
+    expect(derive).toHaveBeenCalledWith('c', mockPaths('1'));
+    const derived = (await chains.deriveAddresses('c', mockPaths('1'))).base;
+    expect(chains.evmParams).toHaveBeenCalledWith(derived, 'base');
+    expect(chains.evmParams).not.toHaveBeenCalledWith(typed, expect.anything());
   });
 
   it('F-08: when the landed-lookup fails, a stale solana payout is NOT re-signed (unknown is not "not landed")', async () => {

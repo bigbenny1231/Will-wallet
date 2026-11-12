@@ -1,8 +1,11 @@
-// Derived foreign source addresses for a vault (SPEC §1): paths base-<id> / monad-<id> / sol-<id>,
-// predecessor = the dmw contract account. Uses the live signer's `derived_public_key`
-// view (authoritative; verified byte-identical to chainsig.js deriveAddressAndPublicKey).
+// Derived foreign source addresses for a vault (SPEC §1). Contract v2 salts the paths per vault
+// (`base-<id>-<salt>` / `monad-<id>-<salt>` / `sol-<id>-<salt>`) and publishes them in the vault view as
+// `derivation_paths`: always read them from there, never rebuild them. A v1 contract has no salt, so
+// `vaultPaths` falls back to `<prefix>-<id>` for it. Predecessor = the dmw contract account. Uses the live
+// signer's `derived_public_key` view (authoritative; verified byte-identical to chainsig.js).
 import { base58Decode, evmAddressFromPubkey64 } from './codec.js';
 import { chainConfig, type EvmChainName } from './evm.js';
+import type { DerivationPaths } from '../types.js';
 
 export const MPC_SIGNER_TESTNET = 'v1.signer-prod.testnet';
 const DEFAULT_NEAR_RPC = 'https://rpc.testnet.fastnear.com';
@@ -12,14 +15,22 @@ export interface DeriveOptions {
   mpcSigner?: string; // default v1.signer-prod.testnet
 }
 
-export const basePath = (tokenId: string | number) => `base-${tokenId}`;
-export const monadPath = (tokenId: string | number) => `monad-${tokenId}`;
-export const solanaPath = (tokenId: string | number) => `sol-${tokenId}`;
+/** Unsalted v1 paths (`<prefix>-<id>`), only for a vault on a contract that predates `derivation_paths`. */
+export const legacyPaths = (tokenId: string | number): DerivationPaths => ({
+  base: `${chainConfig('base').pathPrefix}-${tokenId}`,
+  monad: `${chainConfig('monad').pathPrefix}-${tokenId}`,
+  solana: `sol-${tokenId}`,
+});
 
-/** Derivation path of a vault's source address on any payout chain (matches the contract). */
-export function derivationPath(chain: string, tokenId: string | number): string {
-  if (chain === 'solana') return solanaPath(tokenId);
-  return `${chainConfig(chain).pathPrefix}-${tokenId}`;
+/** The vault's paths: `derivation_paths` from its view (v2), or the v1 form for an older contract. */
+export function vaultPaths(v: { token_id: string; derivation_paths?: DerivationPaths | null }): DerivationPaths {
+  return v.derivation_paths ?? legacyPaths(v.token_id);
+}
+
+/** Derivation path of a vault's source address on one payout chain. */
+export function derivationPath(chain: string, paths: DerivationPaths): string {
+  if (chain === 'solana') return paths.solana;
+  return chainConfig(chain).chain === 'monad' ? paths.monad : paths.base;
 }
 
 async function viewDerivedKey(
@@ -54,38 +65,38 @@ export function solanaAddressFromNearKey(key: string): string {
   return b58;
 }
 
-/** EVM source address of `chain` (`base` | `monad`) for a vault: path `<chain>-<id>`, domain 0. */
-export async function deriveEvmAddress(chain: EvmChainName, contractId: string, tokenId: string | number, opts: DeriveOptions = {}) {
-  const path = derivationPath(chain, tokenId);
+/** EVM source address of `chain` (`base` | `monad`) for a vault, from its paths; domain 0. */
+export async function deriveEvmAddress(chain: EvmChainName, contractId: string, paths: DerivationPaths, opts: DeriveOptions = {}) {
+  const path = derivationPath(chain, paths);
   const key = await viewDerivedKey(opts.rpcUrl ?? DEFAULT_NEAR_RPC, opts.mpcSigner ?? MPC_SIGNER_TESTNET, path, contractId, 0);
   return { address: evmAddressFromNearKey(key), publicKey: key, path };
 }
 
-export const deriveBaseAddress = (contractId: string, tokenId: string | number, opts: DeriveOptions = {}) =>
-  deriveEvmAddress('base', contractId, tokenId, opts);
-export const deriveMonadAddress = (contractId: string, tokenId: string | number, opts: DeriveOptions = {}) =>
-  deriveEvmAddress('monad', contractId, tokenId, opts);
+export const deriveBaseAddress = (contractId: string, paths: DerivationPaths, opts: DeriveOptions = {}) =>
+  deriveEvmAddress('base', contractId, paths, opts);
+export const deriveMonadAddress = (contractId: string, paths: DerivationPaths, opts: DeriveOptions = {}) =>
+  deriveEvmAddress('monad', contractId, paths, opts);
 
-export async function deriveSolanaAddress(contractId: string, tokenId: string | number, opts: DeriveOptions = {}) {
-  const key = await viewDerivedKey(opts.rpcUrl ?? DEFAULT_NEAR_RPC, opts.mpcSigner ?? MPC_SIGNER_TESTNET, solanaPath(tokenId), contractId, 1);
-  return { address: solanaAddressFromNearKey(key), publicKey: key, path: solanaPath(tokenId) };
+export async function deriveSolanaAddress(contractId: string, paths: DerivationPaths, opts: DeriveOptions = {}) {
+  const key = await viewDerivedKey(opts.rpcUrl ?? DEFAULT_NEAR_RPC, opts.mpcSigner ?? MPC_SIGNER_TESTNET, paths.solana, contractId, 1);
+  return { address: solanaAddressFromNearKey(key), publicKey: key, path: paths.solana };
 }
 
-/** Keeper entry point. Third arg may be the keeper Config (uses its `rpcUrl`). */
+/** Keeper entry point: the vault's paths (from its view). Third arg may be the keeper Config (uses its `rpcUrl`). */
 export async function deriveAddresses(
-  contractId: string, tokenId: string | number, opts: DeriveOptions = {},
+  contractId: string, paths: DerivationPaths, opts: DeriveOptions = {},
 ): Promise<{ base: string; monad: string; solana: string }> {
   const o = { rpcUrl: opts.rpcUrl, mpcSigner: opts.mpcSigner ?? process.env.MPC_SIGNER };
   const [b, m, s] = await Promise.all([
-    deriveBaseAddress(contractId, tokenId, o), deriveMonadAddress(contractId, tokenId, o), deriveSolanaAddress(contractId, tokenId, o),
+    deriveBaseAddress(contractId, paths, o), deriveMonadAddress(contractId, paths, o), deriveSolanaAddress(contractId, paths, o),
   ]);
   return { base: b.address, monad: m.address, solana: s.address };
 }
 
 /** Source address for one payout chain (`base` | `monad` | `solana`). */
 export async function deriveAddressFor(
-  chain: string, contractId: string, tokenId: string | number, opts: DeriveOptions = {},
+  chain: string, contractId: string, paths: DerivationPaths, opts: DeriveOptions = {},
 ): Promise<string> {
-  if (chain === 'solana') return (await deriveSolanaAddress(contractId, tokenId, opts)).address;
-  return (await deriveEvmAddress(chainConfig(chain).chain, contractId, tokenId, opts)).address;
+  if (chain === 'solana') return (await deriveSolanaAddress(contractId, paths, opts)).address;
+  return (await deriveEvmAddress(chainConfig(chain).chain, contractId, paths, opts)).address;
 }
