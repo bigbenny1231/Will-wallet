@@ -4,7 +4,7 @@ Pure, dependency-free functions (global `fetch` only) that the keeper imports vi
 
 | Module | Export | Returns |
 | --- | --- | --- |
-| `derive.ts` | `deriveAddresses(contractId, tokenId, opts?)` | `{ base: "0x…", monad: "0x…", solana: "<base58>" }` for paths `base-<id>` / `monad-<id>` / `sol-<id>` |
+| `derive.ts` | `deriveAddresses(contractId, paths, opts?)`, `vaultPaths(view)` | `{ base: "0x…", monad: "0x…", solana: "<base58>" }` for the vault's `derivation_paths` (contract v2: `base-<id>-<salt>` / `monad-<id>-<salt>` / `sol-<id>-<salt>`; v1 fallback `base-<id>` …) |
 | | `deriveAddressFor(chain, contractId, tokenId)`, `derivationPath(chain, tokenId)` | source address / path for one payout chain |
 | | `deriveEvmAddress(chain, …)`, `deriveBaseAddress`, `deriveMonadAddress`, `deriveSolanaAddress` | `{ address, publicKey, path }` |
 | `evm.ts` | `chainConfig(chain)` | `{ chain, chainId, rpc, pathPrefix, maxFeePerGas, explorerTx(h), explorerAddress(a) }` for `base` (84532) / `monad` (10143); `BASE_RPC` / `MONAD_RPC` override the RPC |
