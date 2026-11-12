@@ -1,6 +1,6 @@
 # Final pre-submission review: `contracts/dmw`
 
-> The live contract, `dmw-885364.testnet` (v2), has no full-access key, so its code cannot change; the code-only
+> The live contract (contract v2, `docs/LIVE_CONTRACT.md`) has no full-access key, so its code cannot change; the code-only
 > redeploy below was made on the earlier `dmw-x8cx.testnet`, which kept its deployer key.
 
 Review of the Dead Man's Wallet vault contract (near-sdk 5.30, Rust), done 2026-11-07 on
