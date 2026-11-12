@@ -11,6 +11,8 @@ name: testnet
 #   task=finish   the C-2 attack check and the demo video, on `contract` (an `all` run that stopped after the smoke test)
 #   task=edit     re-edit the video from the raw footage of an earlier record run (`raw_run`), no chain access
 #   task=release  only the reproducible build below, no chain access
+#   task=admin    keeper-admin action on `contract` (recovery path, 48 h timelock): input `admin` is one of
+#                 "propose-keeper <account>", "propose-mpc <account>", "execute", "cancel"
 #
 # `all` and `release` first make a reproducible build (`cargo near build reproducible-wasm` in the Docker image pinned
 # in contracts/dmw/Cargo.toml) of the dispatched commit and commit it to the same branch as contracts/release/dmw.wasm,
@@ -27,7 +29,7 @@ on:
   workflow_dispatch:
     inputs:
       task:
-        description: all | verify | record | finish | edit | release
+        description: all | verify | record | finish | edit | release | admin
         required: true
         default: all
       contract:
@@ -36,6 +38,10 @@ on:
         default: ''
       raw_run:
         description: run id of the record run whose raw footage to re-edit (edit)
+        required: false
+        default: ''
+      admin:
+        description: 'admin: propose-keeper <account> | propose-mpc <account> | execute | cancel'
         required: false
         default: ''
 
@@ -102,13 +108,36 @@ jobs:
             git commit -qm "release: reproducible build of $SRC (code hash $H)" && git push -q origin "HEAD:$GITHUB_REF_NAME"; fi
 
       - name: Contract from the input
-        if: inputs.task == 'verify' || inputs.task == 'record' || inputs.task == 'finish'
+        if: inputs.task == 'verify' || inputs.task == 'record' || inputs.task == 'finish' || inputs.task == 'admin'
         env:
           CONTRACT_INPUT: ${{ inputs.contract }}
         run: |
           case "$CONTRACT_INPUT" in *.testnet) ;; *) echo "contract input must be a .testnet account"; exit 1;; esac
           case "$CONTRACT_INPUT" in *[!a-z0-9._-]*) echo "contract input has invalid characters"; exit 1;; esac
           printf 'NEAR_NETWORK=testnet\nDMW_CONTRACT=%s\n' "$CONTRACT_INPUT" > .env; chmod 600 .env
+
+      # ---------------- keeper admin (recovery) ----------------
+      - name: Keeper-admin action
+        if: inputs.task == 'admin'
+        env:
+          KEEPER_SEED: ${{ secrets.KEEPER_SEED }}
+          ADMIN_INPUT: ${{ inputs.admin }}
+        run: |
+          set -euo pipefail
+          C=$(sed -n 's/^DMW_CONTRACT=//p' .env)
+          A=$(node scripts/near-admin.mjs derive-account admin); ./scripts/ci/mask.sh
+          read -r act arg <<< "$ADMIN_INPUT"
+          case "$act" in
+            propose-keeper) M=propose_keeper; J="{\"account_id\":\"$arg\"}";;
+            propose-mpc)    M=propose_mpc_signer; J="{\"account_id\":\"$arg\"}";;
+            execute)        M=execute_admin_proposal; J='{}';;
+            cancel)         M=cancel_admin_proposal; J='{}';;
+            *) echo "::error::admin input must be propose-keeper <account> | propose-mpc <account> | execute | cancel"; exit 1;;
+          esac
+          case "$arg" in *[!a-z0-9._-]*) echo "::error::bad account id"; exit 1;; esac
+          D=1y; [ "$act" = execute ] && D=0
+          node scripts/near-admin.mjs call "$A" "$C" "$M" "$J" 50 $D 2>&1 | tee >(eval "$SAVE" > "$OUT/admin.log")
+          node scripts/near-admin.mjs view "$C" get_config '{}' | tee >(eval "$SAVE" >> "$OUT/admin.log")
 
       # ---------------- deploy ----------------
       - name: Deploy the release build to a fresh account

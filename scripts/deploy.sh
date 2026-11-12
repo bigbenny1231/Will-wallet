@@ -66,7 +66,15 @@ if CFG=$($ADMIN view "$ACCOUNT" get_config '{}' 2>/dev/null); then
   say "keeper"
   register_keeper "$ACCOUNT"
 else
-  INIT="{\"owner_id\":\"$OWNER\",\"keeper_id\":\"$KEEPER_ACCOUNT_ID\"${DMW_MPC_SIGNER:+,\"mpc_signer\":\"$DMW_MPC_SIGNER\"}}"
+  # v3: with KEEPER_SEED set, the keeper admin is the long-lived account derived from it (role "admin"). Its only
+  # power is a 48 h timelocked proposal to replace the keeper or the MPC signer (testnet.yml task=admin).
+  ADMIN_ID=""
+  if [ -n "${KEEPER_SEED:-}" ]; then
+    ADMIN_ID=$($ADMIN derive-account admin) || die "could not derive the keeper admin"
+    account_exists "$ADMIN_ID" || { $ADMIN create "$ADMIN_ID" || die "faucet could not create $ADMIN_ID"; }
+    say "keeper admin $ADMIN_ID (derived from KEEPER_SEED)"
+  fi
+  INIT="{\"owner_id\":\"$OWNER\",\"keeper_id\":\"$KEEPER_ACCOUNT_ID\"${ADMIN_ID:+,\"keeper_admin\":\"$ADMIN_ID\"}${DMW_MPC_SIGNER:+,\"mpc_signer\":\"$DMW_MPC_SIGNER\"}}"
   say "deploying to $ACCOUNT and calling new($INIT) in the same transaction"
   $ADMIN deploy "$ACCOUNT" "$WASM" "$INIT"
 fi
