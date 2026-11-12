@@ -47,7 +47,7 @@ Motion: slow (600–900 ms, ease-out-quint), nothing bounces. The pulse animates
 
 Calm, declarative, short. No exclamation marks, no emoji, no hype adjectives.
 Sentences like a will reads: "While you are alive, nothing happens." "When you are not, this executes."
-Legal framing rules are in the plan doc and site/README.md (never claim legal effect, certainty of outcome, or that it is or replaces a will; never say it detects death).
+Legal framing rules (never claim legal effect, certainty of outcome, or that it is or replaces a will; never say it detects death).
 
 ## Site (landing)
 

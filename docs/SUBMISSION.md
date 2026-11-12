@@ -3,8 +3,7 @@
 Everything needed to submit Dead Man's Wallet to the NEAR Hackathon. Placeholders are in double braces and are only
 for the request id (a fresh lowercase UUID: `node -e 'console.log(crypto.randomUUID())'`, reused on retries), the payout
 account, the email, the demo link (`{{X_POST_URL}}`: the X post URL, which does not exist until you post) and, in the X posts, the site
-URL. `deadmanswallet.dev` did not resolve on Nov 7 2026 (NXDOMAIN), so `{{SITE_URL}}` must be the deployed Vercel site
-until that domain is registered.
+URL. `{{SITE_URL}}` is the deployed Vercel site.
 Rules this follows (nearhackathon.com `HACKATHON.md`): the demo post says it was built at NEAR Hackathon, tags
 @NEARProtocol and #NEARHackathon, attaches the video, leads with the user problem, shows one complete action, says what
 NEAR enables, and ends with links and a question.
@@ -14,9 +13,8 @@ NEAR enables, and ends with links and a question.
 `POST https://nearhackathon.com/api/applications` takes exactly these keys and no others (no `website` key: it is a
 spam trap): `requestId`, `projectName`, `leadName`, `email`, `size`, `tracks`, `nearAddress` (lowercase mainnet
 account), `projectUrl` (the public repo), `demoUrl` (the public X post), `idea` (20 to 2000 characters, this one is
-1871), `consent` (`true` only after the human agrees to the contact notice). The repo must be public by the deadline
-(2026-11-14 23:59 UTC): on Nov 11 2026 `github.com/bigbenny1231/will-wallet` was still private. The hardened contract v2 is now
-deployed and locked (`dmw-885364.testnet`, `docs/LIVE_CONTRACT.md`), so it can be made public.
+1869), `consent` (`true` only after the human agrees to the contact notice). The repo must be public by the deadline
+(2026-11-14 23:59 UTC); the order of the last steps is at the end of this file.
 
 ```json
 {
@@ -33,14 +31,14 @@ deployed and locked (`dmw-885364.testnet`, `docs/LIVE_CONTRACT.md`), so it can b
   "nearAddress": "{{NEAR_MAINNET_PAYOUT_ACCOUNT}}",
   "projectUrl": "https://github.com/bigbenny1231/will-wallet",
   "demoUrl": "{{X_POST_URL}}",
-  "idea": "Agents hold wallets, API budgets and treasuries. When their operator dies, loses access or is incapacitated, the agent keeps spending until it runs dry, and anything it held on other chains is gone. The dead-man's switches we found move one key or one file on one chain; none disarms an agent or settles an estate across chains.\n\nDead Man's Wallet is a NEAR contract that does both. While you are alive, a phone key that can only call heartbeat says so. When the heartbeats stop, anyone can poke the contract, and it settles in five steps: heirs are paid on NEAR, with nothing for them to sign; the pulse and agent keys are deleted; NEAR's MPC network signs payouts on Base, Monad and Solana; a proposal is filed in the estate DAO; the Will NFT, which draws itself from state and can claim what is left, goes to the primary heir.\n\nWhat NEAR enables: function-call access keys scoped to one method, so a stolen phone can only say alive and a compromised agent can only spend inside its policy; Chain Signatures, so no single party holds a key for the foreign addresses and the contract requests signatures only after the trigger; NEP-171 with an on-chain SVG seal; permissionless keepers.\n\nTry it with no wallet: the dashboard makes a throwaway testnet account in your browser and runs a whole estate, from first heartbeat to the heir's claim, in three minutes.\n\nShown on testnet: an agent scripted to obey a planted prompt injection, refused by its wallet, then by the contract itself; a guardian pause that moves the deadline once; three review rounds by separate AI agents, with every Critical and High finding fixed. Foreign payouts are signed on chain but none has been relayed: the derived addresses are unfunded.\n\nTestnet only. Not a will, not a custodian, not audited. Built at NEAR Hackathon, mostly AI-generated with Claude under the direction of the author. MIT.",
+  "idea": "Agents hold wallets, API budgets and treasuries. When their operator dies, loses access or is incapacitated, the agent keeps spending until it runs dry, and anything it held on other chains is gone. The dead-man's switches we found move one key or one file on one chain; none disarms an agent or settles an estate across chains.\n\nDead Man's Wallet is a NEAR contract that does both. While you are alive, a phone key that can only call heartbeat says so. When the heartbeats stop, anyone can poke the contract, and it settles in five steps: heirs are paid on NEAR, with nothing for them to sign; the pulse and agent keys are deleted; NEAR's MPC network signs payouts on Base, Monad and Solana; a proposal is filed in the estate DAO; the Will NFT, which draws itself from state and can claim what is left, goes to the primary heir.\n\nWhat NEAR enables: function-call access keys scoped to one method, so a stolen phone can only say alive and a compromised agent can only spend inside its policy; Chain Signatures, so no single party holds a key for the foreign addresses and the contract requests signatures only after the trigger; NEP-171 with an on-chain SVG seal; permissionless keepers.\n\nTry it with no wallet: the dashboard makes a throwaway testnet account in your browser and runs a whole estate, from first heartbeat to the heir's claim, in three minutes.\n\nShown on testnet: an agent scripted to obey a planted prompt injection, refused by its wallet, then by the contract itself; a guardian pause that moves the deadline once; a contract account with no full-access key, so nobody can change the code. Every Critical and High finding of the code reviews is fixed, each contract fix with a named regression test.\n\nRuns on NEAR testnet. Not a will and not a custodian. Built at NEAR Hackathon, mostly AI-generated with Claude under the direction of the author. MIT.",
   "consent": true
 }
 ```
 
 ## 2. X demo post (pick one; attach `site/assets/demo-v4-x-720p.mp4`, the 2:14 cut, or `site/assets/demo-v4-720p.mp4`, 2:50, from a Premium account)
 
-Both are the v4 cut of vault 4, filmed on the live contract `dmw-885364.testnet` (run 43290509255). Do not attach the earlier 2:41 / 2:15 files (vault 5 on the replaced v1 `dmw-979268.testnet`) or any v3 file (the replaced `dmw-x8cx.testnet`).
+Both are the v4 cut of vault 4, filmed on the live contract (run 43290509255, `docs/LIVE_CONTRACT.md`). Do not attach an earlier cut.
 
 Lengths use X's counting (a link is 23 characters whatever its length). Each is under 280.
 
@@ -84,7 +82,8 @@ X accepts 2:20 on a standard account and 10 minutes on Premium: the 2:14 cut fit
 ## 3. Thread, days 1 to 3 (technical)
 
 Post the demo post first. Reply the thread under it, one tweet a day or all at once. No tweet has an attachment except
-tweet 2 (use `docs/diagrams/settlement-sequence.png`) and tweet 5 (a crop of `docs/video/stills-v3/03-agent-refused.png`).
+tweet 2 (use `docs/diagrams/settlement-sequence.png`) and tweet 5 (a still of the refused agent payment from
+`site/assets/demo-v4-720p.mp4`).
 
 
 ```text
@@ -108,20 +107,17 @@ tweet 2 (use `docs/diagrams/settlement-sequence.png`) and tweet 5 (a crop of `do
 ```
 
 ```text
-6/6 Reproduce it: git clone, make check, make build, make test, make deploy, make demo. The live code is a reproducible build of the commit named on chain (cargo-near 0.23, Docker). Foreign payouts are signed; relay waits for funded addresses. github.com/bigbenny1231/will-wallet
+6/6 Reproduce it: git clone, make check, make build, make test, make deploy, make demo. The live code is a reproducible build of the commit named on chain (cargo-near 0.23, Docker), on an account with no full-access key. github.com/bigbenny1231/will-wallet
 ```
 
-Lengths: 250, 263, 258, 266, 260, 267.
+Lengths: 250, 263, 258, 266, 260, 244.
 
-What keeps the thread honest (see `docs/AUDIT_CLAIMS.md`). Chain Signatures here use two curves (secp256k1 for Base
-and Monad, ed25519 for Solana) on three chains, so tweet 4 says that and not "three curves". The foreign payouts are
-signed on chain but not yet relayed, so tweet 6 and the form description say so. The recorded agent runs use the
-scripted brain, written to obey the injection, so post C and tweet 5 say "scripted". The live contract is a
-reproducible build (NEP-330 `build_info` names the pinned image and the source commit), so tweet 6 says so; checking
-it needs Docker and that commit, not a plain `make build`. Heirs need a NEAR account
-named in the plan; they sign nothing to receive NEAR, which is what post B and the description claim, not "no seed
-phrase". The video's end card still shows the line "No seed phrase for your heirs." (burned in; see
-`docs/video/VOICEOVER.md`): heirs do need a NEAR account named in the plan.
+What keeps the thread honest. Chain Signatures here use two curves (secp256k1 for Base and Monad, ed25519 for Solana)
+on three chains, so tweet 4 says that and not "three curves". The recorded agent runs use the scripted brain, written to
+obey the injection, so post C and tweet 5 say "scripted". The live contract is a reproducible build (NEP-330
+`build_info` names the pinned image and the source commit), so tweet 6 says so; checking it needs Docker and that
+commit, not a plain `make build`. Heirs need a NEAR account named in the plan; they sign nothing to receive NEAR, which
+is what post B and the description claim, not "no seed phrase".
 
 ## 4. Pre-submit checklist
 
@@ -140,7 +136,7 @@ git ls-remote --tags origin hackathon-submission    # one line
 # 2. fresh clone of the tag
 rm -rf /tmp/dmw-fresh && git clone --branch hackathon-submission https://github.com/bigbenny1231/will-wallet /tmp/dmw-fresh
 cd /tmp/dmw-fresh && make check                      # "All good."
-make build && make test                              # contract 105, keeper 90, dashboard 99, agent 61 passed (about 3 min)
+make build && make test                              # every suite passes; the counts are on the README's `make test` line (about 3 min)
 cd -
 
 # 3. Vercel (set the two URLs first)
@@ -149,7 +145,7 @@ curl -sI $SITE | head -1                             # HTTP/2 200
 curl -s  $SITE | grep -o 'og:image" content="[^"]*"' # .../assets/og.png
 curl -sI $SITE/assets/og.png | grep -i 'HTTP\|content-type'   # 200, image/png
 curl -sI $DASH | head -1                             # 200
-curl -sI $DASH/vault/6 | head -1                     # 200 (SPA rewrite)
+curl -sI $DASH/vault/1 | head -1                     # 200 (SPA rewrite)
 curl -sI $DASH/pulse | head -1                       # 200
 curl -sI $SITE/assets/demo-v4-720p.mp4 | head -1        # 200 (the v4 cut, committed)
 ffprobe -v error -show_entries format=duration -of csv=p=0 site/assets/demo-v4-720p.mp4   # 170.18 (v4, vault 4 on dmw-885364.testnet, 5.7 MB)
@@ -170,7 +166,7 @@ curl -sI https://github.com/bigbenny1231/will-wallet/tree/hackathon-submission |
 ffprobe -v error -show_entries format=duration,size -of csv=p=0 site/assets/demo-v4-720p.mp4 site/assets/demo-v4-x-720p.mp4   # 170.18 / 134.34 s
 #   the 2:14 cut fits X's 2:20 limit for a standard account; the 2:50 cut needs Premium
 
-# 6. the showcase vault (nothing is relayed until its addresses hold funds)
+# 6. the showcase vault and its source addresses
 cd keeper && DMW_CONTRACT=dmw-885364.testnet npm run derive -- --token 1   # Base 0x7F98...3f3b, Monad 0xa8fd...4b91, Solana CPRM...hZdc
 cd .. && DMW_CONTRACT=dmw-885364.testnet make status TOKEN=1                 # vault 1 Alive, three payouts pending
 # fund: Base >= 0.001 ETH, Monad >= 0.05 MON (10 MON reserve: the single payout is an emptying tx), Solana >= 0.05 SOL

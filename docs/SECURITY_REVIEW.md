@@ -1,9 +1,9 @@
 # Security review: `contracts/dmw`
 
 > **Update, contract v2 (Nov 12 2026, live as `dmw-885364.testnet`).** Several statements here describe v1 and changed in v2:
-> `mark_broadcast` and `resign_foreign` are now operator-only (contract keeper, vault keeper, owner, heirs) with a 5-minute cooldown on every re-sign; step-3 args come from an operator for the first hour of each payout and from anyone after that (the timeout fallback this review recommended for M-2); every EVM signature is ecrecovered on-chain against the derived key; derivation paths are salted per vault. See [`SECURITY_FIXES_V2.md`](SECURITY_FIXES_V2.md). The live contract is now `dmw-885364.testnet` (v2); `dmw-979268.testnet` runs v1.
+> `mark_broadcast` and `resign_foreign` are now operator-only (contract keeper, vault keeper, owner, heirs) with a 5-minute cooldown on every re-sign; step-3 args come from an operator for the first hour of each payout and from anyone after that (the timeout fallback this review recommended for M-2); every EVM signature is ecrecovered on-chain against the derived key; derivation paths are salted per vault. See [`SECURITY_FIXES_V2.md`](SECURITY_FIXES_V2.md). The live contract is now `dmw-885364.testnet` (v2). The live contract has no full-access key, so its code cannot change; the in-place upgrades this file describes were made on the earlier `dmw-x8cx.testnet`, which kept its deployer key.
 
-Independent review of the Dead Man's Wallet vault contract (near-sdk 5.30, Rust), done 2026-11-07
+Review of the Dead Man's Wallet vault contract (near-sdk 5.30, Rust), done 2026-11-07
 against SPEC.md (including §2.7) and every file in `contracts/dmw/src` (`lib.rs`, `foreign.rs`,
 `nft.rs`, `types.rs`, `tests.rs`). The reviewer did not write the code.
 

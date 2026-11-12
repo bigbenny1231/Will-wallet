@@ -2,7 +2,7 @@
 
 Scope: `keeper/`, `agent/`, `dashboard/`, `scripts/`, `site/` (TypeScript, JavaScript, shell). `contracts/dmw` is out of scope (separate review) and was only read, to check what the contract enforces on behalf of the off-chain code.
 
-Date: 2026-11-07. Reviewer: an independent pass by someone who did not write the code.
+Date: 2026-11-07. Reviewer: an AI agent that had not written the code.
 
 Threat model:
 

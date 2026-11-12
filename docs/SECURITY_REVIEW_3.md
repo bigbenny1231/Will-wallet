@@ -1,7 +1,7 @@
 # Security review 3: whole repository, final pass before submission
 
 > **Update, contract v2 (Nov 12 2026, live as `dmw-885364.testnet`).** Several statements here describe v1 and changed in v2:
-> test counts are now contract 134, keeper 91, dashboard 108, agent 62; the C-2 rule (the step-4 bond is never credited back) is unchanged, and `contracts/attack-c2.sh` now also allows the step-5 storage release; the keeper is passed to `new` and can hand itself over on a locked contract; the K-1 rule (only a derived source address goes to the RPC) now prefers the derived address over any stored one. See [`SECURITY_FIXES_V2.md`](SECURITY_FIXES_V2.md). The live contract is now `dmw-885364.testnet` (v2); `dmw-979268.testnet` runs v1.
+> the C-2 rule (the step-4 bond is never credited back) is unchanged, and `contracts/attack-c2.sh` now also allows the step-5 storage release; the keeper is passed to `new` and can hand itself over on a locked contract; the K-1 rule (only a derived source address goes to the RPC) now prefers the derived address over any stored one. See [`SECURITY_FIXES_V2.md`](SECURITY_FIXES_V2.md). The live contract is now `dmw-885364.testnet` (v2), with no full-access key; the C-2 attack was run against it and blocked (`docs/LIVE_CONTRACT.md`).
 
 Done 2026-11-10 on commit `0348a3e` (the tree that was live on both Vercel deployments and, for the contract,
 code hash `HAxzQkJdB9fdJtVANeCrLr46ZZzy88VdLBD3pFE87pqZ` on `dmw-x8cx.testnet`). Three AI reviewers that did not
@@ -14,17 +14,15 @@ not a third-party audit.
   code allows one. Three contract Lows are documented and left for after the hackathon.
 - **Tests after the fixes:** contract 105 (was 104), keeper 90 (81), dashboard 99 (88), agent 61 (60).
   `cargo clippy --target wasm32-unknown-unknown -- -D warnings` and `cargo fmt --check` are clean.
-- **Deployment:** the contract fix changes no stored layout, so the live contract can be upgraded in place. The
-  fixed build is committed as `contracts/release/dmw.wasm`, code hash
-  `6s9oqxvBZfhWncW6irGH6zXTebeYUKTHh1pk1WSDxjYH` (rustc 1.97.0, cargo-near 0.23.0; two separate clones gave the same
-  hash). **Until it is deployed over `dmw-x8cx.testnet`, the live contract still has C-2.** The status line in the
-  README row "The live contract is this source" says which code is live.
+- **Deployment:** the fixed build (code hash `6s9oqxvBZfhWncW6irGH6zXTebeYUKTHh1pk1WSDxjYH`) went live on Nov 11 2026
+  as contract v1, and the fix is part of contract v2, the live code; `docs/LIVE_CONTRACT.md` has the C-2 attack run
+  against the live contract.
 
 ## Summary
 
 | ID | Severity | Where | Title | Status |
 | --- | --- | --- | --- | --- |
-| C-2 | Critical | contract | A vault's "DAO" can keep the step-4 bond and still have it credited back; `claim` then pays it out of other vaults' NEAR | Fixed in source and release build; live deploy pending |
+| C-2 | Critical | contract | A vault's "DAO" can keep the step-4 bond and still have it credited back; `claim` then pays it out of other vaults' NEAR | Fixed; live since Nov 11 2026, and in contract v2 |
 | K-1 | Medium | keeper, dashboard | A malformed `from_address` stops settlement at step 3 for good; the hosted sweep then finds the same work on every run | Fixed |
 | K-2 | Medium | keeper | A failed "did the old transaction land" lookup was read as "no", and the keeper re-signed (F-08 from the off-chain audit, still open then) | Fixed |
 | D-1 | Medium | dashboard | A pairing link silently replaced the pulse key already on a paired phone, for any contract | Fixed |
