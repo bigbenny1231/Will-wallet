@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Before a demo run: the funder wallet derived from KEEPER_SEED must hold enough to pay the demo vault's Base, Monad
-# and Solana payouts (amount + gas each, with headroom). Solana devnet is topped up by airdrop when low (best effort;
-# the devnet faucet is rate-limited). Prints addresses and balances only; the keys are never printed.
+# and Solana payouts (amount + gas each, with headroom). When Solana is low it asks the devnet RPC for an airdrop, which
+# is best effort only: the public RPC faucet is closed on devnet (Nov 2026), so fund the address from a web faucet that
+# links a GitHub account (devnetfaucet.org, faucet.solana.com). Prints addresses and balances only; keys are never printed.
 #   scripts/ci/funder-check.sh            env: KEEPER_SEED; optional MIN_ETH (0.002) MIN_MON (0.05) MIN_SOL (0.03)
 set -euo pipefail
 cd "$(dirname "$0")/../../keeper"
@@ -27,5 +28,5 @@ echo "$J" | node -e '
     const ok = have >= m; if (!ok) short++;
     console.log(`${ok ? "ok   " : "SHORT"} ${c.padEnd(6)} ${b.address}  holds ${have} ${sym}, needs ${m} ${sym}  ${b.explorer}${b.error ? "  (read failed: " + b.error + ")" : ""}`);
   }
-  if (short) { console.log(`::error::the funder wallet is short on ${short} chain(s); fund the addresses above, then run again`); process.exit(1); }
+  if (short) { console.log(`::error::the funder wallet is short on ${short} chain(s); fund the addresses above (Solana devnet: devnetfaucet.org or faucet.solana.com; the RPC airdrop is closed), then run again`); process.exit(1); }
 ' "$MIN_ETH" "$MIN_MON" "$MIN_SOL"
