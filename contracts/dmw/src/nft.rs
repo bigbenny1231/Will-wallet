@@ -123,10 +123,7 @@ pub fn render_svg(id: u64, v: &Vault, now_ms: u64) -> String {
     let heirs = v.heirs.len();
     let plural = if heirs == 1 { "" } else { "S" };
     let word = state.as_str();
-    let rim = format!(
-        "LASTWORD \u{b7} VAULT {id} \u{b7} {}",
-        word.to_uppercase()
-    );
+    let rim = format!("LASTWORD \u{b7} VAULT {id} \u{b7} {}", word.to_uppercase());
     format!(
         concat!(
             r##"<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="400" height="400" viewBox="0 0 400 400">"##,
