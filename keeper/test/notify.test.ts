@@ -30,20 +30,20 @@ describe('notice body', () => {
   it('carries the same calm line as text (Slack) and content (Discord), plus the structured fields', () => {
     const v = mockCreate(T0, { token_id: '12', owner_id: 'andrew.testnet', heartbeat_interval_s: 3600, grace_missed: 2 });
     const b = buildNotice('vault_warning', v, { contract: 'dmw-x8cx.testnet' });
-    expect(b.text).toBe('Vault 12 missed a heartbeat. Settlement becomes possible at 2026-11-09 17:00:00 UTC unless a heartbeat arrives first. https://will-wallet.vercel.app/vault/12');
+    expect(b.text).toBe('Vault 12 missed a heartbeat. Settlement becomes possible at 2026-11-09 17:00:00 UTC unless a heartbeat arrives first. https://lastwordvault-app.vercel.app/vault/12');
     expect(b.content).toBe(b.text);
     expect(b.text).not.toMatch(/[!\n—]/);
     expect(b).toMatchObject({ event: 'vault_warning', token_id: '12', owner_id: 'andrew.testnet', warning_at_ms: T0 + 3_600_000, trigger_at_ms: T0 + 10_800_000, contract: 'dmw-x8cx.testnet' });
     expect(Object.keys(b).sort()).toEqual(['content', 'contract', 'event', 'owner_id', 'text', 'token_id', 'trigger_at_ms', 'warning_at_ms']);
 
     const t = buildNotice('vault_triggered', { ...v, state: 'Triggered' }, { contract: 'dmw-x8cx.testnet' });
-    expect(t.text).toBe('Vault 12 has been triggered and settlement has started. Heartbeats are no longer accepted. https://will-wallet.vercel.app/vault/12');
+    expect(t.text).toBe('Vault 12 has been triggered and settlement has started. Heartbeats are no longer accepted. https://lastwordvault-app.vercel.app/vault/12');
     expect(t.content).toBe(t.text);
     expect(t.event).toBe('vault_triggered');
 
     // seen late, after the deadline: the same notice in the past tense
     const late = buildNotice('vault_warning', v, { contract: 'dmw-x8cx.testnet' }, T0 + 10_800_000);
-    expect(late.text).toBe('Vault 12 missed a heartbeat. Settlement has been possible since 2026-11-09 17:00:00 UTC. https://will-wallet.vercel.app/vault/12');
+    expect(late.text).toBe('Vault 12 missed a heartbeat. Settlement has been possible since 2026-11-09 17:00:00 UTC. https://lastwordvault-app.vercel.app/vault/12');
     expect(late.content).toBe(late.text);
   });
 
@@ -53,7 +53,7 @@ describe('notice body', () => {
     expect(b.trigger_at_ms).toBe(T0 + 600_000);
     expect(b.text).toContain('at 2026-11-09 14:10:00 UTC');
     expect(b.text).toContain(' http://localhost:3000/vault/7');
-    expect(vaultLink('7')).toBe('https://will-wallet.vercel.app/vault/7');
+    expect(vaultLink('7')).toBe('https://lastwordvault-app.vercel.app/vault/7');
     const odd = buildNotice('vault_warning', { ...v, token_id: '<!channel> 9' }, { contract: 'c.testnet' });
     expect(odd.text.startsWith('Vault channel9 missed')).toBe(true);
     expect(odd.text).toContain('/vault/%3C!channel%3E%209');
@@ -80,8 +80,8 @@ describe('keeper loop notifications', () => {
     expect(first.init.method).toBe('POST');
     expect(first.init.headers).toEqual({ 'content-type': 'application/json' });
     expect(first.body).toEqual({
-      text: 'Vault 1 missed a heartbeat. Settlement becomes possible at 2026-11-09 14:00:20 UTC unless a heartbeat arrives first. https://will-wallet.vercel.app/vault/1',
-      content: 'Vault 1 missed a heartbeat. Settlement becomes possible at 2026-11-09 14:00:20 UTC unless a heartbeat arrives first. https://will-wallet.vercel.app/vault/1',
+      text: 'Vault 1 missed a heartbeat. Settlement becomes possible at 2026-11-09 14:00:20 UTC unless a heartbeat arrives first. https://lastwordvault-app.vercel.app/vault/1',
+      content: 'Vault 1 missed a heartbeat. Settlement becomes possible at 2026-11-09 14:00:20 UTC unless a heartbeat arrives first. https://lastwordvault-app.vercel.app/vault/1',
       event: 'vault_warning',
       token_id: '1',
       owner_id: 'mock-owner.testnet',
@@ -105,7 +105,7 @@ describe('keeper loop notifications', () => {
     expect(stored('1').state).toBe('Settled');
     expect(f.calls.map((c) => c.body.event)).toEqual(['vault_warning', 'vault_warning', 'vault_triggered']);
     expect(f.calls[2].body.owner_id).toBe('mock-owner.testnet'); // still the creator at the moment of the trigger
-    expect(f.calls[2].body.text).toBe('Vault 1 has been triggered and settlement has started. Heartbeats are no longer accepted. https://will-wallet.vercel.app/vault/1');
+    expect(f.calls[2].body.text).toBe('Vault 1 has been triggered and settlement has started. Heartbeats are no longer accepted. https://lastwordvault-app.vercel.app/vault/1');
     await tickOnce(deps);
     expect(f.calls).toHaveLength(3);
   });
@@ -237,7 +237,7 @@ describe('ntfy phone push (DMW_NOTIFY_NTFY_TOPIC)', () => {
       Title: 'Vault 12 missed a heartbeat',
       Tags: 'warning,dmw',
       Priority: 'default',
-      Click: 'https://will-wallet.vercel.app/vault/12',
+      Click: 'https://lastwordvault-app.vercel.app/vault/12',
     });
     const t = buildNtfy('vault_triggered', { ...v, state: 'Triggered', token_id: '<b>9' }, { server: 'https://ntfy.example.org/', topic: TOPIC, contract: 'c.testnet', dashboardUrl: 'https://dash.test' });
     expect(t.url).toBe(`https://ntfy.example.org/${TOPIC}`);
@@ -263,8 +263,8 @@ describe('ntfy phone push (DMW_NOTIFY_NTFY_TOPIC)', () => {
     expect(f.calls.map((c) => c.url)).toEqual([HOOK, `https://ntfy.sh/${TOPIC}`]);
     const push = f.calls[1].init;
     expect(push.method).toBe('POST');
-    expect(String(push.body)).toMatch(/^Vault 1 missed a heartbeat\. .* https:\/\/will-wallet\.vercel\.app\/vault\/1$/);
-    expect((push.headers as Record<string, string>).Click).toBe('https://will-wallet.vercel.app/vault/1');
+    expect(String(push.body)).toMatch(/^Vault 1 missed a heartbeat\. .* https:\/\/lastwordvault-app\.vercel\.app\/vault\/1$/);
+    expect((push.headers as Record<string, string>).Click).toBe('https://lastwordvault-app.vercel.app/vault/1');
     expect(lines.some((l) => l.includes('sent to ntfy'))).toBe(true);
   });
 

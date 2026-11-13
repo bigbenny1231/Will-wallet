@@ -4,8 +4,8 @@ import { initHero } from './hero.js';
 import { reducedMotion } from './seal.js';
 
 export const CONFIG = {
-  DASHBOARD_URL: 'https://will-wallet.vercel.app',  // deployed separately; see dashboard/README.md
-  SITE_URL: 'https://will-wallet-site.vercel.app',
+  DASHBOARD_URL: 'https://lastwordvault-app.vercel.app',  // deployed separately; see dashboard/README.md
+  SITE_URL: 'https://lastwordvault.vercel.app',
   GITHUB_URL: 'https://github.com/bigbenny1231/will-wallet',
 };
 

@@ -1,6 +1,6 @@
 // Would your crypto arrive? Four single-tap questions, scored here in the page. Nothing is sent anywhere.
 // The verdict is also drawn as a 1200x630 card on a canvas, in the house style, for "Download card".
-const SITE = 'https://will-wallet-site.vercel.app/#would-it-arrive';
+const SITE = 'https://lastwordvault.vercel.app/#would-it-arrive';
 
 // How likely heirs are to find and move a wallet, by where its keys live and what they were told.
 const FIND = { hardware: 0.25, paper: 0.45, exchange: 0.7, head: 0 };
@@ -104,7 +104,7 @@ async function drawCard(canvas, s, lines) {
   ctx.fillStyle = C.bone2; ctx.font = '400 17px "Inter Tight"';
   ctx.fillText('A rough estimate from four answers, not advice.', 80, 576);
   ctx.textAlign = 'right'; ctx.fillStyle = C.bone; ctx.font = '400 24px "Instrument Serif"';
-  ctx.fillText('Lastword  —  will-wallet-site.vercel.app', 1120, 578);
+  ctx.fillText('Lastword  —  lastwordvault.vercel.app', 1120, 578);
   ctx.textAlign = 'left';
 }
 

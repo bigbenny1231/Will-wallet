@@ -203,4 +203,4 @@ function svg(text, opts) {
 }
 
 module.exports = { matrix, svg };
-if (require.main === module) process.stdout.write(svg(process.argv[2] || 'https://will-wallet.vercel.app/pulse'));
+if (require.main === module) process.stdout.write(svg(process.argv[2] || 'https://lastwordvault-app.vercel.app/pulse'));

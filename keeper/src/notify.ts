@@ -5,7 +5,7 @@ import type { VaultView } from './types.js';
 
 export type NoticeEvent = 'vault_warning' | 'vault_triggered';
 
-export const DEFAULT_DASHBOARD_URL = 'https://will-wallet.vercel.app';
+export const DEFAULT_DASHBOARD_URL = 'https://lastwordvault-app.vercel.app';
 export const NOTIFY_TIMEOUT_MS = 5_000;
 
 /** JSON body of one notification. `text` is what Slack shows, `content` is what Discord shows; both are the same line. */

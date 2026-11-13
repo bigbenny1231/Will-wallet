@@ -23,7 +23,7 @@ import re
 import shutil
 import subprocess
 
-PULSE_URL = "https://will-wallet.vercel.app/pulse"
+PULSE_URL = "https://lastwordvault-app.vercel.app/pulse"
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 DESIGN = ROOT / "design"

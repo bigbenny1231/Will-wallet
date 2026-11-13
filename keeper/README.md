@@ -40,7 +40,7 @@ Read from the process environment, then `keeper/.env`, then the repo-root `.env`
 | `NEAR_NETWORK`, `NEAR_RPC` | all | default testnet, `https://rpc.testnet.fastnear.com` |
 | `BASE_RPC`, `MONAD_RPC`, `SOLANA_RPC` | keeper, derive | defaults from SPEC section 1 (Base Sepolia, Monad testnet `https://testnet-rpc.monad.xyz`, Solana devnet) |
 | `DMW_NOTIFY_WEBHOOK` | keeper | optional; webhook URL for owner notifications (see below). It is a secret and is never printed |
-| `DMW_DASHBOARD_URL` | keeper | optional; base URL for the vault link in notifications, default `https://will-wallet.vercel.app` |
+| `DMW_DASHBOARD_URL` | keeper | optional; base URL for the vault link in notifications, default `https://lastwordvault-app.vercel.app` |
 | `DMW_NOTIFY_NTFY_TOPIC`, `DMW_NOTIFY_NTFY_SERVER` | keeper | optional; phone push through [ntfy](https://ntfy.sh) (see below). The topic is a secret and is never printed |
 | `KEEPER_SEED` | funder, fund-sources, keeper `--fund-sources` | at least 32 characters; the funder keys are derived from it (see below). The same secret the long-lived keeper's NEAR key comes from |
 | `DMW_FUND_SOURCES=1` | keeper | same as `--fund-sources` |
@@ -116,7 +116,7 @@ There is one message per transition per vault. A heartbeat that brings the vault
 }
 ```
 
-`text` is the field Slack incoming webhooks read and `content` is the field Discord webhooks read; both hold the same line. Other receivers can use the structured fields. The link points at the dashboard (`https://will-wallet.vercel.app` by default); `DMW_DASHBOARD_URL` replaces its base, as in this example (`http://localhost:5173`).
+`text` is the field Slack incoming webhooks read and `content` is the field Discord webhooks read; both hold the same line. Other receivers can use the structured fields. The link points at the dashboard (`https://lastwordvault-app.vercel.app` by default); `DMW_DASHBOARD_URL` replaces its base, as in this example (`http://localhost:5173`).
 
 - Only transitions the running process saw are reported. A vault that is already in Warning when the keeper starts gets no warning message, so a restart never repeats one. This means notifications need the long-running keeper. A sweep is a new process each time and never sees Alive turn into Warning.
 - With `--token` or `--owner-prefix`, only matching vaults are reported.

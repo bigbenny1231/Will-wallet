@@ -4,7 +4,7 @@ const path = require('path');
 const ours = require('./qr.js');
 const ref = require(path.join(__dirname, '..', 'dashboard', 'node_modules', 'qrcode'));
 
-const texts = ['a', 'https://will-wallet.vercel.app/pulse', 'https://will-wallet-site.vercel.app/#would-it-arrive', 'x'.repeat(60), 'y'.repeat(100)];
+const texts = ['a', 'https://lastwordvault-app.vercel.app/pulse', 'https://lastwordvault.vercel.app/#would-it-arrive', 'x'.repeat(60), 'y'.repeat(100)];
 let fails = 0, checks = 0;
 for (const t of texts) {
   const auto = ours.matrix(t);

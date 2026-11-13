@@ -44,5 +44,18 @@
         }
       ]
     }
+  ],
+  "redirects": [
+    {
+      "source": "/:path*",
+      "has": [
+        {
+          "type": "host",
+          "value": "will-wallet-site.vercel.app"
+        }
+      ],
+      "destination": "https://lastwordvault.vercel.app/:path*",
+      "permanent": true
+    }
   ]
 }

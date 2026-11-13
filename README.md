@@ -46,7 +46,7 @@ What is in the build:
 Built at NEAR Hackathon, Nov 1–14 2026. Tracks: `security` (06 AI Security & Defense), `nfts` (10), `open` (13).
 Runs on NEAR testnet. Not a will and not a custodian. MIT license.
 
-Live site: [will-wallet-site.vercel.app](https://will-wallet-site.vercel.app) · Live dashboard: [will-wallet.vercel.app](https://will-wallet.vercel.app) (try [/vault/1](https://will-wallet.vercel.app/vault/1), the showcase vault) ·
+Live site: [lastwordvault.vercel.app](https://lastwordvault.vercel.app) · Live dashboard: [lastwordvault-app.vercel.app](https://lastwordvault-app.vercel.app) (try [/vault/1](https://lastwordvault-app.vercel.app/vault/1), the showcase vault) ·
 Live contract: [`dmw-885364.testnet`](https://testnet.nearblocks.io/address/dmw-885364.testnet), contract v2, deployed Nov 12 2026 from a reproducible build and locked (no full-access key) ·
 The record of the live contract, with its transaction links (deploy, smoke run, attack run, demo video run): [`docs/LIVE_CONTRACT.md`](docs/LIVE_CONTRACT.md) ·
 Showcase vault (vault 1, read live by the site): [`keeper/SHOWCASE.md`](keeper/SHOWCASE.md) · Demo video (2:50, vault 4 on the live contract): [`site/assets/demo-v4-720p.mp4`](site/assets/demo-v4-720p.mp4), how it was made in [`docs/video/README.md`](docs/video/README.md) ·
@@ -171,7 +171,7 @@ this.
 
 ## Try it without a wallet (about 3 minutes)
 
-Open the dashboard's [`/try`](https://will-wallet.vercel.app/try) page and press Begin, or run it locally:
+Open the dashboard's [`/try`](https://lastwordvault-app.vercel.app/try) page and press Begin, or run it locally:
 
 ```bash
 cd dashboard && npm ci && npm run dev     # http://localhost:5173/try  (uses dmw-885364.testnet unless .env.local says otherwise)
