@@ -33,7 +33,7 @@ What is in the build:
   relay code as Base.
 - **The record.** Each vault page lists the Will NFT's history from the contract's own log: who created it, what
   the agent paid or was denied, the trigger, each settlement step, and who holds it now.
-- **Hosted keeper and warning notices.** The `keeper` GitHub workflow runs every 10 minutes and settles every due
+- **Hosted keeper and warning notices.** The `keeper` GitHub workflow runs every 20 minutes and settles every due
   vault on the live contract. It signs as the contract keeper, a long-lived `dmw-keeper-<hex>.testnet` account whose
   key is derived from a repository secret, and tops itself up from the faucet
   ([`keeper/README.md`](keeper/README.md#hosted-keeper); run links: [`docs/LIVE_CONTRACT.md`](docs/LIVE_CONTRACT.md)).

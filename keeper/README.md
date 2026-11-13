@@ -177,7 +177,7 @@ The keeper then sends the same notices as the webhook (Warning, Triggered; same 
 ## Hosted keeper
 
 [`.github/workflows/keeper.yml`](../.github/workflows/keeper.yml) (`keeper`) is the project's hosted keeper for the
-live testnet contract. It runs every 10 minutes and on manual dispatch, one run at a time, and settles every due vault
+live testnet contract. It runs every 20 minutes and on manual dispatch, one run at a time, and settles every due vault
 on the contract, not only the project's own.
 
 1. Checkout, Node 22, `npm ci` in `keeper/`. Then the showcase vault's daily owner heartbeat

@@ -378,7 +378,7 @@ Commands (`npm run <cmd>` or `npx dmw <cmd>`):
 > `--until-idle` and `--max-seconds <n>` (a bounded sweep that exits when nothing matching is overdue or Triggered).
 > `due --owner-prefix <prefix>` is the read-only pre-check. With `DMW_NOTIFY_WEBHOOK` set, the loop posts one JSON
 > message when a vault turns Warning and one when it is Triggered. `.github/workflows/keeper.yml` runs the sweep for
-> `dmw-guest-` vaults every ten minutes. Details in `keeper/README.md`.
+> `dmw-guest-` vaults every twenty minutes. Details in `keeper/README.md`.
 
 Config via `.env` (`.env.example` committed): `NEAR_NETWORK`, `DMW_CONTRACT`, `KEEPER_ACCOUNT_ID`, `KEEPER_PRIVATE_KEY`, `BASE_RPC`, `MONAD_RPC`, `SOLANA_RPC`.
 Solana blockhashes expire in ~60–90 s; the keeper fetches a fresh one right before `execute_step`. It never retries at once: if the payout comes out `failed`, or its signed tx goes stale before it is relayed, the keeper waits until `get_sign_track().resign_allowed_after_ms` (5 min after the last request) and then calls `resign_foreign` with a new blockhash. For a stale signed tx it first checks that the old signature never landed; if that lookup fails it waits and looks again instead of signing. After 2 re-signs of one payout it pauses that payout for 5 min.

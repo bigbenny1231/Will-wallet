@@ -1,14 +1,15 @@
 name: keeper
 
-# The hosted keeper for the live testnet contract. Every 10 minutes a read-only check looks for vaults that are past
+# The hosted keeper for the live testnet contract. Every 20 minutes a read-only check looks for vaults that are past
 # their deadline or Triggered; when there is one, the keeper pokes it and runs its steps until nothing is due.
 # It signs as the contract keeper: the long-lived account derived from the KEEPER_SEED repository secret
 # (scripts/near-admin.mjs derive-keeper), the same account the deploy names in `new`. Its key exists only in that
 # secret and in the runner's memory while a job runs. Details: keeper/README.md, "Hosted keeper".
 on:
   schedule:
-    # Every 10 minutes, a few minutes off the hour (the top of the hour is the busiest time for scheduled runs).
-    - cron: '7-59/10 * * * *'
+    # Every 20 minutes, a few minutes off the hour (the top of the hour is the busiest time for scheduled runs).
+    # 20 rather than 10 keeps the private repo inside its monthly Actions minutes; each run bills one minute.
+    - cron: '7-59/20 * * * *'
   workflow_dispatch:
 
 permissions:
