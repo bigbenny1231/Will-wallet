@@ -92,6 +92,7 @@ main, .footer { position: relative; z-index: 1; }
 .brand-lockup { display: flex; flex-direction: column; gap: 2px; font: 500 9.5px/1 var(--font-mono); letter-spacing: .22em; text-transform: uppercase; }
 .brand-lockup span:first-child { color: var(--bone); }
 .brand-lockup span:last-child { color: var(--brass); }
+.brand-lockup span:only-child { color: var(--bone); font-size: 11px; letter-spacing: .24em; }
 .brand:hover .mark .t, .brand:focus-visible .mark .t { filter: drop-shadow(0 0 3px var(--life)); }
 .nav-trace { flex: 1 1 40px; min-width: 24px; height: 24px; display: block; }
 .nav-trace-base { fill: none; stroke: var(--hair); stroke-width: 1; vector-effect: non-scaling-stroke; }

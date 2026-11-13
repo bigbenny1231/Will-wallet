@@ -124,7 +124,7 @@ pub fn render_svg(id: u64, v: &Vault, now_ms: u64) -> String {
     let plural = if heirs == 1 { "" } else { "S" };
     let word = state.as_str();
     let rim = format!(
-        "DEAD MAN\u{2019}S WALLET \u{b7} VAULT {id} \u{b7} {}",
+        "LASTWORD \u{b7} VAULT {id} \u{b7} {}",
         word.to_uppercase()
     );
     format!(
