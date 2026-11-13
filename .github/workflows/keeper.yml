@@ -55,6 +55,25 @@ jobs:
         run: |
           if [ "${#KEEPER_SEED}" -ge 32 ]; then npx tsx src/cli.ts funder; else echo "KEEPER_SEED is not set"; fi
 
+      # Before the one-press release run: report (lengths and status codes only, never values) whether its secrets are in,
+      # and keep the funder's Solana devnet balance topped up by airdrop so the run does not depend on the faucet's rate limit.
+      - name: Release prerequisites
+        continue-on-error: true
+        env:
+          KEEPER_SEED: ${{ secrets.KEEPER_SEED }}
+          KEEPER_ADMIN_SEED: ${{ secrets.KEEPER_ADMIN_SEED }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          SEED="${KEEPER_SEED:-}"; ADM="${KEEPER_ADMIN_SEED:-}"; KEY="${ANTHROPIC_API_KEY:-}"
+          echo "KEEPER_SEED: ${#SEED} characters"
+          if [ ${#ADM} -ge 32 ] && [ "$ADM" != "$SEED" ]; then echo "KEEPER_ADMIN_SEED: ok (${#ADM} characters, differs from KEEPER_SEED)"
+          else echo "KEEPER_ADMIN_SEED: MISSING, shorter than 32 characters, or equal to KEEPER_SEED"; fi
+          if [ -n "$KEY" ]; then
+            code=$(curl -s -o /dev/null -w '%{http_code}' https://api.anthropic.com/v1/models -H "x-api-key: $KEY" -H 'anthropic-version: 2023-06-01')
+            echo "ANTHROPIC_API_KEY: set, API answered $code"
+          else echo "ANTHROPIC_API_KEY: not set"; fi
+          if [ ${#SEED} -ge 32 ]; then MIN_ETH=0 MIN_MON=0 MIN_SOL=0.05 ./scripts/ci/funder-check.sh || true; fi
+
       # Read-only view call. Sets outputs `work` (true/false) and `count`. No account, no key, no transaction.
       - name: Check for vaults that are past their deadline or Triggered
         id: due
