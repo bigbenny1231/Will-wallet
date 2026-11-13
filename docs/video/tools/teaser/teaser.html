@@ -10,7 +10,7 @@ canvas { display: block; }
 </style></head>
 <body><canvas id="c"></canvas>
 <script>
-// Dead Man's Wallet teaser. Every frame is a pure function of its index: renderFrame(i) draws frame i at FPS.
+// Lastword teaser. Every frame is a pure function of its index: renderFrame(i) draws frame i at FPS.
 // The timeline (TL) is written by build.py from the voice's word timings, so the cuts land on the words.
 const TL = {"DUR": 10.467, "BEATS": [0.35, 1.15, 1.806, 2.344, 2.785, 3.147, 3.444, 3.687, 3.886], "T_FLAT": 4.137, "T_TRIG": 4.687, "T_STEPS": 5.736, "STEP": 0.32, "T_SETTLED": 7.336, "T_END": 7.756, "T_LAST": 9.847, "WORDS": [[0.95, 2.552, "If you die tonight,", "serif"], [2.552, 4.137, "your agent keeps spending.", "serif"]], "TRIG_TEXT": "Not anymore.", "VO": {"a": 0.95, "b": 4.687, "c": 7.886}};
 const FPS = 30, DUR = TL.DUR;
@@ -83,7 +83,7 @@ function ring(cx, cy, R, t, state, word, a = 1, o = {}) {
   ctx.strokeStyle = BRASS; ctx.lineWidth = Math.max(1.5, R * 0.0066); ctx.beginPath(); ctx.arc(cx, cy, R, 0, 7); ctx.stroke();
   ctx.lineWidth = Math.max(1, R * 0.0032); ctx.beginPath(); ctx.arc(cx, cy, R * 0.971, 0, 7); ctx.stroke();
   ctx.lineWidth = Math.max(1, R * 0.004); ctx.beginPath(); ctx.arc(cx, cy, R * 0.763, 0, 7); ctx.stroke();
-  const unit = `DEAD MAN’S WALLET · VAULT 0042 · ${word} · `, s = unit + unit;
+  const unit = `LASTWORD · VAULT 0042 · ${word} · `, s = unit + unit;
   const fs = R * 0.07; ctx.font = `500 ${fs}px "Inter Tight"`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   const rr = R * 0.862, rot = (o.rot ?? t * 0.10) - Math.PI / 2;
   for (let i = 0; i < s.length; i++) {
@@ -249,8 +249,8 @@ function actEnd(t, i) {
   // the words
   const tx = wide ? W * 0.485 : W / 2, al = wide ? 'left' : 'center', y0 = wide ? H * 0.44 : H * 0.70, mw = wide ? W * 0.47 : W * 0.88;
   const rise = (d) => ({ alpha: clamp((t - T_END - d) / 0.3), dy: lerp(14 * u, 0, easeOut((t - T_END - d) / 0.5)) });
-  let p = rise(0.05); const ts = fit('Dead Man’s Wallet', '400 SIZE "Instrument Serif"', 176 * u, mw);
-  text('Dead Man’s Wallet', tx, y0 + p.dy, `400 ${ts}px "Instrument Serif"`, BONE, { align: al, alpha: p.alpha });
+  let p = rise(0.05); const ts = fit('Lastword', '400 SIZE "Instrument Serif"', 176 * u, mw);
+  text('Lastword', tx, y0 + p.dy, `400 ${ts}px "Instrument Serif"`, BONE, { align: al, alpha: p.alpha });
   p = rise(0.22); const gs = fit('Your crypto shouldn’t die with you.', 'italic 400 SIZE "Instrument Serif"', 78 * u, mw);
   text('Your crypto shouldn’t die with you.', tx, y0 + 104 * u + p.dy, `italic 400 ${gs}px "Instrument Serif"`, BONE, { align: al, alpha: p.alpha });
   p = rise(0.45);

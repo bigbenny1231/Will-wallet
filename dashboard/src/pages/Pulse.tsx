@@ -93,7 +93,7 @@ function Unpaired({ error, onPaired }: { error: string | null; onPaired: (v: Sto
   };
   return (
     <Shell>
-      <TopBar left={<span className="display text-[20px]">Dead Man’s Wallet</span>} />
+      <TopBar left={<span className="display text-[20px]">Lastword</span>} />
       <div className="mt-10 flex justify-center opacity-70">
         <img src={sealDataUri("–", "Settled", "not paired", 0)} alt="" width={220} height={220} className="h-[220px] w-[220px] rounded-full" />
       </div>

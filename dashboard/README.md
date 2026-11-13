@@ -1,4 +1,4 @@
-# Dead Man's Wallet dashboard
+# Lastword dashboard
 
 Vite + React 18 + TypeScript + Tailwind (PostCSS). Wallets via `@near-wallet-selector` v10 (MyNearWallet, Meteor).
 

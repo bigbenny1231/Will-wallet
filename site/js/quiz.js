@@ -71,7 +71,7 @@ async function drawCard(canvas, s, lines) {
   ctx.beginPath(); ctx.arc(cx, cy, R - 46, 0, Math.PI * 2); ctx.stroke();
   // rim inscription
   ctx.save(); ctx.translate(cx, cy); ctx.fillStyle = C.brass; ctx.font = '500 14px "Inter Tight"';
-  const rim = 'DEAD MAN’S WALLET · WOULD IT ARRIVE? · DEAD MAN’S WALLET · WOULD IT ARRIVE? · ';
+  const rim = 'LASTWORD · WOULD IT ARRIVE? · LASTWORD · WOULD IT ARRIVE? · ';
   const step = (Math.PI * 2) / rim.length;
   [...rim].forEach((ch, i) => { ctx.save(); ctx.rotate(-Math.PI / 2 + i * step); ctx.translate(0, -(R - 26)); ctx.fillText(ch, -4, 5); ctx.restore(); });
   ctx.restore();
@@ -104,7 +104,7 @@ async function drawCard(canvas, s, lines) {
   ctx.fillStyle = C.bone2; ctx.font = '400 17px "Inter Tight"';
   ctx.fillText('A rough estimate from four answers, not advice.', 80, 576);
   ctx.textAlign = 'right'; ctx.fillStyle = C.bone; ctx.font = '400 24px "Instrument Serif"';
-  ctx.fillText('Dead Man’s Wallet  —  will-wallet-site.vercel.app', 1120, 578);
+  ctx.fillText('Lastword  —  will-wallet-site.vercel.app', 1120, 578);
   ctx.textAlign = 'left';
 }
 
@@ -135,7 +135,7 @@ export function init() {
     items.push('A vault covers what you move into it. At settlement it pays your heirs on NEAR, has NEAR’s network sign Base, Monad and Solana payouts, and deletes its agent key. Testnet today.');
     lines.textContent = '';
     items.filter(Boolean).forEach((t) => { const li = document.createElement('li'); li.textContent = t; lines.append(li); });
-    summary = 'Would my crypto arrive? ' + headline(s) + ' (A four-question check by Dead Man’s Wallet; a rough estimate, not advice.) ' + SITE;
+    summary = 'Would my crypto arrive? ' + headline(s) + ' (A four-question check by Lastword; a rough estimate, not advice.) ' + SITE;
     wait.hidden = true;
     card.hidden = false;
     copyStatus.textContent = '';

@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 780" width="1000" height="780" role="img" aria-labelledby="t d">
-<title id="t">Dead Man's Wallet architecture</title>
+<title id="t">Lastword architecture</title>
 <desc id="d">Pulse key, agent key, owner and keeper act on the dmw contract (vault, policy, step machine, Will NFT). Five settlement steps produce NEAR payouts to heirs, key deletion, MPC signatures for Base, Solana and Monad, a Sputnik DAO proposal and the Will NFT going to the primary heir.</desc>
 <style>/*STYLE*/</style>
 <defs>

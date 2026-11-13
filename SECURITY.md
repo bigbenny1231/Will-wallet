@@ -1,6 +1,6 @@
 # Security
 
-Dead Man's Wallet runs on NEAR testnet. It is not a will. Do not send it real funds.
+Lastword runs on NEAR testnet. It is not a will. Do not send it real funds.
 
 ## Reporting a vulnerability
 

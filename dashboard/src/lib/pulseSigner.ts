@@ -1,4 +1,4 @@
-// Sends heartbeats from the phone. Signer = the DMW contract account + the pulse key (a function-call access key
+// Sends heartbeats from the phone. Signer = the Lastword contract account + the pulse key (a function-call access key
 // scoped to `heartbeat`, 1 NEAR allowance). 10 TGas per beat: the allowance is charged for prepaid gas.
 import { Account, KeyPair, KeyPairSigner, providers } from "near-api-js";
 import { MOCK, RPC } from "../config";

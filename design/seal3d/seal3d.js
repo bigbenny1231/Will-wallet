@@ -1,4 +1,4 @@
-// Dead Man's Wallet — the will seal as a WebGL brass medallion.
+// Lastword — the will seal as a WebGL brass medallion.
 //
 //   import { createSeal3D, supportsWebGL } from './seal3d.bundle.js';
 //   if (supportsWebGL()) { const seal = createSeal3D(canvas, { state: 'alive', vaultNo: '0042' }); await seal.ready; }

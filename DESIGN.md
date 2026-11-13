@@ -1,4 +1,4 @@
-# Dead Man's Wallet — Design Direction (binding for site, dashboard, NFT art, video)
+# Lastword — Design Direction (binding for site, dashboard, NFT art, video)
 
 Goal: the most beautiful thing the judges see that week. Not "a dark dashboard". An object with a point of view.
 

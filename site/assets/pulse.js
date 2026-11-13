@@ -1,4 +1,4 @@
-/* Dead Man's Wallet: the pulse motif.
+/* Lastword: the pulse motif.
  * Shared module for the site and the dashboard. Plain script, no dependencies; exposes window.DMWPulse.
  * design/build_site.py copies this file to site/assets/pulse.js; edit it here, not there.
  *

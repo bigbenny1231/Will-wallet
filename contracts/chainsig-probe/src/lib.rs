@@ -1,5 +1,5 @@
 //! chainsig-probe: the smallest contract that proves NEAR Chain Signatures end to end
-//! for the two Dead Man's Wallet payout chains.
+//! for the two Lastword payout chains.
 //!
 //! - `sign_evm_transfer`   -> EIP-1559 native transfer on Base Sepolia (domain 0, secp256k1)
 //! - `sign_solana_transfer`-> SystemProgram::transfer on Solana devnet (domain 1, ed25519)

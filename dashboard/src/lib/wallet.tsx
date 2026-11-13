@@ -19,7 +19,7 @@ interface WalletCtx {
   accountId: string | null;
   connect: () => void;
   disconnect: () => Promise<void>;
-  /** Sends one or more function calls to the DMW contract. Redirect wallets (MyNearWallet) navigate away and never resolve. */
+  /** Sends one or more function calls to the Lastword contract. Redirect wallets (MyNearWallet) navigate away and never resolve. */
   call: (calls: CallArgs | CallArgs[]) => Promise<unknown>;
   /** Guest mode (lib/guest.ts): a throwaway testnet account held in this browser. Null when there is none. */
   guest: GuestSession | null;

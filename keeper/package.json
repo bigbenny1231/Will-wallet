@@ -3,7 +3,7 @@
   "license": "MIT",
   "version": "0.1.0",
   "private": true,
-  "description": "Off-chain keeper, pulse daemon and demo CLI for Dead Man's Wallet",
+  "description": "Off-chain keeper, pulse daemon and demo CLI for Lastword",
   "type": "module",
   "engines": {
     "node": ">=22"

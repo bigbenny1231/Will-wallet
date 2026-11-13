@@ -15,7 +15,7 @@ import { notifierFromEnv } from './notify.js';
 import { errMsg, formatYocto, foreignTxLink, termSafe } from './util.js';
 import { viewBackend } from './factory.js';
 
-const program = new Command('dmw').description("Dead Man's Wallet keeper and demo CLI (DMW_MOCK=1 for an offline mock vault)");
+const program = new Command('dmw').description("Lastword keeper and demo CLI (DMW_MOCK=1 for an offline mock vault)");
 
 const run = (fn: () => Promise<void>) =>
   fn().catch((e) => {

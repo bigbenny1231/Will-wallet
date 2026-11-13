@@ -1,4 +1,4 @@
-# Dead Man's Wallet: landing page (v4)
+# Lastword: landing page (v4)
 
 Static, build-free site: `index.html`, `styles.css`, `js/`, `fonts/`, `assets/`. No CDN, no runtime
 dependencies. Design rules are in [`../DESIGN.md`](../DESIGN.md) (binding); every claim is held to the code and to the live

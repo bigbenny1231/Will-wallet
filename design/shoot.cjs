@@ -65,7 +65,7 @@ async function scrollThrough(page) {
         p{font-size:22px;color:var(--bone-2);margin:0;max-width:20em;line-height:1.45}
         .k{margin-top:40px;font:500 12px/1 var(--font-text);letter-spacing:.12em;text-transform:uppercase;color:var(--brass);padding-top:16px;border-top:1px solid var(--hair-strong);max-width:420px}
       </style></head><body><div class="s">${seal}</div>
-      <div><h1>Dead Man&#8217;s Wallet</h1><p>A vault is created. Its agent is refused. The heartbeats stop, and settlement runs on NEAR testnet.</p><div class="k">The demo, 2 minutes 50 seconds, vault 17</div></div></body></html>`, { waitUntil: 'networkidle' });
+      <div><h1>Lastword</h1><p>A vault is created. Its agent is refused. The heartbeats stop, and settlement runs on NEAR testnet.</p><div class="k">The demo, 2 minutes 50 seconds, vault 17</div></div></body></html>`, { waitUntil: 'networkidle' });
     await page.evaluate(async () => { await Promise.all(['400 40px "Instrument Serif"', 'italic 400 40px "Instrument Serif"', '400 16px "Inter Tight"', '500 16px "Inter Tight"', '400 14px "JetBrains Mono"'].map(f => document.fonts.load(f))); await document.fonts.ready; });
     await page.waitForTimeout(300);
     await page.screenshot({ path: path.join(ROOT, 'site', 'assets', 'poster.jpg'), type: 'jpeg', quality: 86 });
@@ -102,7 +102,7 @@ async function scrollThrough(page) {
         .l{position:absolute;left:0;right:0;bottom:22px;height:120px}
         .k{position:absolute;left:80px;bottom:150px;font:400 16px/1 var(--font-text);color:var(--bone-2);max-width:none;white-space:nowrap}
       </style></head><body>
-      <div class="b"><svg viewBox="0 0 32 32">${mark}</svg>Dead Man&#8217;s Wallet</div>
+      <div class="b"><svg viewBox="0 0 32 32">${mark}</svg>Lastword</div>
       <div class="t"><h1>Your crypto shouldn&#8217;t die with you.</h1><p>While you&#8217;re alive, nothing happens. When you&#8217;re not, your vault pays the people you chose.</p></div>
       <div class="s" id="s">${seal}<canvas id="c"></canvas></div>
       <svg class="l" viewBox="0 0 1200 120"><path d="${line} L560,60" fill="none" stroke="#3DDC84" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>

@@ -1,6 +1,6 @@
 <svg class="seal" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" role="img" aria-labelledby="seal-title seal-desc" style="--state:#3DDC84">
   <title id="seal-title">Will seal, vault 0004: alive</title>
-  <desc id="seal-desc">A circular medallion with a double brass ring, the inscription Dead Man's Wallet, vault 0004, alive, around the rim, and a heartbeat trace in the centre that beats every three seconds.</desc>
+  <desc id="seal-desc">A circular medallion with a double brass ring, the inscription Lastword, vault 0004, alive, around the rim, and a heartbeat trace in the centre that beats every three seconds.</desc>
   <style>
     .seal { overflow: visible; }
     .seal .rim { fill: none; stroke: #C8A96A; }
@@ -48,7 +48,7 @@
 
   <circle class="rim" cx="200" cy="200" r="190" stroke-width="1.25"/>
   <circle class="rim" cx="200" cy="200" r="184.5" stroke-width="0.6"/>
-  <text class="inscription"><textPath href="#seal-rim-path" textLength="1000" lengthAdjust="spacing">DEAD MAN&#8217;S WALLET &#183; VAULT 0004 &#183; <tspan class="state">ALIVE</tspan> &#183; DEAD MAN&#8217;S WALLET &#183; VAULT 0004 &#183; <tspan class="state">ALIVE</tspan> &#183;</textPath></text>
+  <text class="inscription"><textPath href="#seal-rim-path" textLength="1000" lengthAdjust="spacing">LASTWORD &#183; VAULT 0004 &#183; <tspan class="state">ALIVE</tspan> &#183; LASTWORD &#183; VAULT 0004 &#183; <tspan class="state">ALIVE</tspan> &#183;</textPath></text>
   <circle class="rim" cx="200" cy="200" r="145" stroke-width="0.75"/>
 
   <g clip-path="url(#seal-field)">

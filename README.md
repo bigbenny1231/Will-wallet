@@ -1,10 +1,12 @@
-# Dead Man's Wallet
+# Lastword
 
 **Your crypto shouldn't die with you.** A NEAR contract that executes your estate plan — for humans and for AI agents.
 While you're alive, a pulse key sends a heartbeat. If the heartbeats stop, the contract
 pays your heirs on NEAR, deletes your AI agent's spending key, has NEAR's MPC network sign payouts
 on Base, Monad and Solana, files a proposal in your estate DAO, and hands the Will NFT (whose holder can
 claim what is left in the vault) to your primary heir. Heirs do not sign anything to receive their NEAR.
+
+_Lastword was called Dead Man's Wallet until 13 Nov 2026; dated review and history docs keep that name. The `dmw` crate, CLI and testnet account prefixes are unchanged._
 
 What is in the build:
 
@@ -72,7 +74,7 @@ Prerequisites (`make check` verifies them and prints the fix for anything missin
 No `.env`, keys or near-cli credentials are needed beforehand. `make deploy` creates them.
 
 ```bash
-git clone https://github.com/bigbenny1231/will-wallet deadmans-wallet && cd deadmans-wallet
+git clone https://github.com/bigbenny1231/will-wallet lastword && cd lastword
 make check     # verify toolchain   -> "All good." (optional tools only warn)
 make build     # build the contract -> contracts/dmw/target/near/dmw.wasm and its code hash (about 1 min)
 make test      # unit tests         -> contract "174 passed", keeper "140 passed", dashboard "130 passed", agent "103 passed" (runs npm ci first)
@@ -341,7 +343,7 @@ The author leads no other hackathon project.
 
 ## What's next
 
-Dead Man's Wallet is not a legal instrument: it runs alongside a will or trust (see the FAQ on the site). Next:
+Lastword is not a legal instrument: it runs alongside a will or trust (see the FAQ on the site). Next:
 
 - push notices to the paired phone (today the keeper's notice goes to a Slack or Discord webhook);
 - stablecoin and Bitcoin payouts (today: NEAR, and native ETH, MON and SOL);

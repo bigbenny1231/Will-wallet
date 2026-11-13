@@ -1,7 +1,7 @@
 {
-  "name": "Dead Man’s Wallet — Pulse",
+  "name": "Lastword — Pulse",
   "short_name": "Pulse",
-  "description": "Your heartbeat for a Dead Man’s Wallet vault. While this is open, the vault knows you are here.",
+  "description": "Your heartbeat for a Lastword vault. While this is open, the vault knows you are here.",
   "id": "/pulse",
   "start_url": "/pulse",
   "scope": "/",

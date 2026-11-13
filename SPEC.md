@@ -1,4 +1,4 @@
-# Dead Man's Wallet — Technical Spec (v1, hackathon)
+# Lastword — Technical Spec (v1, hackathon)
 
 This is the single source of truth for every component. Agents code against this file.
 If you must deviate, update this file in the same change and say why in the commit.
@@ -202,7 +202,7 @@ red `#e74c3c` Triggered, grey `#7f8c8d` Settled), vault id, state word, "next be
 "settled", and the heir count. `extra` carries the JSON `{state, trigger_at_ms, heirs}`.
 
 > Note (dashboard agent, 2026-11-07): the image is now the DESIGN.md seal: brass double ring, rim inscription
-> "DEAD MAN'S WALLET · VAULT N · STATE" on a textPath, a static ECG trace per state, the state word and the status line.
+> "LASTWORD · VAULT N · STATE" on a textPath, a static ECG trace per state, the state word and the status line.
 > State colours are the DESIGN.md tokens: `#3DDC84` Alive, `#F5B942` Warning, `#FF4D4D` Triggered, `#7A7F87` Settled. About 1.6 KB.
 
 ### 2.6 Tests

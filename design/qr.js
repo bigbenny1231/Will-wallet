@@ -1,4 +1,4 @@
-/* Dead Man's Wallet: a tiny QR encoder (byte mode, error correction M, versions 1-6, up to 106 bytes).
+/* Lastword: a tiny QR encoder (byte mode, error correction M, versions 1-6, up to 106 bytes).
  * Used at build time by design/build_site.py to inline a QR code as SVG; no runtime dependency.
  * Verified module-for-module against npm `qrcode` 1.5.4 for every mask (see design/qr.test.cjs).
  *

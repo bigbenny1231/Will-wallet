@@ -13,7 +13,7 @@ want() { # name, cmd, what-for, fix
   if command -v "$2" >/dev/null 2>&1; then say "$1" "ok ($(ver "$2" --version))"; else say "$1" "optional, not found ($3) -> $4"; fi
 }
 
-echo "Dead Man's Wallet toolchain check"
+echo "Lastword toolchain check"
 echo "required:"
 need "rustc"   rustc   "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh"
 need "cargo"   cargo   "(installed with rustup)"

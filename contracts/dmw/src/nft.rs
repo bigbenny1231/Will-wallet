@@ -170,7 +170,7 @@ pub(crate) fn token_view(id: u64, v: &Vault) -> Token {
         metadata: Some(TokenMetadata {
             title: Some(format!("Will #{id}")),
             description: Some(format!(
-                "Dead Man's Wallet vault {id}. State: {}. Heartbeat every {}s, triggers after {} missed.",
+                "Lastword vault {id}. State: {}. Heartbeat every {}s, triggers after {} missed.",
                 state.as_str(),
                 v.heartbeat_interval_s,
                 u64::from(v.grace_missed) + 1
@@ -290,7 +290,7 @@ impl Contract {
     pub fn nft_metadata(&self) -> NFTContractMetadata {
         NFTContractMetadata {
             spec: "nft-1.0.0".to_string(),
-            name: "Dead Man's Wallet".to_string(),
+            name: "Lastword".to_string(),
             symbol: "WILL".to_string(),
             icon: Some(ICON.to_string()),
             base_uri: None,

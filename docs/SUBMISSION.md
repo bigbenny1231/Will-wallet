@@ -1,6 +1,6 @@
 # Submission kit
 
-Everything needed to submit Dead Man's Wallet to the NEAR Hackathon. Placeholders are in double braces and are only
+Everything needed to submit Lastword to the NEAR Hackathon. Placeholders are in double braces and are only
 for the request id (a fresh lowercase UUID: `node -e 'console.log(crypto.randomUUID())'`, reused on retries), the payout
 account, the email, the demo link (`{{X_POST_URL}}`: the X post URL, which does not exist until you post) and, in the X posts, the site
 URL. `{{SITE_URL}}` is the deployed Vercel site.
@@ -19,7 +19,7 @@ account), `projectUrl` (the public repo), `demoUrl` (the public X post), `idea` 
 ```json
 {
   "requestId": "{{REQUEST_ID}}",
-  "projectName": "Dead Man's Wallet",
+  "projectName": "Lastword",
   "leadName": "Andrew Garretson",
   "email": "{{EMAIL}}",
   "size": "1",
@@ -31,7 +31,7 @@ account), `projectUrl` (the public repo), `demoUrl` (the public X post), `idea` 
   "nearAddress": "{{NEAR_MAINNET_PAYOUT_ACCOUNT}}",
   "projectUrl": "https://github.com/bigbenny1231/will-wallet",
   "demoUrl": "{{X_POST_URL}}",
-  "idea": "Agents hold wallets, API budgets and treasuries. When their operator dies, loses access or is incapacitated, the agent keeps spending until it runs dry, and anything it held on other chains is gone. The dead-man's switches we found move one key or one file on one chain; none disarms an agent or settles an estate across chains.\n\nDead Man's Wallet is a NEAR contract that does both. While you are alive, a phone key that can only call heartbeat says so. When the heartbeats stop, anyone can poke the contract, and it settles in five steps: heirs are paid on NEAR, with nothing for them to sign; the pulse and agent keys are deleted; NEAR's MPC network signs payouts on Base, Monad and Solana; a proposal is filed in the estate DAO; the Will NFT, which draws itself from state and can claim what is left, goes to the primary heir.\n\nWhat NEAR enables: function-call access keys scoped to one method, so a stolen phone can only say alive and a compromised agent can only spend inside its policy; Chain Signatures, so no single party holds a key for the foreign addresses and the contract requests signatures only after the trigger; NEP-171 with an on-chain SVG seal; permissionless keepers.\n\nTry it with no wallet: the dashboard makes a throwaway testnet account in your browser and runs a whole estate, from first heartbeat to the heir's claim, in three minutes.\n\nShown on testnet: an agent scripted to obey a planted prompt injection, refused by its wallet, then by the contract itself; a guardian pause that moves the deadline once; a contract account with no full-access key, so nobody can change the code. Every Critical and High finding of the code reviews is fixed, each contract fix with a named regression test.\n\nRuns on NEAR testnet. Not a will and not a custodian. Built at NEAR Hackathon, mostly AI-generated with Claude under the direction of the author. MIT.",
+  "idea": "Agents hold wallets, API budgets and treasuries. When their operator dies, loses access or is incapacitated, the agent keeps spending until it runs dry, and anything it held on other chains is gone. The dead-man's switches we found move one key or one file on one chain; none disarms an agent or settles an estate across chains.\n\nLastword is a NEAR contract that does both. While you are alive, a phone key that can only call heartbeat says so. When the heartbeats stop, anyone can poke the contract, and it settles in five steps: heirs are paid on NEAR, with nothing for them to sign; the pulse and agent keys are deleted; NEAR's MPC network signs payouts on Base, Monad and Solana; a proposal is filed in the estate DAO; the Will NFT, which draws itself from state and can claim what is left, goes to the primary heir.\n\nWhat NEAR enables: function-call access keys scoped to one method, so a stolen phone can only say alive and a compromised agent can only spend inside its policy; Chain Signatures, so no single party holds a key for the foreign addresses and the contract requests signatures only after the trigger; NEP-171 with an on-chain SVG seal; permissionless keepers.\n\nTry it with no wallet: the dashboard makes a throwaway testnet account in your browser and runs a whole estate, from first heartbeat to the heir's claim, in three minutes.\n\nShown on testnet: an agent scripted to obey a planted prompt injection, refused by its wallet, then by the contract itself; a guardian pause that moves the deadline once; a contract account with no full-access key, so nobody can change the code. Every Critical and High finding of the code reviews is fixed, each contract fix with a named regression test.\n\nRuns on NEAR testnet. Not a will and not a custodian. Built at NEAR Hackathon, mostly AI-generated with Claude under the direction of the author. MIT.",
   "consent": true
 }
 ```
@@ -47,7 +47,7 @@ Lengths use X's counting (a link is 23 characters whatever its length). Each is 
 ```text
 Your AI agent keeps spending after you die.
 
-Dead Man's Wallet: miss the heartbeats and a NEAR contract kills the agent's key and pays heirs. Built at NEAR Hackathon @NEARProtocol #NEARHackathon
+Lastword: miss the heartbeats and a NEAR contract kills the agent's key and pays heirs. Built at NEAR Hackathon @NEARProtocol #NEARHackathon
 {{SITE_URL}}
 github.com/bigbenny1231/will-wallet
 Who holds your agent's keys?
@@ -58,7 +58,7 @@ Who holds your agent's keys?
 ```text
 Your crypto shouldn't die with you.
 
-Dead Man's Wallet: when your pulse stops, a NEAR contract pays them. They sign nothing to receive it. Built at NEAR Hackathon @NEARProtocol #NEARHackathon
+Lastword: when your pulse stops, a NEAR contract pays them. They sign nothing to receive it. Built at NEAR Hackathon @NEARProtocol #NEARHackathon
 {{SITE_URL}}
 github.com/bigbenny1231/will-wallet
 Who is yours?
@@ -69,7 +69,7 @@ Who is yours?
 ```text
 Our scripted agent obeyed a prompt injection: send everything to a stranger. The wallet refused. Wallet off: the contract refused.
 
-Dead Man's Wallet, built at NEAR Hackathon @NEARProtocol #NEARHackathon
+Lastword, built at NEAR Hackathon @NEARProtocol #NEARHackathon
 {{SITE_URL}}
 github.com/bigbenny1231/will-wallet
 What would you test next?
@@ -87,7 +87,7 @@ tweet 2 (use `docs/diagrams/settlement-sequence.png`) and tweet 5 (a still of th
 
 
 ```text
-1/6 Agents hold wallets and budgets. When the operator disappears, the agent keeps spending and other chains are lost. Dead Man's Wallet is a NEAR contract that settles it: five steps, one trigger. Built at NEAR Hackathon @NEARProtocol #NEARHackathon
+1/6 Agents hold wallets and budgets. When the operator disappears, the agent keeps spending and other chains are lost. Lastword is a NEAR contract that settles it: five steps, one trigger. Built at NEAR Hackathon @NEARProtocol #NEARHackathon
 ```
 
 ```text
@@ -125,7 +125,7 @@ Run each command; every one should print what the comment says. `SITE` and `DASH
 
 ```bash
 # 0. state of the tree
-cd deadmans-wallet && git status --short            # empty
+cd lastword && git status --short            # empty
 git log --oneline | head -3
 
 # 1. tag the submitted tree, push it

@@ -1,4 +1,4 @@
-// Dead Man's Wallet landing page, v4. Vanilla ES modules, no dependencies besides assets/pulse.js (window.DMWPulse).
+// Lastword landing page, v4. Vanilla ES modules, no dependencies besides assets/pulse.js (window.DMWPulse).
 // No backend: links are plain, the estate graph makes read-only RPC calls, the heir name and quiz never leave the page.
 import { initHero } from './hero.js';
 import { reducedMotion } from './seal.js';

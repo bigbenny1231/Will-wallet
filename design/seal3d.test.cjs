@@ -38,10 +38,10 @@ const check = (name, fn) => Promise.resolve().then(fn).then(() => { pass++; cons
   });
 
   const expect = {
-    alive: 'DEAD MAN’S WALLET · VAULT 0042 · ALIVE',
-    warning: 'DEAD MAN’S WALLET · VAULT 0042 · WARNING',
-    triggered: 'DEAD MAN’S WALLET · VAULT 0042 · TRIGGERED',
-    settled: 'DEAD MAN’S WALLET · VAULT 0042 · SETTLED',
+    alive: 'LASTWORD · VAULT 0042 · ALIVE',
+    warning: 'LASTWORD · VAULT 0042 · WARNING',
+    triggered: 'LASTWORD · VAULT 0042 · TRIGGERED',
+    settled: 'LASTWORD · VAULT 0042 · SETTLED',
   };
   for (const [state, want] of Object.entries(expect)) {
     await check(`inscription for ${state}`, () => {
@@ -57,10 +57,10 @@ const check = (name, fn) => Promise.resolve().then(fn).then(() => { pass++; cons
   });
   await check('vault numbers pad to four digits and match the SVG wording', () => {
     assert.strictEqual(mod.inscriptionText('alive', 42), expect.alive);
-    assert.strictEqual(mod.inscriptionText('alive', '7'), 'DEAD MAN’S WALLET · VAULT 0007 · ALIVE');
-    assert.strictEqual(mod.inscriptionText('alive', '12345'), 'DEAD MAN’S WALLET · VAULT 12345 · ALIVE');
+    assert.strictEqual(mod.inscriptionText('alive', '7'), 'LASTWORD · VAULT 0007 · ALIVE');
+    assert.strictEqual(mod.inscriptionText('alive', '12345'), 'LASTWORD · VAULT 12345 · ALIVE');
     const svg = fs.readFileSync(path.join(__dirname, 'seal.svg'), 'utf8');
-    assert(svg.includes('DEAD MAN&#8217;S WALLET &#183; VAULT 0004 &#183;'), 'seal.svg wording changed');
+    assert(svg.includes('LASTWORD &#183; VAULT 0004 &#183;'), 'seal.svg wording changed');
   });
   await check('rim carries two passes, each closed with a middle dot', () => {
     assert.strictEqual(mod.inscriptionRing('alive', '0042'), `${expect.alive} · ${expect.alive} ·`);

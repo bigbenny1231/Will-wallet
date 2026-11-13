@@ -1,4 +1,4 @@
-/* Dead Man's Wallet design tokens. Source of truth: DESIGN.md. Shared by site, dashboard, NFT art, video.
+/* Lastword design tokens. Source of truth: DESIGN.md. Shared by site, dashboard, NFT art, video.
    design/build_site.py copies this file to site/assets/tokens.css; edit it here, not there. */
 :root {
   --ink:   #0B0C0F;  /* background */

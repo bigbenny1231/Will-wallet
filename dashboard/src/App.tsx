@@ -47,7 +47,7 @@ function Header() {
           <div className="flex min-w-0 items-center gap-x-10">
             <Link to="/" className="flex items-center gap-[7px]">
               <Mark />
-              <span className="display whitespace-nowrap text-[26px] leading-none sm:text-[28px]">Dead Man’s Wallet</span>
+              <span className="display whitespace-nowrap text-[26px] leading-none sm:text-[28px]">Lastword</span>
             </Link>
             <nav className="hidden gap-6 whitespace-nowrap md:flex" aria-label="Primary">{links}</nav>
           </div>

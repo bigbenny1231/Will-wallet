@@ -17,7 +17,7 @@ export function setSeal(seal, state, word) {
   }
 }
 
-// The rim reads: DEAD MAN'S WALLET · VAULT 0042 · ALIVE · FOR MARIA · VAULT 0042 · ALIVE ·
+// The rim reads: LASTWORD · VAULT 0042 · ALIVE · FOR MARIA · VAULT 0042 · ALIVE ·
 export function setSealHeir(seal, name) {
   if (!seal) return;
   seal.dataset.heirName = name;
@@ -28,7 +28,7 @@ export function setSealHeir(seal, name) {
   const NS = 'http://www.w3.org/2000/svg';
   const st = () => { const t = document.createElementNS(NS, 'tspan'); t.setAttribute('class', 'state'); t.textContent = stateWord; return t; };
   tp.textContent = '';
-  tp.append('DEAD MAN’S WALLET · ' + vault + ' · ', st(), ' · FOR ' + name.toUpperCase() + ' · ' + vault + ' · ', st(), ' ·');
+  tp.append('LASTWORD · ' + vault + ' · ', st(), ' · FOR ' + name.toUpperCase() + ' · ' + vault + ' · ', st(), ' ·');
   const no = seal.querySelector('.no');
   if (no && seal.getAttribute('data-state') === 'still') no.textContent = 'TO ' + name.toUpperCase();
 }

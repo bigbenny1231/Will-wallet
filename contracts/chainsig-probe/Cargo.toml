@@ -1,6 +1,6 @@
 [package]
 name = "chainsig-probe"
-description = "Dead Man's Wallet: probe contract proving NEAR Chain Signatures for Base Sepolia + Solana devnet"
+description = "Lastword: probe contract proving NEAR Chain Signatures for Base Sepolia + Solana devnet"
 version = "0.1.0"
 edition = "2021"
 license = "MIT"

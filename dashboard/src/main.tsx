@@ -25,7 +25,7 @@ if (window.location.pathname.startsWith("/pulse")) {
   add("meta", { name: "mobile-web-app-capable", content: "yes" });
   add("meta", { name: "apple-mobile-web-app-status-bar-style", content: "black-translucent" });
   add("meta", { name: "apple-mobile-web-app-title", content: "Pulse" });
-  document.title = "Pulse · Dead Man’s Wallet";
+  document.title = "Pulse · Lastword";
   if ("serviceWorker" in navigator && import.meta.env.PROD) {
     window.addEventListener("load", () => navigator.serviceWorker.register("/sw.js", { scope: "/" }).catch(() => undefined));
   }

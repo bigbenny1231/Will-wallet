@@ -5,7 +5,7 @@
 // The key can only call `heartbeat` on the contract (function-call access key, SPEC 2.7).
 
 export interface Pairing {
-  /** DMW contract account; the pulse key is an access key on this account. */
+  /** Lastword contract account; the pulse key is an access key on this account. */
   contract: string;
   /** Vault id. */
   token: string;

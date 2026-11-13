@@ -28,7 +28,7 @@ export interface SealDrawing {
 
 export function drawSeal(d: SealDrawing): string {
   const c = d.color;
-  const rim = `DEAD MAN’S WALLET · VAULT ${d.id} · ${d.rim.toUpperCase()}`;
+  const rim = `LASTWORD · VAULT ${d.id} · ${d.rim.toUpperCase()}`;
   return (
     `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="400" height="400" viewBox="0 0 400 400">` +
     `<defs><radialGradient id="g"><stop offset="0" stop-color="${c}" stop-opacity="${d.glow}"/><stop offset="1" stop-color="${c}" stop-opacity="0"/></radialGradient>` +

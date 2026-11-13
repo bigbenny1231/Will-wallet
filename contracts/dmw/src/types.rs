@@ -1,4 +1,4 @@
-//! Wire and storage types for Dead Man's Wallet (SPEC §2.1).
+//! Wire and storage types for Lastword (SPEC §2.1).
 
 use near_sdk::json_types::{U128, U64};
 use near_sdk::{near, AccountId, PublicKey};

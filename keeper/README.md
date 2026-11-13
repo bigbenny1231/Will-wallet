@@ -1,6 +1,6 @@
 # keeper
 
-Off-chain half of Dead Man's Wallet: the heartbeat daemon, the settlement keeper, and the demo helpers.
+Off-chain half of Lastword: the heartbeat daemon, the settlement keeper, and the demo helpers.
 Node 22, TypeScript, run through `tsx` (no build step). Spec: [`SPEC.md`](../SPEC.md) section 3.
 
 ```bash

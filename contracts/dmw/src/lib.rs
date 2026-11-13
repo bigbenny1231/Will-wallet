@@ -1,4 +1,4 @@
-//! Dead Man's Wallet (`dmw`): heartbeat-triggered inheritance vaults, each one a
+//! Lastword (`dmw`): heartbeat-triggered inheritance vaults, each one a
 //! NEP-171 "Will NFT". See SPEC.md §2 for the authoritative description.
 
 use near_sdk::collections::{LookupMap, UnorderedMap};
@@ -1710,7 +1710,7 @@ impl Contract {
                 }
                 v.balance -= DAO_BOND;
                 let description = format!(
-                    "Dead Man's Wallet: vault {id} settled; heirs: {}",
+                    "Lastword: vault {id} settled; heirs: {}",
                     v.heirs
                         .iter()
                         .map(|h| format!("{} {}bps", h.account_id, h.bps))

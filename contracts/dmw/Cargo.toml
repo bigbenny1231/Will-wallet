@@ -1,6 +1,6 @@
 [package]
 name = "dmw"
-description = "Dead Man's Wallet: heartbeat-triggered inheritance vaults as Will NFTs on NEAR"
+description = "Lastword: heartbeat-triggered inheritance vaults as Will NFTs on NEAR"
 version = "0.1.0"
 edition = "2021"
 license = "MIT"

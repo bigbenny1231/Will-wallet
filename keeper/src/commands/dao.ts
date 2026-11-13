@@ -28,7 +28,7 @@ export async function daoCreate(
   const daoId = `${o.name}.${FACTORY}`;
   const accountId = o.account || cfg.keeperAccountId;
   const owner = o.owner || accountId || 'OWNER.testnet';
-  const purpose = o.purpose || "Estate settlement proposals from Dead Man's Wallet";
+  const purpose = o.purpose || "Estate settlement proposals from Lastword";
   const manual = nearCliCommand(o.name, owner, purpose);
 
   if (!validDaoName(o.name)) return { ok: false, daoId, hint: `invalid DAO name "${o.name}" (lowercase letters, digits, - and _)` };

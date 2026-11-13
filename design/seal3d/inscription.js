@@ -22,9 +22,9 @@ export function vaultLabel(vaultNo) {
   return v.toUpperCase().replace(/[^A-Z0-9 \-]/g, '').slice(0, 10) || '0042';
 }
 
-// One pass of the rim inscription, exactly as on the 2D seal: DEAD MAN’S WALLET · VAULT 0042 · ALIVE
+// One pass of the rim inscription, exactly as on the 2D seal: LASTWORD · VAULT 0042 · ALIVE
 export function inscriptionText(state, vaultNo) {
-  return `DEAD MAN’S WALLET · VAULT ${vaultLabel(vaultNo)} · ${stateWord(state).toUpperCase()}`;
+  return `LASTWORD · VAULT ${vaultLabel(vaultNo)} · ${stateWord(state).toUpperCase()}`;
 }
 
 // The rim carries the inscription twice, each pass closed with a middle dot, like the SVG textPath.
