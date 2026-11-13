@@ -14,6 +14,6 @@
     { "source": "/manifest.webmanifest", "headers": [{ "key": "Content-Type", "value": "application/manifest+json" }] },
     { "source": "/robots.txt", "headers": [{ "key": "Content-Type", "value": "text/plain; charset=utf-8" }] }
   ],
-  "redirects": [{ "source": "/:path*", "has": [{ "type": "host", "value": "will-wallet.vercel.app" }], "destination": "https://lastwordvault-app.vercel.app/:path*", "permanent": true }],
+  "redirects": [{ "source": "/", "has": [{ "type": "host", "value": "will-wallet.vercel.app" }], "destination": "https://lastwordvault-app.vercel.app/", "permanent": true }, { "source": "/:path*", "has": [{ "type": "host", "value": "will-wallet.vercel.app" }], "destination": "https://lastwordvault-app.vercel.app/:path*", "permanent": true }],
   "rewrites": [{ "source": "/((?!sw\\.js|robots\\.txt|manifest\\.webmanifest|icons/).*)", "destination": "/index.html" }]
 }
