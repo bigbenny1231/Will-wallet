@@ -304,7 +304,9 @@ jobs:
           if grep -rIl 'ed25519:[1-9A-HJ-NP-Za-km-z]\{80,\}' "$OUT" 2>/dev/null; then echo "a private key reached the results; not pushing"; exit 1; fi
           git config user.name "github-actions[bot]"; git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           mv "$OUT" /tmp/results-out
-          git fetch origin ci/testnet-results 2>/dev/null && git checkout -B ci/testnet-results origin/ci/testnet-results || git checkout --orphan ci/testnet-results
+          # -f: the diagram step regenerates tracked PNGs/PDF in the work tree (copies are already in $OUT); a plain
+          # checkout refuses to switch over them and the old `|| --orphan` fallback then pushed a non-fast-forward.
+          if git fetch origin ci/testnet-results 2>/dev/null; then git checkout -f -B ci/testnet-results origin/ci/testnet-results; else git checkout -f --orphan ci/testnet-results; fi
           git rm -rq --cached . 2>/dev/null || true
           find . -mindepth 1 -maxdepth 1 ! -name .git ! -name results -exec rm -rf {} +
           mkdir -p results && rm -rf "results/${{ github.run_id }}" && mv /tmp/results-out "results/${{ github.run_id }}"
