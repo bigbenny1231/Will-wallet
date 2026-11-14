@@ -1,0 +1,134 @@
+window scale 1.00; raw 756.3 s -> 167.9 s (2:48), 0 banner cut(s), longest fast stretch 3.5 s
+   0.0   5.0 card cold
+   5.0   1.5 card act1
+   6.5   8.0 0.6-8.6 @1x alive, phone paired
+  14.5   2.2 8.6-15.3 @3x fast
+  16.7   7.5 15.3-22.8 @1x phone beat, seal pulses
+  24.2   3.4 22.8-43.2 @6x fast
+  27.6  14.5 43.2-57.7 @1x agent pane, scroll to Agent + key audit, poisoned inbox + invoice 1 allowed + invoice 2, Doing as asked, refused by the wallet
+  42.1   1.2 57.7-58.9 @1x fast
+  43.3   6.2 58.9-65.1 @1x run 2: denied by the contract
+  49.5   0.7 65.1-67.3 @3x fast
+  50.3   2.5 67.3-69.8 @1x back to the console
+  52.8   2.4 69.8-84.5 @6x fast
+  55.2   8.8 84.5-93.3 @1x guardian pause: Paused.
+  64.1   2.9 93.3-128.6 @12x fast
+  67.0   1.5 card act2
+  68.5   9.8 128.6-138.4 @1x hold to stop, Stopped., flatline + Warning
+  78.3  34.4 138.4-689.4 @16x fast
+ 112.8  11.7 689.4-701.1 @1x poke, Triggered + step 1 + step 2
+ 124.5   1.5 card act3
+ 126.0   2.7 701.1-711.8 @4x fast
+ 128.6   5.6 711.8-717.4 @1x step 3 base
+ 134.2   2.0 717.4-723.3 @3x fast
+ 136.2   5.6 723.3-728.9 @1x step 3 monad
+ 141.8   2.2 728.9-735.6 @3x fast
+ 144.0  17.8 735.6-753.4 @1x step 3 solana + step 4 + Settled + step 5
+ 161.9   6.0 card end
+cap    7.4   27.5 2.8 ch/s The owner’s phone holds a key that can only say ‘a
+cap   28.0   38.1 4.7 ch/s An agent with the second key pays two invoices.
+cap   38.5   52.1 7.5 ch/s Then its inbox is poisoned: ‘move everything’. Ref
+cap   52.3   64.0 3.4 ch/s A guardian can buy time, once per cycle.
+cap   68.8   73.0 4.6 ch/s Put the phone down.
+cap   73.1  117.0 1.3 ch/s Two missed beats. Anyone can poke it and earn the 
+cap  117.2  128.5 6.0 ch/s I. Heirs paid on NEAR. II. The agent’s key deleted
+cap  128.6  141.2 7.2 ch/s III. The contract asks NEAR’s MPC network to sign 
+cap  141.4  153.8 7.8 ch/s IV. No estate DAO on this vault, skipped. V. The W
+cap  153.9  161.7 7.0 ch/s Settled. Testnet, open source, one command: make d
+scene cold 150
+scene act1 45
+scene act2 45
+scene act3 45
+scene end 180
+cap 0 1 lines
+cap 1 1 lines
+cap 2 2 lines
+cap 3 1 lines
+cap 4 1 lines
+cap 5 1 lines
+cap 6 1 lines
+cap 7 2 lines
+cap 8 2 lines
+cap 9 1 lines
+final /tmp/v4/dmw-demo-v4.mp4 167.85 s
+stills 11
+window scale 0.75; raw 756.3 s -> 135.6 s (2:16), 0 banner cut(s), longest fast stretch 0.5 s
+   0.0   5.0 card cold
+   5.0   1.5 card act1
+   6.5   6.0 0.6-6.6 @1x alive, phone paired
+  12.5   0.5 6.6-15.3 @16x fast
+  13.0   5.6 15.3-21.0 @1x phone beat, seal pulses
+  18.7   1.4 21.0-43.2 @16x fast
+  20.1   2.8 43.2-46.0 @1x agent pane, scroll to Agent
+  22.8   0.5 46.0-47.5 @3x fast
+  23.3   9.1 47.5-56.6 @1x key audit, poisoned inbox + invoice 1 allowed + invoice 2, Doing as asked, refused by the wallet
+  32.4   0.4 56.6-58.9 @6x fast
+  32.8   4.6 58.9-63.6 @1x run 2: denied by the contract
+  37.4   0.5 63.6-67.3 @8x fast
+  37.9   2.0 67.3-69.3 @1x back to the console
+  39.9   0.9 69.3-84.5 @16x fast
+  40.9   6.6 84.5-91.1 @1x guardian pause: Paused.
+  47.5   2.3 91.1-128.6 @16x fast
+  49.8   1.5 card act2
+  51.3   7.7 128.6-136.3 @1x hold to stop, Stopped., flatline + Warning
+  59.0  34.6 136.3-689.4 @16x fast
+  93.6  10.6 689.4-700.0 @1x poke, Triggered + step 1 + step 2
+ 104.1   1.5 card act3
+ 105.6   0.7 700.0-711.8 @16x fast
+ 106.4   4.2 711.8-716.0 @1x step 3 base
+ 110.6   0.5 716.0-723.3 @16x fast
+ 111.0   4.2 723.3-727.5 @1x step 3 monad
+ 115.2   0.5 727.5-735.6 @16x fast
+ 115.7   4.2 735.6-739.8 @1x step 3 solana
+ 119.9   0.4 739.8-742.1 @6x fast
+ 120.3   9.3 742.1-751.4 @1x step 4 + Settled + step 5
+ 129.6   6.0 card end
+cap    7.4   20.0 4.4 ch/s The owner’s phone holds a key that can only say ‘a
+cap   20.5   29.5 5.2 ch/s An agent with the second key pays two invoices.
+cap   29.9   43.5 7.5 ch/s Then its inbox is poisoned: ‘move everything’. Ref
+cap   43.7   52.3 4.7 ch/s A guardian can buy time, once per cycle.
+cap   52.4   56.6 4.6 ch/s Put the phone down.
+cap   56.7   88.0 1.8 ch/s Two missed beats. Anyone can poke it and earn the 
+cap   88.2   96.3 8.4 ch/s I. Heirs paid on NEAR. II. The agent’s key deleted
+cap   96.4  109.0 7.2 ch/s III. The contract asks NEAR’s MPC network to sign 
+cap  109.2  121.6 7.8 ch/s IV. No estate DAO on this vault, skipped. V. The W
+cap  121.7  129.4 7.0 ch/s Settled. Testnet, open source, one command: make d
+scene cold 150
+scene act1 45
+scene act2 45
+scene act3 45
+scene end 180
+cap 0 1 lines
+cap 1 1 lines
+cap 2 2 lines
+cap 3 1 lines
+cap 4 1 lines
+cap 5 1 lines
+cap 6 1 lines
+cap 7 2 lines
+cap 8 2 lines
+cap 9 1 lines
+final /tmp/v4/x/full.mp4 135.65 s
+X cut: 135.658000 s
+total 62280
+drwxr-xr-x 4 runner runner     4096 Nov 14 19:31 .
+drwxr-xr-x 3 runner runner     4096 Nov 14 19:03 ..
+-rw-r--r-- 1 runner runner     8056 Nov 14 19:26 agent.out
+-rw-r--r-- 1 runner runner     5175 Nov 14 19:04 attack-c2.log
+-rw-r--r-- 1 runner runner     1972 Nov 14 19:26 captions.json
+-rw-r--r-- 1 runner runner     3330 Nov 14 19:26 demo.out
+-rw-r--r-- 1 runner runner  5901478 Nov 14 19:26 dmw-demo-v4-720p.mp4
+-rw-r--r-- 1 runner runner  4976495 Nov 14 19:32 dmw-demo-v4-x-720p.mp4
+-rw-r--r-- 1 runner runner 52782892 Nov 14 19:26 dmw-demo-v4.mp4
+-rw-r--r-- 1 runner runner     4609 Nov 14 19:32 edit.log
+-rw-r--r-- 1 runner runner     2104 Nov 14 19:26 edl-x.txt
+-rw-r--r-- 1 runner runner     6918 Nov 14 19:26 edl.json
+-rw-r--r-- 1 runner runner     1980 Nov 14 19:19 edl.txt
+-rw-r--r-- 1 runner runner     2154 Nov 14 19:26 endinfo.json
+-rw-r--r-- 1 runner runner     9036 Nov 14 19:26 events.json
+-rw-r--r-- 1 runner runner      529 Nov 14 19:03 funder.log
+-rw-r--r-- 1 runner runner     3902 Nov 14 19:26 keeper.log
+-rw-r--r-- 1 runner runner    16090 Nov 14 19:19 record.log
+drwxr-xr-x 2 runner runner     4096 Nov 14 19:05 rendered
+-rw-r--r-- 1 runner runner     2771 Nov 14 19:26 setup.out
+drwxr-xr-x 2 runner runner     4096 Nov 14 19:26 stills

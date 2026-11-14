@@ -1,0 +1,29 @@
+19:05:57 fund      funding payout sources from 0xfB76Db2A00a9E5E6fc19d62aA7A4BfE6575ff764 (Base, Monad) and Fy2LUVqerdY71u18TH1eY1EiB6ZEAXYNt7u4WSgdp2BN (Solana), capped by FUND_CAP_* and FUND_RUN_CAP_*
+19:05:57 keeper    watching dmw-26a506.testnet via near:dmw-keeper-89d05f3b.testnet→dmw-26a506.testnet, poll every 5s
+19:05:57 keeper    only vault 4
+19:09:38 state     vault 4: Alive → Warning
+19:18:00 poke      vault 4 → Triggered  https://testnet.nearblocks.io/txns/HLycj9dmZqUxYAp2kJsuSr1oHR7gwZShaNYvJ947PtwB
+19:18:00 state     vault 4: Warning → Triggered
+19:18:03 step      vault 4 step 1/5  https://testnet.nearblocks.io/txns/5zsdXzzkGMo1Uk4uGGrn9cMRy5JDJiXxACWNtw5e6SBN
+19:18:07 step      vault 4 step 2/5  https://testnet.nearblocks.io/txns/2r8LFJZ6Lcjui5mGC25tpQHaoSUipkQrtdeEHXD1zGYn
+19:18:09 fund      vault 4 base source 0x3a04fA8a96CB6EC643aD8e6771F0AEaf49F858Fa (payout #0) topped up by 0.0005011 ETH to 0.0005011 ETH  https://sepolia.basescan.org/tx/0xb15aab0a9a6902d6dcce1d7b2e4d26fb42508104fe29babf8b57318db8e09537
+19:18:12 fund      vault 4 monad source 0xBc20bDe46A526d7651B673823d9b7f6E073d76d4 (payout #1) topped up by 0.0302 MON to 0.0302 MON  https://testnet.monadexplorer.com/tx/0x94180b97875724a49dbaa400c3c78a5763b2e3f45ac47a62faff18b2f99d5acd
+19:18:14 fund      vault 4 solana source 2WnHAi6eF8QTDAgkGFszsU7e68fzuRjgJyVpyGMeczya (payout #2) topped up by 0.010005 SOL to 0.010005 SOL  https://explorer.solana.com/tx/4tHTnd5513RhZmRh3YiNMJGLF7bmrXNq7abM7qSA6zWhvYoaCE8KWDMMuscHA92ibuxFAidtiZGdRzHq4MxxtnZp?cluster=devnet
+19:18:22 step      vault 4 step 3/5 (base #0)  https://testnet.nearblocks.io/txns/Bzj6tt6WMXLqixgeG8XRUyNbgoLuNrKE56p5qFaZCKia
+19:18:22 relay     vault 4 payout #0 base sent  https://sepolia.basescan.org/tx/0x9eef8be2d052c2bcb8b0d369cc878bc3fae65b05bec500722f6365157e352ea0
+19:18:25 mark      vault 4 mark_broadcast #0  https://testnet.nearblocks.io/txns/Gf8q2L2Rqfr6w5ULgabaZMMmynMn3BFJ2sLNCbqBVBJu
+19:18:25 fund      vault 4 monad source 0xBc20bDe46A526d7651B673823d9b7f6E073d76d4 (payout #1) holds 0.0302 MON, needs 0.0302 MON: enough
+19:18:25 fund      vault 4 solana source 2WnHAi6eF8QTDAgkGFszsU7e68fzuRjgJyVpyGMeczya (payout #2) holds 0.010005 SOL, needs 0.010005 SOL: enough
+19:18:33 step      vault 4 step 3/5 (monad #1)  https://testnet.nearblocks.io/txns/eZgHL8eizvMSy71NEuc4jnqjVEYU9FXare3FspMyu9f
+19:18:33 relay     vault 4 payout #1 monad sent  https://testnet.monadexplorer.com/tx/0x49485735526a6ea2e18991f1478ca86ad80c42c984024654b4cf4e44df2c9f94
+19:18:36 mark      vault 4 mark_broadcast #1  https://testnet.nearblocks.io/txns/9heGgb1PRfDtbTzy5yiyjG2h11f7h43XEaPDkSdfT4ut
+19:18:37 fund      vault 4 solana source 2WnHAi6eF8QTDAgkGFszsU7e68fzuRjgJyVpyGMeczya (payout #2) holds 0.010005 SOL, needs 0.010005 SOL: enough
+19:18:46 step      vault 4 step 3/5 (solana #2)  https://testnet.nearblocks.io/txns/2fTnjFas56ncoAvGhLYW99jqtmF6NCuTB5YNwnVu2ZPJ
+19:18:46 relay     vault 4 payout #2 solana sent  https://explorer.solana.com/tx/Qbkw2phdwUtmGBmyvEa2srcUGgfZHAB6gzw9wfwSieJbkjCmBXhKdBfQDRBT6pvYnuo87kKEXCwwiRtN99Mk1jH?cluster=devnet
+19:18:49 mark      vault 4 mark_broadcast #2  https://testnet.nearblocks.io/txns/EjDhDouUvTZb7LzmPvci8PBkwv6v2Y8KRYBL4Su72K8x
+19:18:52 step      vault 4 step 4/5  https://testnet.nearblocks.io/txns/DiYmMdA9bREw3fkcq5fYrtmbmZiSwZaKRkKcW1yZpCKR
+19:18:56 step      vault 4 step 5/5  https://testnet.nearblocks.io/txns/uGLuiJ7rNBzaDBqvfenHRXYWsZkHSfoQkAmzebPRMDP
+19:18:56 state     vault 4: Triggered → Settled
+19:19:01 verify    vault 4 payout #0 base 0x9eef8be2d052c2bcb8b0d369cc878bc3fae65b05bec500722f6365157e352ea0 is on chain
+19:19:01 verify    vault 4 payout #1 monad 0x49485735526a6ea2e18991f1478ca86ad80c42c984024654b4cf4e44df2c9f94 is on chain
+19:19:02 verify    vault 4 payout #2 solana Qbkw2phdwUtmGBmyvEa2srcUGgfZHAB6gzw9wfwSieJbkjCmBXhKdBfQDRBT6pvYnuo87kKEXCwwiRtN99Mk1jH is on chain

@@ -1,0 +1,20 @@
+== setup v4: vault 4 owner dmw-demo-owner-13231b.testnet on dmw-26a506.testnet
+tx https://testnet.nearblocks.io/txns/CVgBqt9XdY6x5asSFfsDuzz6rvwfGJEPaZVKUPh6fF6G
+  log: EVENT_JSON:{"standard":"dmw","version":"1.0.0","event":"deposit","data":{"token_id":"4","amount":"1500000000000000000000000","from":"dmw-demo-owner-13231b.testnet"}}
+  result: "3450000000000000000000000"
+tx https://testnet.nearblocks.io/txns/FS1Ryqe8AHH5aFoSshTtmUvmPV4CnmFjqcgrbvCW8SYo
+  log: EVENT_JSON:{"standard":"dmw","version":"1.0.0","event":"key_add_requested","data":{"token_id":"4","public_key":"ed25519:7EoMWYGJefSUvz5WZv6sUA3UtbDzGMG12hxLSuSEQAp5","kind":"Pulse"}}
+  log: EVENT_JSON:{"standard":"dmw","version":"1.0.0","event":"key_added","data":{"token_id":"4","public_key":"ed25519:7EoMWYGJefSUvz5WZv6sUA3UtbDzGMG12hxLSuSEQAp5","kind":"Pulse","method":"heartbeat"}}
+  result: true
+tx https://testnet.nearblocks.io/txns/9oVUyUVgSZY9tkTHDeddc8MjjHiVq8XJHtD7phrXFr34
+  log: EVENT_JSON:{"standard":"dmw","version":"1.0.0","event":"foreign_set","data":{"token_id":"4","foreign":[{"chain":"base","to":"0xfd151ad02f573689f235f56059ce6e2f3b64dd89","amount":"500000000000000","from_address":"0x3a04fA8a96CB6EC643aD8e6771F0AEaf49F858Fa","status":"pending","signed_tx":null,"tx_hash":null},{"chain":"monad","to":"0xfd151ad02f573689f235f56059ce6e2f3b64dd89","amount":"10000000000000000","from_address":"0xBc20bDe46A526d7651B673823d9b7f6E073d76d4","status":"pending","signed_tx":null,"tx_hash":null},{"chain":"solana","to":"HpEHvLpa9pMNiDCQDnVMSomCx4bmJuXX8sKqtKGg2uWr","amount":"10000000","from_address":"2WnHAi6eF8QTDAgkGFszsU7e68fzuRjgJyVpyGMeczya","status":"pending","signed_tx":null,"tx_hash":null}]}}
+  result: (empty)
+  base 0x3a04fA8a96CB6EC643aD8e6771F0AEaf49F858Fa  monad 0xBc20bDe46A526d7651B673823d9b7f6E073d76d4  solana 2WnHAi6eF8QTDAgkGFszsU7e68fzuRjgJyVpyGMeczya
+funder wallet (derived from KEEPER_SEED; fund these addresses, the keys are never printed)
+  Base Sepolia   0xfB76Db2A00a9E5E6fc19d62aA7A4BfE6575ff764  0.0051 ETH  https://sepolia.basescan.org/address/0xfB76Db2A00a9E5E6fc19d62aA7A4BfE6575ff764
+  Monad testnet  0xfB76Db2A00a9E5E6fc19d62aA7A4BfE6575ff764  5 MON  https://testnet.monadexplorer.com/address/0xfB76Db2A00a9E5E6fc19d62aA7A4BfE6575ff764
+  Solana devnet  Fy2LUVqerdY71u18TH1eY1EiB6ZEAXYNt7u4WSgdp2BN  0.5 SOL  https://explorer.solana.com/address/Fy2LUVqerdY71u18TH1eY1EiB6ZEAXYNt7u4WSgdp2BN?cluster=devnet
+  caps: per top-up 0.002 ETH / 0.05 MON / 0.02 SOL; per run 0.01 ETH / 0.25 MON / 0.1 SOL
+tx https://testnet.nearblocks.io/txns/HLTkG8WFNGJEyPnxAAL2QjtDBJPU3o3MYz4byZdTApVW
+  log: EVENT_JSON:{"standard":"dmw","version":"1.0.0","event":"guardian_set","data":{"token_id":"4","guardian_id":"dmw-demo-guardian-67d7.testnet","max_pause_s":600}}
+  result: (empty)

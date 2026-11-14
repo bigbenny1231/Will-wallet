@@ -1,0 +1,329 @@
+{
+  "token_id": "4",
+  "owner_id": "dmw-demo-sarah-67d7.testnet",
+  "state": "Settled",
+  "heartbeat_interval_s": 60,
+  "grace_missed": 1,
+  "last_beat_ms": 1794683314821,
+  "warning_at_ms": 1794683374821,
+  "trigger_at_ms": 1794683876585,
+  "balance": "100000000000000000000000",
+  "bounty": "50000000000000000000000",
+  "heirs": [
+    {
+      "account_id": "dmw-demo-sarah-67d7.testnet",
+      "bps": 6000
+    },
+    {
+      "account_id": "dmw-demo-ben-67d7.testnet",
+      "bps": 4000
+    }
+  ],
+  "foreign": [
+    {
+      "chain": "base",
+      "to": "0xfd151ad02f573689f235f56059ce6e2f3b64dd89",
+      "amount": "500000000000000",
+      "from_address": "0x3a04fa8a96cb6ec643ad8e6771f0aeaf49f858fa",
+      "status": "broadcast",
+      "signed_tx": "0x02f87283014a3480830f424083a7d8c082c35094fd151ad02f573689f235f56059ce6e2f3b64dd898701c6bf5263400080c080a031989741d800aed1da197e938cf897f7cb236b9bd700514aa484ec46786801a7a03597177ae7ac39f33a712312846d827004e3b7da9a49693217891fad348147ca",
+      "tx_hash": "0x9eef8be2d052c2bcb8b0d369cc878bc3fae65b05bec500722f6365157e352ea0"
+    },
+    {
+      "chain": "monad",
+      "to": "0xfd151ad02f573689f235f56059ce6e2f3b64dd89",
+      "amount": "10000000000000000",
+      "from_address": "0xbc20bde46a526d7651b673823d9b7f6e073d76d4",
+      "status": "broadcast",
+      "signed_tx": "0x02f87482279f808477359400852f0823640082c35094fd151ad02f573689f235f56059ce6e2f3b64dd89872386f26fc1000080c001a0bb913418cbfd18a11d66b44adb1d548f36c25c1a7c1173d14bf4e69abd34e374a07f3d778e034895e73a58078dd04f3bfa39db8ce7091e1ecdc25631203f263ddc",
+      "tx_hash": "0x49485735526a6ea2e18991f1478ca86ad80c42c984024654b4cf4e44df2c9f94"
+    },
+    {
+      "chain": "solana",
+      "to": "HpEHvLpa9pMNiDCQDnVMSomCx4bmJuXX8sKqtKGg2uWr",
+      "amount": "10000000",
+      "from_address": "2WnHAi6eF8QTDAgkGFszsU7e68fzuRjgJyVpyGMeczya",
+      "status": "broadcast",
+      "signed_tx": "ARRZ4m+dDduUN7LtJXEwQ6fA/CHP+x2yYbTKOJg5/vg5uMafKvDGmGplOocE14pco73RTY94hVZBSiJYxC765gwBAAEDFny6K/StPsg8+P1e3o6gWqmbDreHtVvWxMKlAhCtCd351FFeHuvjifNXU/G1oU+ZRAK9lsHfzPwmyToI3RfaCwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAC3rVLhpCAQr0MynPa4cHYjAJGbZvXgHPOv7tmKUZD3kBAgIAAQwCAAAAgJaYAAAAAAA=",
+      "tx_hash": "Qbkw2phdwUtmGBmyvEa2srcUGgfZHAB6gzw9wfwSieJbkjCmBXhKdBfQDRBT6pvYnuo87kKEXCwwiRtN99Mk1jH"
+    }
+  ],
+  "pulse_keys": [],
+  "agent_keys": [],
+  "policy": {
+    "per_tx_max": "500000000000000000000000",
+    "daily_max": "1000000000000000000000000",
+    "allowlist": [
+      "dmw-demo-api-67d7.testnet"
+    ]
+  },
+  "daily_spent": "250000000000000000000000",
+  "daily_window_start_ms": 1794683152263,
+  "spends": [
+    {
+      "ms": 1794683152263,
+      "amount": "50000000000000000000000"
+    },
+    {
+      "ms": 1794683239030,
+      "amount": "120000000000000000000000"
+    },
+    {
+      "ms": 1794683242146,
+      "amount": "80000000000000000000000"
+    }
+  ],
+  "dao_id": null,
+  "dao_proposal_id": null,
+  "step": 6,
+  "foreign_index": 3,
+  "foreign_inflight": false,
+  "created_ms": 1794683137733,
+  "log": [
+    {
+      "ms": 1794683137733,
+      "event": "vault_created",
+      "detail": "dmw-demo-owner-13231b.testnet",
+      "seq": 0
+    },
+    {
+      "ms": 1794683140709,
+      "event": "key_add_requested",
+      "detail": "heartbeat ed25519:AGHkNv2x8kdSm22hegoUCj3x34wfCTFgf8RMRxgukt9i",
+      "seq": 1
+    },
+    {
+      "ms": 1794683141923,
+      "event": "key_added",
+      "detail": "heartbeat ed25519:AGHkNv2x8kdSm22hegoUCj3x34wfCTFgf8RMRxgukt9i",
+      "seq": 2
+    },
+    {
+      "ms": 1794683144970,
+      "event": "key_add_requested",
+      "detail": "agent_pay ed25519:AB5DxVYTnHtbYr4vUy7CTreg1iAsb7QpmGWqkMZpptsV",
+      "seq": 3
+    },
+    {
+      "ms": 1794683146157,
+      "event": "key_added",
+      "detail": "agent_pay ed25519:AB5DxVYTnHtbYr4vUy7CTreg1iAsb7QpmGWqkMZpptsV",
+      "seq": 4
+    },
+    {
+      "ms": 1794683148651,
+      "event": "heartbeat",
+      "detail": "pulse_key",
+      "seq": 5
+    },
+    {
+      "ms": 1794683149890,
+      "event": "foreign_set",
+      "detail": "2 payouts",
+      "seq": 6
+    },
+    {
+      "ms": 1794683152263,
+      "event": "agent_pay_allowed",
+      "detail": "dmw-demo-api-67d7.testnet 50000000000000000000000",
+      "seq": 7
+    },
+    {
+      "ms": 1794683155332,
+      "event": "agent_pay_denied",
+      "detail": "receiver_not_allowlisted stranger-1b157789.testnet 1000000000000000000000000",
+      "seq": 8
+    },
+    {
+      "ms": 1794683158847,
+      "event": "deposit",
+      "detail": "1500000000000000000000000",
+      "seq": 9
+    },
+    {
+      "ms": 1794683161231,
+      "event": "key_add_requested",
+      "detail": "heartbeat ed25519:7EoMWYGJefSUvz5WZv6sUA3UtbDzGMG12hxLSuSEQAp5",
+      "seq": 10
+    },
+    {
+      "ms": 1794683162611,
+      "event": "key_added",
+      "detail": "heartbeat ed25519:7EoMWYGJefSUvz5WZv6sUA3UtbDzGMG12hxLSuSEQAp5",
+      "seq": 11
+    },
+    {
+      "ms": 1794683166784,
+      "event": "foreign_set",
+      "detail": "3 payouts",
+      "seq": 12
+    },
+    {
+      "ms": 1794683168623,
+      "event": "heartbeat",
+      "detail": "pulse_key",
+      "seq": 13
+    },
+    {
+      "ms": 1794683173483,
+      "event": "guardian_set",
+      "detail": "dmw-demo-guardian-67d7.testnet 600s",
+      "seq": 14
+    },
+    {
+      "ms": 1794683185051,
+      "event": "heartbeat",
+      "detail": "pulse_key",
+      "seq": 15
+    },
+    {
+      "ms": 1794683206483,
+      "event": "heartbeat",
+      "detail": "pulse_key",
+      "seq": 16
+    },
+    {
+      "ms": 1794683228120,
+      "event": "heartbeat",
+      "detail": "pulse_key",
+      "seq": 17
+    },
+    {
+      "ms": 1794683239030,
+      "event": "agent_pay_allowed",
+      "detail": "dmw-demo-api-67d7.testnet 120000000000000000000000",
+      "seq": 18
+    },
+    {
+      "ms": 1794683242146,
+      "event": "agent_pay_allowed",
+      "detail": "dmw-demo-api-67d7.testnet 80000000000000000000000",
+      "seq": 19
+    },
+    {
+      "ms": 1794683249320,
+      "event": "agent_pay_denied",
+      "detail": "receiver_not_allowlisted stranger.testnet 2250000000000000000000000",
+      "seq": 20
+    },
+    {
+      "ms": 1794683249908,
+      "event": "heartbeat",
+      "detail": "pulse_key",
+      "seq": 21
+    },
+    {
+      "ms": 1794683271196,
+      "event": "heartbeat",
+      "detail": "pulse_key",
+      "seq": 22
+    },
+    {
+      "ms": 1794683276585,
+      "event": "paused",
+      "detail": "guardian dmw-demo-guardian-67d7.testnet until 1794683876585",
+      "seq": 23
+    },
+    {
+      "ms": 1794683292936,
+      "event": "heartbeat",
+      "detail": "pulse_key",
+      "seq": 24
+    },
+    {
+      "ms": 1794683314821,
+      "event": "heartbeat",
+      "detail": "pulse_key",
+      "seq": 25
+    },
+    {
+      "ms": 1794683878335,
+      "event": "triggered",
+      "detail": "by dmw-keeper-89d05f3b.testnet, bounty 50000000000000000000000",
+      "seq": 26
+    },
+    {
+      "ms": 1794683881875,
+      "event": "step_1",
+      "detail": "dmw-demo-sarah-67d7.testnet 1.26 NEAR, dmw-demo-ben-67d7.testnet 0.84 NEAR",
+      "seq": 27
+    },
+    {
+      "ms": 1794683885543,
+      "event": "step_2",
+      "detail": "3 keys deleted",
+      "seq": 28
+    },
+    {
+      "ms": 1794683901355,
+      "event": "foreign_signed",
+      "detail": "#0 signed 0x9eef8be2d052c2bcb8b0d369cc878bc3fae65b05bec500722f6365157e352ea0",
+      "seq": 29
+    },
+    {
+      "ms": 1794683903654,
+      "event": "foreign_broadcast",
+      "detail": "#0 0x9eef8be2d052c2bcb8b0d369cc878bc3fae65b05bec500722f6365157e352ea0",
+      "seq": 30
+    },
+    {
+      "ms": 1794683912828,
+      "event": "foreign_signed",
+      "detail": "#1 signed 0x49485735526a6ea2e18991f1478ca86ad80c42c984024654b4cf4e44df2c9f94",
+      "seq": 31
+    },
+    {
+      "ms": 1794683915270,
+      "event": "foreign_broadcast",
+      "detail": "#1 0x49485735526a6ea2e18991f1478ca86ad80c42c984024654b4cf4e44df2c9f94",
+      "seq": 32
+    },
+    {
+      "ms": 1794683924993,
+      "event": "foreign_signed",
+      "detail": "#2 signed Qbkw2phdwUtmGBmyvEa2srcUGgfZHAB6gzw9wfwSieJbkjCmBXhKdBfQDRBT6pvYnuo87kKEXCwwiRtN99Mk1jH",
+      "seq": 33
+    },
+    {
+      "ms": 1794683924993,
+      "event": "step_3",
+      "detail": "foreign payouts done",
+      "seq": 34
+    },
+    {
+      "ms": 1794683928034,
+      "event": "foreign_broadcast",
+      "detail": "#2 Qbkw2phdwUtmGBmyvEa2srcUGgfZHAB6gzw9wfwSieJbkjCmBXhKdBfQDRBT6pvYnuo87kKEXCwwiRtN99Mk1jH",
+      "seq": 35
+    },
+    {
+      "ms": 1794683931126,
+      "event": "step_4",
+      "detail": "no dao; skipped",
+      "seq": 36
+    },
+    {
+      "ms": 1794683934112,
+      "event": "step_5",
+      "detail": "will nft -> dmw-demo-sarah-67d7.testnet",
+      "seq": 37
+    },
+    {
+      "ms": 1794683934112,
+      "event": "settled",
+      "detail": "dmw-demo-sarah-67d7.testnet",
+      "seq": 38
+    }
+  ],
+  "guardian_id": "dmw-demo-guardian-67d7.testnet",
+  "max_pause_s": 600,
+  "paused_until_ms": 1794683876585,
+  "derivation_paths": {
+    "base": "base-4-1197d7458f956664",
+    "monad": "monad-4-1197d7458f956664",
+    "solana": "sol-4-1197d7458f956664"
+  },
+  "keeper_id": null,
+  "storage_bytes": 5445,
+  "storage_deposit": "73220000000000000000000"
+}

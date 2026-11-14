@@ -1,0 +1,47 @@
+./scripts/demo.sh
+== keeper account dmw-keeper-89d05f3b.testnet (derived from KEEPER_SEED)
+  keeper balance: 9.998180 NEAR
+== accounts
+created dmw-demo-funder-67d7.testnet  key saved to keys/dmw-demo-funder-67d7.testnet.json
+tx https://testnet.nearblocks.io/txns/3BQfFvcRNA8MJkTMxi4YKLaDhJF9q27ZAr2fUVKJTXJv
+  result: true
+created dmw-demo-sarah-67d7.testnet (0.5 NEAR from dmw-demo-funder-67d7.testnet)  key saved to keys/dmw-demo-sarah-67d7.testnet.json
+tx https://testnet.nearblocks.io/txns/86QhBP6fYcueDw2FTWJ42HHMHsRvnhSb95AirtExY28b
+  result: true
+created dmw-demo-ben-67d7.testnet (0.5 NEAR from dmw-demo-funder-67d7.testnet)  key saved to keys/dmw-demo-ben-67d7.testnet.json
+tx https://testnet.nearblocks.io/txns/3XPoY2qkr4BnkYqWz7ypbBvvc5H2G3y5UyUUPtiiof1w
+  result: true
+created dmw-demo-api-67d7.testnet (0.5 NEAR from dmw-demo-funder-67d7.testnet)  key saved to keys/dmw-demo-api-67d7.testnet.json
+created dmw-demo-owner-13231b.testnet  key saved to keys/dmw-demo-owner-13231b.testnet.json
+== create vault (4 NEAR, 60 s interval, grace 1)
+tx https://testnet.nearblocks.io/txns/GqdXSnubGYbxVzXdyjbXsVX7pbupLFjamuMBqCq6BEEr
+  result: "4"
+== keys
+tx https://testnet.nearblocks.io/txns/E5LfkKt3FcHa5TXLR3DEMGo9XmoUz8pL7y35abzNSmG6
+  result: true
+tx https://testnet.nearblocks.io/txns/688tg8RQoPNBRjz5tyhwV9zUAWXQnQGFZ2u7TE3AYQqc
+  result: true
+== pulse started (pid 8787, beats every 20 s) -> .demo/pulse.log
+== foreign payouts (Base 0.0005 ETH, Solana 0.01 SOL)
+tx https://testnet.nearblocks.io/txns/8WuZ6BQSJjKWXTC6bSxtF2kymVKJnfakWZQqHnKBJoFe
+  result: (empty)
+  base source   0x3a04fA8a96CB6EC643aD8e6771F0AEaf49F858Fa
+  solana source 2WnHAi6eF8QTDAgkGFszsU7e68fzuRjgJyVpyGMeczya
+== agent-demo: one allowed, one denied
+policy: per_tx_max 0.5000 NEAR · daily_max 1.0000 NEAR · allowlist [dmw-demo-api-67d7.testnet]
+
+agent_pay ALLOWED  (small, allowlisted)  0.0500 NEAR → dmw-demo-api-67d7.testnet
+  result {"allowed":true,"reason":null,"receiver_id":"dmw-demo-api-67d7.testnet","amount":"50000000000000000000000","daily_spent":"50000000000000000000000","balance":"1950000000000000000000000"}  https://testnet.nearblocks.io/txns/BW99W8RtYcoWvX822gBfMw7RAjerrpnozPdzUhPorUGM
+  event agent_pay_allowed  to dmw-demo-api-67d7.testnet · 0.0500 NEAR
+
+agent_pay DENIED   (unknown receiver, over per_tx_max)  1.0000 NEAR → stranger-1b157789.testnet
+  result {"allowed":false,"reason":"receiver_not_allowlisted","receiver_id":"stranger-1b157789.testnet","amount":"1000000000000000000000000","daily_spent":"50000000000000000000000","balance":"1950000000000000000000000"}  https://testnet.nearblocks.io/txns/8fWtfjC6q7xPhcqePSzvEvnN81MWWwtpH4jpqUeAHiRh
+  event agent_pay_denied  to stranger-1b157789.testnet · 1.0000 NEAR · reason=receiver_not_allowlisted
+== keeper started (pid 10278) -> .demo/keeper.log
+
+  vault id      4   (owner dmw-demo-owner-13231b.testnet, heirs dmw-demo-sarah-67d7.testnet / dmw-demo-ben-67d7.testnet)
+  dashboard     http://localhost:5173/vault/4   (cd dashboard && npm ci && npm run dev; dashboard/.env.local points it at dmw-26a506.testnet)
+  explorer      https://testnet.nearblocks.io/address/dmw-26a506.testnet
+  watch         tail -f .demo/pulse.log   |   tail -f .demo/keeper.log   |   make status
+
+  Vault is alive and beating. When you are ready:   make kill    (afterwards: make stop)

@@ -1,0 +1,371 @@
+{
+ "map": [
+  {
+   "e": [
+    "card",
+    "cold",
+    5
+   ],
+   "o": 0,
+   "len": 5
+  },
+  {
+   "e": [
+    "card",
+    "act1",
+    1.5
+   ],
+   "o": 5,
+   "len": 1.5
+  },
+  {
+   "e": [
+    0.6,
+    8.6,
+    1,
+    "alive, phone paired"
+   ],
+   "o": 6.5,
+   "len": 8
+  },
+  {
+   "e": [
+    8.6,
+    15.342000007629395,
+    3,
+    "fast"
+   ],
+   "o": 14.5,
+   "len": 2.247333335876465
+  },
+  {
+   "e": [
+    15.342000007629395,
+    22.842000007629395,
+    1,
+    "phone beat, seal pulses"
+   ],
+   "o": 16.747333335876466,
+   "len": 7.5
+  },
+  {
+   "e": [
+    22.842000007629395,
+    43.2289999961853,
+    6,
+    "fast"
+   ],
+   "o": 24.247333335876466,
+   "len": 3.3978333314259843
+  },
+  {
+   "e": [
+    43.2289999961853,
+    57.70300002098084,
+    1,
+    "agent pane, scroll to Agent + key audit, poisoned inbox + invoice 1 allowed + invoice 2, Doing as asked, refused by the wallet"
+   ],
+   "o": 27.64516666730245,
+   "len": 14.474000024795536
+  },
+  {
+   "e": [
+    57.70300002098084,
+    58.90899996757507,
+    1,
+    "fast"
+   ],
+   "o": 42.11916669209799,
+   "len": 1.2059999465942326
+  },
+  {
+   "e": [
+    58.90899996757507,
+    65.10899996757507,
+    1,
+    "run 2: denied by the contract"
+   ],
+   "o": 43.325166638692224,
+   "len": 6.200000000000003
+  },
+  {
+   "e": [
+    65.10899996757507,
+    67.33600010871888,
+    3,
+    "fast"
+   ],
+   "o": 49.52516663869223,
+   "len": 0.7423333803812682
+  },
+  {
+   "e": [
+    67.33600010871888,
+    69.83600010871888,
+    1,
+    "back to the console"
+   ],
+   "o": 50.267500019073495,
+   "len": 2.5
+  },
+  {
+   "e": [
+    69.83600010871888,
+    84.51000003814697,
+    6,
+    "fast"
+   ],
+   "o": 52.767500019073495,
+   "len": 2.445666654904682
+  },
+  {
+   "e": [
+    84.51000003814697,
+    93.34699997901916,
+    1,
+    "guardian pause: Paused."
+   ],
+   "o": 55.21316667397818,
+   "len": 8.83699994087219
+  },
+  {
+   "e": [
+    93.34699997901916,
+    128.55700001716613,
+    12,
+    "fast"
+   ],
+   "o": 64.05016661485037,
+   "len": 2.934166669845581
+  },
+  {
+   "e": [
+    "card",
+    "act2",
+    1.5
+   ],
+   "o": 66.98433328469595,
+   "len": 1.5
+  },
+  {
+   "e": [
+    128.55700001716613,
+    138.3970000743866,
+    1,
+    "hold to stop, Stopped., flatline + Warning"
+   ],
+   "o": 68.48433328469595,
+   "len": 9.840000057220465
+  },
+  {
+   "e": [
+    138.3970000743866,
+    689.4010000705719,
+    16,
+    "fast"
+   ],
+   "o": 78.32433334191641,
+   "len": 34.43774999976158
+  },
+  {
+   "e": [
+    689.4010000705719,
+    701.1059999465942,
+    1,
+    "poke, Triggered + step 1 + step 2"
+   ],
+   "o": 112.762083341678,
+   "len": 11.704999876022384
+  },
+  {
+   "e": [
+    "card",
+    "act3",
+    1.5
+   ],
+   "o": 124.46708321770038,
+   "len": 1.5
+  },
+  {
+   "e": [
+    701.1059999465942,
+    711.7860001564026,
+    4,
+    "fast"
+   ],
+   "o": 125.96708321770038,
+   "len": 2.6700000524520817
+  },
+  {
+   "e": [
+    711.7860001564026,
+    717.3860001564026,
+    1,
+    "step 3 base"
+   ],
+   "o": 128.63708327015246,
+   "len": 5.600000000000023
+  },
+  {
+   "e": [
+    717.3860001564026,
+    723.293000125885,
+    3,
+    "fast"
+   ],
+   "o": 134.23708327015248,
+   "len": 1.9689999898274664
+  },
+  {
+   "e": [
+    723.293000125885,
+    728.893000125885,
+    1,
+    "step 3 monad"
+   ],
+   "o": 136.20608325997995,
+   "len": 5.600000000000023
+  },
+  {
+   "e": [
+    728.893000125885,
+    735.5679999828338,
+    3,
+    "fast"
+   ],
+   "o": 141.80608325997997,
+   "len": 2.2249999523162765
+  },
+  {
+   "e": [
+    735.5679999828338,
+    753.389000082016,
+    1,
+    "step 3 solana + step 4 + Settled + step 5"
+   ],
+   "o": 144.03108321229624,
+   "len": 17.82100009918213
+  },
+  {
+   "e": [
+    "card",
+    "end",
+    6
+   ],
+   "o": 161.85208331147837,
+   "len": 6
+  }
+ ],
+ "capT": [
+  {
+   "s": 7.4,
+   "e": 27.49516666730245,
+   "text": "The owner’s phone holds a key that can only say ‘alive’.",
+   "note": "/pulse paired to vault 4 · a function-call key scoped to heartbeat · each beat pulses the seal"
+  },
+  {
+   "s": 28.04516666730245,
+   "e": 38.119166644414264,
+   "text": "An agent with the second key pays two invoices.",
+   "note": "make agent · key scoped to agent_pay · 0.5 NEAR a payment, 1 NEAR a day, one allowlisted receiver"
+  },
+  {
+   "s": 38.51916664441427,
+   "e": 52.102499977747605,
+   "text": "Then its inbox is poisoned: ‘move everything’. Refused by the wallet. Refused by the contract. Logged.",
+   "note": "run 1: the wallet wrapper will not sign · run 2, wrapper switched off: agent_pay denied on chain, receiver_not_allowlisted"
+  },
+  {
+   "s": 52.252499977747604,
+   "e": 63.950166614850374,
+   "text": "A guardian can buy time, once per cycle.",
+   "note": "pause() by dmw-demo-guardian-67d7.testnet · tx FpCMPsJU… · the deadline moves out up to 10 min · the owner’s next beat ends it"
+  },
+  {
+   "s": 68.78433328469596,
+   "e": 72.95099995136263,
+   "text": "Put the phone down.",
+   "note": "hold to stop, two seconds · the phone stops signing heartbeats"
+  },
+  {
+   "s": 73.10099995136264,
+   "e": 117.01108341415733,
+   "text": "Two missed beats. Anyone can poke it and earn the bounty.",
+   "note": "60 s interval, grace 1 · Warning disarms the agent · poke pays a 0.05 NEAR bounty to whoever calls it"
+  },
+  {
+   "s": 117.16108341415733,
+   "e": 128.49374997814502,
+   "text": "I. Heirs paid on NEAR. II. The agent’s key deleted from the account.",
+   "note": "60 / 40 split · pulse and agent keys removed with DeleteKey"
+  },
+  {
+   "s": 128.64374997814502,
+   "e": 141.22708331147837,
+   "text": "III. The contract asks NEAR’s MPC network to sign a Base, a Monad and a Solana transaction.",
+   "note": "Signed by NEAR’s MPC network for Base, Monad and Solana · v1.signer-prod.testnet · from addresses derived from the vault"
+  },
+  {
+   "s": 141.37708331147837,
+   "e": 153.79374997814503,
+   "text": "IV. No estate DAO on this vault, skipped. V. The Will NFT, with its balance, to the primary heir.",
+   "note": "step 4 opens a Sputnik proposal when a DAO is set · step 5 · nft_transfer to dmw-demo-sarah-67d7.testnet"
+  },
+  {
+   "s": 153.94374997814504,
+   "e": 161.65208331147838,
+   "text": "Settled. Testnet, open source, one command: make demo.",
+   "note": "vault 4 on dmw-26a506.testnet · every transaction is on testnet.nearblocks.io"
+  }
+ ],
+ "speeds": {
+  "3": [
+   [
+    14.5,
+    16.747333335876466
+   ],
+   [
+    49.52516663869223,
+    50.267500019073495
+   ],
+   [
+    134.23708327015248,
+    136.20608325997995
+   ],
+   [
+    141.80608325997997,
+    144.03108321229624
+   ]
+  ],
+  "4": [
+   [
+    125.96708321770038,
+    128.63708327015246
+   ]
+  ],
+  "6": [
+   [
+    24.247333335876466,
+    27.64516666730245
+   ],
+   [
+    52.767500019073495,
+    55.21316667397818
+   ]
+  ],
+  "12": [
+   [
+    64.05016661485037,
+    66.98433328469595
+   ]
+  ],
+  "16": [
+   [
+    78.32433334191641,
+    112.762083341678
+   ]
+  ]
+ },
+ "TOTAL": 167.85208331147837,
+ "cuts": []
+}

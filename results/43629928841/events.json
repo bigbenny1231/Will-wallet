@@ -1,0 +1,393 @@
+[
+ {
+  "t": 1794683178.892,
+  "name": "kline",
+  "text": "19:05:57 fund      funding payout sources from 0xfB76Db2A00a9E5E6fc19d62aA7A4BfE6575ff764 (Base, Monad) and Fy2LUVqerdY71u18TH1eY1EiB6ZEAXYNt7u4WSgdp2BN (Solana"
+ },
+ {
+  "t": 1794683178.893,
+  "name": "kline",
+  "text": "19:05:57 keeper    watching dmw-26a506.testnet via near:dmw-keeper-89d05f3b.testnet→dmw-26a506.testnet, poll every 5s"
+ },
+ {
+  "t": 1794683178.893,
+  "name": "kline",
+  "text": "19:05:57 keeper    only vault 4"
+ },
+ {
+  "t": 1794683183.875,
+  "name": "cli_pulse_stopped"
+ },
+ {
+  "t": 1794683185.94,
+  "name": "phone_first_beat"
+ },
+ {
+  "t": 1794683189.953,
+  "name": "record_start"
+ },
+ {
+  "t": 1794683190.037,
+  "name": "raw_t0",
+  "wall": 1794683190.037
+ },
+ {
+  "t": 1794683207.379,
+  "name": "phone_beat",
+  "n": 2
+ },
+ {
+  "t": 1794683229.325,
+  "name": "phone_beat",
+  "n": 3
+ },
+ {
+  "t": 1794683229.362,
+  "name": "two_beats"
+ },
+ {
+  "t": 1794683233.366,
+  "name": "agent_start"
+ },
+ {
+  "t": 1794683235.58,
+  "name": "scroll",
+  "which": "Agent"
+ },
+ {
+  "t": 1794683238.133,
+  "name": "aline",
+  "kind": "audit"
+ },
+ {
+  "t": 1794683238.333,
+  "name": "aline",
+  "kind": "inbox"
+ },
+ {
+  "t": 1794683238.334,
+  "name": "aline",
+  "kind": "inj"
+ },
+ {
+  "t": 1794683241.135,
+  "name": "aline",
+  "kind": "payment"
+ },
+ {
+  "t": 1794683241.136,
+  "name": "aline",
+  "kind": "allowed"
+ },
+ {
+  "t": 1794683244.339,
+  "name": "aline",
+  "kind": "payment"
+ },
+ {
+  "t": 1794683244.339,
+  "name": "aline",
+  "kind": "allowed"
+ },
+ {
+  "t": 1794683244.34,
+  "name": "aline",
+  "kind": "thought"
+ },
+ {
+  "t": 1794683244.468,
+  "name": "agent_a_exit",
+  "code": 0
+ },
+ {
+  "t": 1794683244.539,
+  "name": "aline",
+  "kind": "payment"
+ },
+ {
+  "t": 1794683244.54,
+  "name": "aline",
+  "kind": "refused"
+ },
+ {
+  "t": 1794683244.54,
+  "name": "aline",
+  "kind": "result"
+ },
+ {
+  "t": 1794683248.143,
+  "name": "aline",
+  "kind": "audit"
+ },
+ {
+  "t": 1794683248.344,
+  "name": "aline",
+  "kind": "inbox"
+ },
+ {
+  "t": 1794683248.345,
+  "name": "aline",
+  "kind": "inj"
+ },
+ {
+  "t": 1794683248.345,
+  "name": "aline",
+  "kind": "thought"
+ },
+ {
+  "t": 1794683250.643,
+  "name": "phone_beat",
+  "n": 4
+ },
+ {
+  "t": 1794683251.139,
+  "name": "agent_b_exit",
+  "code": 0
+ },
+ {
+  "t": 1794683251.142,
+  "name": "agent_dash_rows"
+ },
+ {
+  "t": 1794683251.145,
+  "name": "aline",
+  "kind": "payment"
+ },
+ {
+  "t": 1794683251.146,
+  "name": "aline",
+  "kind": "denied"
+ },
+ {
+  "t": 1794683251.147,
+  "name": "aline",
+  "kind": "result"
+ },
+ {
+  "t": 1794683257.47,
+  "name": "scroll",
+  "which": "top"
+ },
+ {
+  "t": 1794683257.473,
+  "name": "guardian_scene"
+ },
+ {
+  "t": 1794683272.27,
+  "name": "phone_beat",
+  "n": 5
+ },
+ {
+  "t": 1794683274.747,
+  "name": "pause_send"
+ },
+ {
+  "t": 1794683277.476,
+  "name": "pause_done",
+  "out": "FiMDDr2QBCEGUD46\n  log: EVENT_JSON:{\"standard\":\"dmw\",\"version\":\"1.0.0\",\"event\":\"paused\",\"data\":{\"token_id\":\"4\",\"by\":\"guardian\",\"account_id\":\"dmw-demo-guardian-67d7.testnet\",\"paused_until_ms\":1794683876585,\"trigger_at_ms\":1794683876585,\"previous_trigger_at_ms\":1794683391196}}\n  result: 1794683876585\n"
+ },
+ {
+  "t": 1794683279.784,
+  "name": "dash_paused"
+ },
+ {
+  "t": 1794683293.849,
+  "name": "beat_after_pause"
+ },
+ {
+  "t": 1794683293.919,
+  "name": "phone_beat",
+  "n": 6
+ },
+ {
+  "t": 1794683304.198,
+  "name": "dash_unpaused"
+ },
+ {
+  "t": 1794683307.209,
+  "name": "act2"
+ },
+ {
+  "t": 1794683315.832,
+  "name": "phone_beat",
+  "n": 7
+ },
+ {
+  "t": 1794683318.994,
+  "name": "hold_start",
+  "box": {
+   "x": 1493.484375,
+   "y": 659.84375,
+   "width": 134.015625,
+   "height": 134.015625
+  }
+ },
+ {
+  "t": 1794683321.425,
+  "name": "hold_end"
+ },
+ {
+  "t": 1794683321.434,
+  "name": "phone_stopped"
+ },
+ {
+  "t": 1794683321.444,
+  "name": "dash_state",
+  "state": "Warning"
+ },
+ {
+  "t": 1794683378.689,
+  "name": "kline",
+  "text": "19:09:38 state     vault 4: Alive → Warning"
+ },
+ {
+  "t": 1794683880.638,
+  "name": "kline",
+  "text": "19:18:00 poke      vault 4 → Triggered  https://testnet.nearblocks.io/txns/HLycj9dmZqUxYAp2kJsuSr1oHR7gwZShaNYvJ947PtwB"
+ },
+ {
+  "t": 1794683880.639,
+  "name": "kline",
+  "text": "19:18:00 state     vault 4: Warning → Triggered"
+ },
+ {
+  "t": 1794683880.845,
+  "name": "dash_state",
+  "state": "Triggered"
+ },
+ {
+  "t": 1794683880.848,
+  "name": "act3"
+ },
+ {
+  "t": 1794683884.137,
+  "name": "kline",
+  "text": "19:18:03 step      vault 4 step 1/5  https://testnet.nearblocks.io/txns/5zsdXzzkGMo1Uk4uGGrn9cMRy5JDJiXxACWNtw5e6SBN"
+ },
+ {
+  "t": 1794683887.143,
+  "name": "kline",
+  "text": "19:18:07 step      vault 4 step 2/5  https://testnet.nearblocks.io/txns/2r8LFJZ6Lcjui5mGC25tpQHaoSUipkQrtdeEHXD1zGYn"
+ },
+ {
+  "t": 1794683890.146,
+  "name": "kline",
+  "text": "19:18:09 fund      vault 4 base source 0x3a04fA8a96CB6EC643aD8e6771F0AEaf49F858Fa (payout #0) topped up by 0.0005011 ETH to 0.0005011 ETH  https://sepolia.bases"
+ },
+ {
+  "t": 1794683892.647,
+  "name": "kline",
+  "text": "19:18:12 fund      vault 4 monad source 0xBc20bDe46A526d7651B673823d9b7f6E073d76d4 (payout #1) topped up by 0.0302 MON to 0.0302 MON  https://testnet.monadexplo"
+ },
+ {
+  "t": 1794683894.149,
+  "name": "kline",
+  "text": "19:18:14 fund      vault 4 solana source 2WnHAi6eF8QTDAgkGFszsU7e68fzuRjgJyVpyGMeczya (payout #2) topped up by 0.010005 SOL to 0.010005 SOL  https://explorer.so"
+ },
+ {
+  "t": 1794683902.423,
+  "name": "kline",
+  "text": "19:18:22 step      vault 4 step 3/5 (base #0)  https://testnet.nearblocks.io/txns/Bzj6tt6WMXLqixgeG8XRUyNbgoLuNrKE56p5qFaZCKia"
+ },
+ {
+  "t": 1794683902.673,
+  "name": "kline",
+  "text": "19:18:22 relay     vault 4 payout #0 base sent  https://sepolia.basescan.org/tx/0x9eef8be2d052c2bcb8b0d369cc878bc3fae65b05bec500722f6365157e352ea0"
+ },
+ {
+  "t": 1794683905.173,
+  "name": "kline",
+  "text": "19:18:25 mark      vault 4 mark_broadcast #0  https://testnet.nearblocks.io/txns/Gf8q2L2Rqfr6w5ULgabaZMMmynMn3BFJ2sLNCbqBVBJu"
+ },
+ {
+  "t": 1794683906.174,
+  "name": "kline",
+  "text": "19:18:25 fund      vault 4 monad source 0xBc20bDe46A526d7651B673823d9b7f6E073d76d4 (payout #1) holds 0.0302 MON, needs 0.0302 MON: enough"
+ },
+ {
+  "t": 1794683906.175,
+  "name": "kline",
+  "text": "19:18:25 fund      vault 4 solana source 2WnHAi6eF8QTDAgkGFszsU7e68fzuRjgJyVpyGMeczya (payout #2) holds 0.010005 SOL, needs 0.010005 SOL: enough"
+ },
+ {
+  "t": 1794683913.93,
+  "name": "kline",
+  "text": "19:18:33 step      vault 4 step 3/5 (monad #1)  https://testnet.nearblocks.io/txns/eZgHL8eizvMSy71NEuc4jnqjVEYU9FXare3FspMyu9f"
+ },
+ {
+  "t": 1794683914.181,
+  "name": "kline",
+  "text": "19:18:33 relay     vault 4 payout #1 monad sent  https://testnet.monadexplorer.com/tx/0x49485735526a6ea2e18991f1478ca86ad80c42c984024654b4cf4e44df2c9f94"
+ },
+ {
+  "t": 1794683916.94,
+  "name": "kline",
+  "text": "19:18:36 mark      vault 4 mark_broadcast #1  https://testnet.nearblocks.io/txns/9heGgb1PRfDtbTzy5yiyjG2h11f7h43XEaPDkSdfT4ut"
+ },
+ {
+  "t": 1794683917.441,
+  "name": "kline",
+  "text": "19:18:37 fund      vault 4 solana source 2WnHAi6eF8QTDAgkGFszsU7e68fzuRjgJyVpyGMeczya (payout #2) holds 0.010005 SOL, needs 0.010005 SOL: enough"
+ },
+ {
+  "t": 1794683926.205,
+  "name": "kline",
+  "text": "19:18:46 step      vault 4 step 3/5 (solana #2)  https://testnet.nearblocks.io/txns/2fTnjFas56ncoAvGhLYW99jqtmF6NCuTB5YNwnVu2ZPJ"
+ },
+ {
+  "t": 1794683926.456,
+  "name": "kline",
+  "text": "19:18:46 relay     vault 4 payout #2 solana sent  https://explorer.solana.com/tx/Qbkw2phdwUtmGBmyvEa2srcUGgfZHAB6gzw9wfwSieJbkjCmBXhKdBfQDRBT6pvYnuo87kKEXCwwiRt"
+ },
+ {
+  "t": 1794683929.711,
+  "name": "kline",
+  "text": "19:18:49 mark      vault 4 mark_broadcast #2  https://testnet.nearblocks.io/txns/EjDhDouUvTZb7LzmPvci8PBkwv6v2Y8KRYBL4Su72K8x"
+ },
+ {
+  "t": 1794683932.712,
+  "name": "kline",
+  "text": "19:18:52 step      vault 4 step 4/5  https://testnet.nearblocks.io/txns/DiYmMdA9bREw3fkcq5fYrtmbmZiSwZaKRkKcW1yZpCKR"
+ },
+ {
+  "t": 1794683936.026,
+  "name": "dash_state",
+  "state": "Settled"
+ },
+ {
+  "t": 1794683936.22,
+  "name": "kline",
+  "text": "19:18:56 step      vault 4 step 5/5  https://testnet.nearblocks.io/txns/uGLuiJ7rNBzaDBqvfenHRXYWsZkHSfoQkAmzebPRMDP"
+ },
+ {
+  "t": 1794683936.47,
+  "name": "kline",
+  "text": "19:18:56 state     vault 4: Triggered → Settled"
+ },
+ {
+  "t": 1794683941.976,
+  "name": "kline",
+  "text": "19:19:01 verify    vault 4 payout #0 base 0x9eef8be2d052c2bcb8b0d369cc878bc3fae65b05bec500722f6365157e352ea0 is on chain"
+ },
+ {
+  "t": 1794683942.226,
+  "name": "kline",
+  "text": "19:19:01 verify    vault 4 payout #1 monad 0x49485735526a6ea2e18991f1478ca86ad80c42c984024654b4cf4e44df2c9f94 is on chain"
+ },
+ {
+  "t": 1794683942.227,
+  "name": "kline",
+  "text": "19:19:02 verify    vault 4 payout #2 solana Qbkw2phdwUtmGBmyvEa2srcUGgfZHAB6gzw9wfwSieJbkjCmBXhKdBfQDRBT6pvYnuo87kKEXCwwiRtN99Mk1jH is on chain"
+ },
+ {
+  "t": 1794683946.331,
+  "name": "record_end"
+ },
+ {
+  "t": 1794683946.683,
+  "name": "raw_done",
+  "code": 0,
+  "written": 22697,
+  "nFrames": 14808
+ }
+]
