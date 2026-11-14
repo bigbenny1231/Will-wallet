@@ -36,9 +36,9 @@ account), `projectUrl` (the public repo), `demoUrl` (the public X post), `idea` 
 }
 ```
 
-## 2. X demo post (pick one; attach `site/assets/demo-v4-x-720p.mp4`, the 2:14 cut, or `site/assets/demo-v4-720p.mp4`, 2:50, from a Premium account)
+## 2. X demo post (pick one; attach `site/assets/demo-v4-x-720p.mp4`, the 2:16 cut, or `site/assets/demo-v4-720p.mp4`, 2:48, from a Premium account)
 
-Both are the v4 cut of vault 4, filmed on the live contract (run 43290509255, `docs/LIVE_CONTRACT.md`). Do not attach an earlier cut.
+Both are the v4 cut of vault 4, filmed on the live contract (run 43629928841, `docs/LIVE_CONTRACT.md`). Do not attach an earlier cut.
 
 Lengths use X's counting (a link is 23 characters whatever its length). Each is under 280.
 
@@ -77,7 +77,7 @@ What would you test next?
 
 Each one shows the complete action in the video: a vault that is Alive, a stopped pulse, and five settlement steps to
 Settled. Variant A is the agent story (the Security track), B the heir story (the NFT and Open tracks), C the attack.
-X accepts 2:20 on a standard account and 10 minutes on Premium: the 2:14 cut fits either; the 2:50 cut needs Premium.
+X accepts 2:20 on a standard account and 10 minutes on Premium: the 2:16 cut fits either; the 2:48 cut needs Premium.
 
 ## 3. Thread, days 1 to 3 (technical)
 
@@ -148,27 +148,27 @@ curl -sI $DASH | head -1                             # 200
 curl -sI $DASH/vault/1 | head -1                     # 200 (SPA rewrite)
 curl -sI $DASH/pulse | head -1                       # 200
 curl -sI $SITE/assets/demo-v4-720p.mp4 | head -1        # 200 (the v4 cut, committed)
-ffprobe -v error -show_entries format=duration -of csv=p=0 site/assets/demo-v4-720p.mp4   # 170.18 (v4, vault 4 on dmw-885364.testnet, 5.7 MB)
+ffprobe -v error -show_entries format=duration -of csv=p=0 site/assets/demo-v4-720p.mp4   # 167.87 (v4, vault 4 on dmw-26a506.testnet, 5.9 MB)
 
 # 4. NEP-330 link check
-curl -s https://rpc.testnet.fastnear.com -H 'content-type: application/json' -d '{"jsonrpc":"2.0","id":1,"method":"query","params":{"request_type":"call_function","finality":"final","account_id":"dmw-885364.testnet","method_name":"contract_source_metadata","args_base64":"e30="}}' \
+curl -s https://rpc.testnet.fastnear.com -H 'content-type: application/json' -d '{"jsonrpc":"2.0","id":1,"method":"query","params":{"request_type":"call_function","finality":"final","account_id":"dmw-26a506.testnet","method_name":"contract_source_metadata","args_base64":"e30="}}' \
   | python3 -c 'import sys,json;print(bytes(json.load(sys.stdin)["result"]["result"]).decode())'
-#   -> "link" must point to the repo at commit 6c581107017ad53414a2970a1b85497c35d4c57d, and "build_info" must name
+#   -> "link" must point to the repo at commit d8165c6db676cdd66e248a113380a60bf8099fe8, and "build_info" must name
 #      sourcescan/cargo-near:0.23.0-rust-1.99.1@sha256:8013f039... (the reproducible build). The expected hash is in the
 #      README row "The live contract is this source" and in docs/LIVE_CONTRACT.md
 curl -sI https://github.com/bigbenny1231/will-wallet | head -1            # 200 (repo is public)
 curl -sI https://github.com/bigbenny1231/will-wallet/tree/hackathon-submission | head -1           # 200
-# compare: at commit 6c58110, `make build-reproducible` (Docker, cargo-near 0.23.0) prints the code hash; `view_account
-# dmw-885364.testnet` code_hash must be the same (8geWkWLte1vsnVStUZtoNkNoL2b6sgLh5wPuSH9n4tna). The contract has no
+# compare: at commit d8165c6, `make build-reproducible` (Docker, cargo-near 0.23.0) prints the code hash; `view_account
+# dmw-26a506.testnet` code_hash must be the same (21GyDHicz5Zn1nLnYsHnDLMEpdskNigr9jDtqufw6koK). The contract has no
 # full-access key, so it cannot change.
 
 # 5. the video
-ffprobe -v error -show_entries format=duration,size -of csv=p=0 site/assets/demo-v4-720p.mp4 site/assets/demo-v4-x-720p.mp4   # 170.18 / 134.34 s
-#   the 2:14 cut fits X's 2:20 limit for a standard account; the 2:50 cut needs Premium
+ffprobe -v error -show_entries format=duration,size -of csv=p=0 site/assets/demo-v4-720p.mp4 site/assets/demo-v4-x-720p.mp4   # 167.87 / 135.66 s
+#   the 2:16 cut fits X's 2:20 limit for a standard account; the 2:48 cut needs Premium
 
 # 6. the showcase vault and its source addresses
-cd keeper && DMW_CONTRACT=dmw-885364.testnet npm run derive -- --token 1   # Base 0x7F98...3f3b, Monad 0xa8fd...4b91, Solana CPRM...hZdc
-cd .. && DMW_CONTRACT=dmw-885364.testnet make status TOKEN=1                 # vault 1 Alive, three payouts pending
+cd keeper && DMW_CONTRACT=dmw-26a506.testnet npm run derive -- --token 1   # Base 0x71A3...1A15, Monad 0xEfbA...72eb, Solana 6KjP...ghfC
+cd .. && DMW_CONTRACT=dmw-26a506.testnet make status TOKEN=1                 # vault 1 Alive, three payouts pending
 # fund: Base >= 0.001 ETH, Monad >= 0.05 MON (10 MON reserve: the single payout is an emptying tx), Solana >= 0.05 SOL
 # (faucets in keeper/SHOWCASE.md)
 
@@ -183,7 +183,7 @@ PY
 #   -> a length between 20 and 2000, and exactly: {{EMAIL}} {{NEAR_MAINNET_PAYOUT_ACCOUNT}} {{REQUEST_ID}} {{X_POST_URL}}
 ```
 
-Then, in order (the hardened contract v2 is deployed and locked, Nov 12 2026): make the repo public;
+Then, in order (the hardened contract v3 is deployed and locked, Nov 14 2026): make the repo public;
 tag and push `hackathon-submission` (steps 1 and 2 above need the public repo and the tag); post the demo with the video attached (replace `{{SITE_URL}}` with the live
 site); copy its URL into `demoUrl`; fill `requestId`, the email and `nearAddress` (a lowercase mainnet account, not
 `.testnet`); set `consent` only after the human agrees; submit; post the thread.

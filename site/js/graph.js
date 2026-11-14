@@ -1,10 +1,10 @@
-// Live estate graph: vault 1 on dmw-885364.testnet (the showcase vault), read with read-only JSON-RPC `query` calls (no keys, no writes).
+// Live estate graph: vault 1 on dmw-26a506.testnet (the showcase vault), read with read-only JSON-RPC `query` calls (no keys, no writes).
 // Vault -> chains -> who receives what at settlement. Edges pulse on load and whenever the chain reports a new
 // heartbeat (polled every 30 s while the section is on screen). Also the live facts kept from v3: the vault count,
 // vault 1's last beat, and the demo vault's (4) five settlement steps as read now.
 import { emit, reducedMotion } from './seal.js';
 
-const CONTRACT = 'dmw-885364.testnet';
+const CONTRACT = 'dmw-26a506.testnet';
 const SHOWCASE = '1';   // keeper/SHOWCASE.md
 const DEMO = '4';       // the recorded run (docs/video/README.md v4, docs/LIVE_CONTRACT.md)
 const RPCS = ['https://rpc.testnet.fastnear.com', 'https://rpc.testnet.near.org'];
@@ -13,11 +13,11 @@ const POLL_MS = 30000;
 
 // Settlement transactions of the demo vault, from the recorded run's keeper log (docs/video/README.md, v4).
 const V17_TX = {
-  step_1: ['GfRYEWBSYKTgWwqjPFEXykxFvPvPzBb9dAXH6fe7KTiw'],
-  step_2: ['2pUzmF1psUBL1FZAdkvqMaSAZkwuYHhfNcQLynTE1Qfi'],
-  step_3: ['2C5g8gQDjYkfvjHy9S9dtM6YnQneSNXBTHyDwS3vf2nh', '3VrfD3FMJiRvFC6JUyh7JvkXERDxY1yJxH339z2RBCW8', 'FRz14Qnf78CCUXKaqXRRuZittY6JinV5FxDS8Eo6ULzA'],
-  step_4: ['8YjhLkVxGmXy1wfHDeu9hT31fDAZp246c1eyDPivtsGi'],
-  step_5: ['4KtyRoV1yMQMkEBQFPWUVjaFaf3BiQHUken68jAFWLJ7'],
+  step_1: ['5zsdXzzkGMo1Uk4uGGrn9cMRy5JDJiXxACWNtw5e6SBN'],
+  step_2: ['2r8LFJZ6Lcjui5mGC25tpQHaoSUipkQrtdeEHXD1zGYn'],
+  step_3: ['Bzj6tt6WMXLqixgeG8XRUyNbgoLuNrKE56p5qFaZCKia', 'eZgHL8eizvMSy71NEuc4jnqjVEYU9FXare3FspMyu9f', '2fTnjFas56ncoAvGhLYW99jqtmF6NCuTB5YNwnVu2ZPJ'],
+  step_4: ['DiYmMdA9bREw3fkcq5fYrtmbmZiSwZaKRkKcW1yZpCKR'],
+  step_5: ['uGLuiJ7rNBzaDBqvfenHRXYWsZkHSfoQkAmzebPRMDP'],
 };
 const STEP_LABEL = {
   step_1: ['I', 'Heirs paid on NEAR'],

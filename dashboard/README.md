@@ -26,7 +26,7 @@ Vaults 2 and 3 exist so the Heir page has content. In the browser console, `__dm
 
 | Var | Default | Meaning |
 | --- | --- | --- |
-| `VITE_DMW_CONTRACT` | `dmw-885364.testnet` | contract account (see `docs/LIVE_CONTRACT.md`) |
+| `VITE_DMW_CONTRACT` | `dmw-26a506.testnet` | contract account (see `docs/LIVE_CONTRACT.md`) |
 | `VITE_NEAR_NETWORK` | `testnet` | `testnet` or `mainnet` |
 | `VITE_NEAR_RPC` | public RPC | RPC override |
 | `VITE_DMW_MOCK` | `0` | `1` = mock data |

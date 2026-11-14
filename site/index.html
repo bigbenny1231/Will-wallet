@@ -164,13 +164,13 @@
         <div class="cta-row">
           <a class="pill" data-link="try" href="https://lastwordvault-app.vercel.app/try">Try it, no wallet</a>
           <a class="link" data-link="dashboard" href="https://lastwordvault-app.vercel.app">Set up a vault</a>
-          <a class="link" href="#demo">Watch the demo, 2:50</a>
+          <a class="link" href="#demo">Watch the demo, 2:48</a>
         </div>
         <p class="fine">Open source. Runs on NEAR testnet. Not a will; meant to sit alongside one.</p>
       </div>
 
       <div class="sim" id="sim" aria-labelledby="sim-h">
-        <p class="sim-h" id="sim-h">Vault 4, as it settled on testnet on Nov 12 2026. Each line links to its transaction.</p>
+        <p class="sim-h" id="sim-h">Vault 4, as it settled on testnet on Nov 14 2026. Each line links to its transaction.</p>
         <ol class="sim-rows">
           <li><span class="sim-n">I</span><span class="sim-what">Heirs paid on NEAR<span class="sim-detail">Sarah 60 %, Ben 40 %</span></span><code class="sim-hash"></code></li>
           <li><span class="sim-n">II</span><span class="sim-what">Pulse and agent keys deleted<span class="sim-detail">Including the phone&#8217;s</span></span><code class="sim-hash"></code></li>
@@ -196,7 +196,7 @@
 <section class="story" id="how" aria-labelledby="how-h">
   <div class="wrap story-head">
     <h2 id="how-h">Vault 4, as it happened.</h2>
-    <p>12 November 2026, 19:31 to 19:43 UTC, on NEAR testnet, on the live contract <span class="mono">dmw-885364.testnet</span>. Scroll and the line is drawn in the order it happened, spaced by the time between events. Every transaction link below goes to the chain; times are from the recording run&#8217;s logs, within a second or two of the block, and the warning is when the keeper saw it.</p>
+    <p>14 November 2026, 19:06 to 19:18 UTC, on NEAR testnet, on the live contract <span class="mono">dmw-26a506.testnet</span>. Scroll and the line is drawn in the order it happened, spaced by the time between events. Every transaction link below goes to the chain; times are from the recording run&#8217;s logs, within a second or two of the block, and the warning is when the keeper saw it.</p>
   </div>
   <div class="wrap story-grid">
     <div class="story-clock" aria-hidden="true">
@@ -269,7 +269,7 @@
         </div>
         <div class="clock-read">
           <p class="clock-word" data-clock="word">Alive</p>
-          <p class="clock-time" data-clock="time">19:31:00</p>
+          <p class="clock-time" data-clock="time">19:06:25</p>
           <p class="clock-meta">UTC, vault 4</p>
         </div>
       </div>
@@ -278,44 +278,44 @@
     <div class="track" id="track">
       <svg class="spine" id="spine" aria-hidden="true" focusable="false"></svg>
       <ol class="events" aria-label="Vault 4 timeline">
-        <li class="ev ev-act" data-t="1794511858000" data-phase="alive">
+        <li class="ev ev-act" data-t="1794683183409" data-phase="alive">
           <h3 class="kin" data-kin="alive">I. Alive</h3>
           <p class="ev-lede">While you are alive, nothing happens.</p>
           <p>The owner&#8217;s phone holds a pulse key that can only say they are still here. It beat about every 20 seconds. The vault&#8217;s agent kept paying invoices inside its limits.</p>
         </li>
-        <li class="ev ev-beat" data-t="1794511860531"><time>19:31:00</time><span>Heartbeat, signed on the phone</span></li>
-        <li class="ev ev-beat" data-t="1794511882302"><time>19:31:22</time><span>Heartbeat</span></li>
-        <li class="ev ev-beat" data-t="1794511904278"><time>19:31:44</time><span>Heartbeat</span></li>
-        <li class="ev ev-chip ok" data-t="1794511917479"><time>19:31:57</time><span class="chip">agent paid 0.12 NEAR &#183; allowed</span><span class="ev-sub">Invoice INV-2041, to the allowlisted API account. <a href="https://testnet.nearblocks.io/txns/GiBg2hTapA1uMu39Wv9YJoCKHqqHXKiGtEio8PMwTLEA">tx<span class="sr-only">: agent paid 0.12 NEAR on nearblocks</span></a></span></li>
-        <li class="ev ev-chip ok" data-t="1794511920288"><time>19:32:00</time><span class="chip">agent paid 0.08 NEAR &#183; allowed</span><span class="ev-sub">Invoice INV-2042. <a href="https://testnet.nearblocks.io/txns/FZj6GKDAcnzL4AkWfA8bzWjvuvnfw87oNmKo7KyinsPj">tx<span class="sr-only">: agent paid 0.08 NEAR on nearblocks</span></a></span></li>
-        <li class="ev ev-chip no" data-t="1794511920691"><time>19:32:00</time><span class="chip">agent tried 2.45 NEAR &#183; refused</span><span class="ev-sub">The scripted agent obeyed a planted message to pay <span class="mono">stranger.testnet</span>. Its wallet refused to sign; no transaction exists.</span></li>
-        <li class="ev ev-beat" data-t="1794511926268"><time>19:32:06</time><span>Heartbeat</span></li>
-        <li class="ev ev-chip no" data-t="1794511928311"><time>19:32:08</time><span class="chip">agent tried 2.25 NEAR &#183; denied</span><span class="ev-sub">Run again with the wallet&#8217;s checks switched off. The contract refused it, <span class="mono">receiver_not_allowlisted</span>, and logged it. <a href="https://testnet.nearblocks.io/txns/BdAe16wBKJdoiNWZVntmusJjEckiyFvatwzsBZBdybRJ">tx<span class="sr-only">: agent payment denied on nearblocks</span></a></span></li>
-        <li class="ev ev-beat" data-t="1794511947885"><time>19:32:27</time><span>Heartbeat</span></li>
-        <li class="ev ev-note" data-t="1794511954210"><time>19:32:34</time><span>The guardian paused the vault</span><span class="ev-sub">One pause per cycle, capped at 10 minutes. It moved the deadline from 19:34:27 to 19:42:33.</span></li>
-        <li class="ev ev-beat" data-t="1794511970178"><time>19:32:50</time><span>Heartbeat</span></li>
-        <li class="ev ev-beat ev-last" data-t="1794511992768"><time>19:33:12</time><span>The last heartbeat</span></li>
+        <li class="ev ev-beat" data-t="1794683185940"><time>19:06:25</time><span>Heartbeat, signed on the phone</span></li>
+        <li class="ev ev-beat" data-t="1794683207379"><time>19:06:47</time><span>Heartbeat</span></li>
+        <li class="ev ev-beat" data-t="1794683229325"><time>19:07:09</time><span>Heartbeat</span></li>
+        <li class="ev ev-chip ok" data-t="1794683241136"><time>19:07:20</time><span class="chip">agent paid 0.12 NEAR &#183; allowed</span><span class="ev-sub">Invoice INV-2041, to the allowlisted API account. <a href="https://testnet.nearblocks.io/txns/7hk3xW55WPHuFNKVVDuSRqLMvxLsHwahM87iUqdGpYtX">tx<span class="sr-only">: agent paid 0.12 NEAR on nearblocks</span></a></span></li>
+        <li class="ev ev-chip ok" data-t="1794683244339"><time>19:07:24</time><span class="chip">agent paid 0.08 NEAR &#183; allowed</span><span class="ev-sub">Invoice INV-2042. <a href="https://testnet.nearblocks.io/txns/BMPMnGP2HChx1bPMC3qwZFSTfmuKGHo3mzBUmMCNcM6A">tx<span class="sr-only">: agent paid 0.08 NEAR on nearblocks</span></a></span></li>
+        <li class="ev ev-chip no" data-t="1794683244539"><time>19:07:24</time><span class="chip">agent tried 2.45 NEAR &#183; refused</span><span class="ev-sub">The scripted agent obeyed a planted message to pay <span class="mono">stranger.testnet</span>. Its wallet refused to sign; no transaction exists.</span></li>
+        <li class="ev ev-beat" data-t="1794683250643"><time>19:07:30</time><span>Heartbeat</span></li>
+        <li class="ev ev-chip no" data-t="1794683251145"><time>19:07:30</time><span class="chip">agent tried 2.25 NEAR &#183; denied</span><span class="ev-sub">Run again with the wallet&#8217;s checks switched off. The contract refused it, <span class="mono">receiver_not_allowlisted</span>, and logged it. <a href="https://testnet.nearblocks.io/txns/4HAMVHkzUb2QvgEP2zSZyH8vqBD9KvhtmtyJrrBUpSta">tx<span class="sr-only">: agent payment denied on nearblocks</span></a></span></li>
+        <li class="ev ev-beat" data-t="1794683272270"><time>19:07:51</time><span>Heartbeat</span></li>
+        <li class="ev ev-note" data-t="1794683277476"><time>19:07:57</time><span>The guardian paused the vault</span><span class="ev-sub">One pause per cycle, capped at 10 minutes. It moved the deadline from 19:09:51 to 19:17:56.</span></li>
+        <li class="ev ev-beat" data-t="1794683293919"><time>19:08:13</time><span>Heartbeat</span></li>
+        <li class="ev ev-beat ev-last" data-t="1794683315832"><time>19:08:35</time><span>The last heartbeat</span></li>
 
-        <li class="ev ev-act" data-t="1794511994000" data-phase="silence">
+        <li class="ev ev-act" data-t="1794683317021" data-phase="silence">
           <h3 class="kin" data-kin="silence">II. Silence</h3>
           <p class="ev-lede">When the beats stop, the vault waits.</p>
           <p>Vault 4 waited two missed 60-second beats, one to turn amber and one of grace, and the guardian&#8217;s pause on top. Yours can wait years. Only when the grace runs out can anyone start settlement.</p>
         </li>
-        <li class="ev ev-note" data-t="1794511995973"><time>19:33:15</time><span>Hold to stop, on the phone</span></li>
-        <li class="ev ev-warn" data-t="1794512055267" data-state="warn"><time>19:34:15</time><span>Warning. The seal turns amber</span></li>
-        <li class="ev ev-trigger" data-t="1794512558338" data-state="dead"><time>19:42:38</time><span>A keeper pokes it. Triggered</span><span class="ev-sub">Anyone can. This one is the vault&#8217;s own keeper, named by the owner, and it earned the 0.05 NEAR bounty. <a href="https://testnet.nearblocks.io/txns/4aobfntQWvsB4FUhSaQtvxNFvNMKNCcuCod9n8mPXHAE">tx<span class="sr-only">: keeper poke on nearblocks</span></a></span></li>
+        <li class="ev ev-note" data-t="1794683318994"><time>19:08:38</time><span>Hold to stop, on the phone</span></li>
+        <li class="ev ev-warn" data-t="1794683378689" data-state="warn"><time>19:09:38</time><span>Warning. The seal turns amber</span></li>
+        <li class="ev ev-trigger" data-t="1794683880638" data-state="dead"><time>19:18:00</time><span>A keeper pokes it. Triggered</span><span class="ev-sub">Anyone can. This one is the contract&#8217;s standing keeper, and it earned the 0.05 NEAR bounty. <a href="https://testnet.nearblocks.io/txns/HLycj9dmZqUxYAp2kJsuSr1oHR7gwZShaNYvJ947PtwB">tx<span class="sr-only">: keeper poke on nearblocks</span></a></span></li>
 
-        <li class="ev ev-act" data-t="1794512560000" data-phase="settle">
+        <li class="ev ev-act" data-t="1794683881279" data-phase="settle">
           <h3 class="kin" data-kin="settle">III. Settlement</h3>
           <p class="ev-lede">When you are not, this executes.</p>
           <p>Five steps, in order, each a NEAR transaction anyone can push forward.</p>
         </li>
-        <li class="ev ev-tick" data-t="1794512562858"><time>19:42:42</time><span><b class="tick-n">I</b>Heirs paid on NEAR</span><span class="ev-sub">Sarah 60 %, Ben 40 %. <a href="https://testnet.nearblocks.io/txns/GfRYEWBSYKTgWwqjPFEXykxFvPvPzBb9dAXH6fe7KTiw">tx<span class="sr-only">: step I on nearblocks</span></a></span></li>
-        <li class="ev ev-tick" data-t="1794512566117"><time>19:42:46</time><span><b class="tick-n">II</b>Pulse and agent keys deleted</span><span class="ev-sub">Including the phone&#8217;s. <a href="https://testnet.nearblocks.io/txns/2pUzmF1psUBL1FZAdkvqMaSAZkwuYHhfNcQLynTE1Qfi">tx<span class="sr-only">: step II on nearblocks</span></a></span></li>
-        <li class="ev ev-tick" data-t="1794512575889"><time>19:42:55</time><span><b class="tick-n">III</b>Base, Monad and Solana payouts signed</span><span class="ev-sub">By NEAR&#8217;s MPC network, at 19:42:55, 19:43:05 and 19:43:14, for a keeper to relay and record on the vault. <a href="https://testnet.nearblocks.io/txns/2C5g8gQDjYkfvjHy9S9dtM6YnQneSNXBTHyDwS3vf2nh">Base<span class="sr-only"> payout signature on nearblocks</span></a>, <a href="https://testnet.nearblocks.io/txns/3VrfD3FMJiRvFC6JUyh7JvkXERDxY1yJxH339z2RBCW8">Monad<span class="sr-only"> payout signature on nearblocks</span></a>, <a href="https://testnet.nearblocks.io/txns/FRz14Qnf78CCUXKaqXRRuZittY6JinV5FxDS8Eo6ULzA">Solana<span class="sr-only"> payout signature on nearblocks</span></a></span></li>
-        <li class="ev ev-tick" data-t="1794512598489"><time>19:43:18</time><span><b class="tick-n">IV</b>Estate DAO proposal</span><span class="ev-sub">Vault 4 named no DAO, so the step was skipped. <a href="https://testnet.nearblocks.io/txns/8YjhLkVxGmXy1wfHDeu9hT31fDAZp246c1eyDPivtsGi">tx<span class="sr-only">: step IV on nearblocks</span></a></span></li>
-        <li class="ev ev-tick ev-final" data-t="1794512613278" data-state="still"><time>19:43:33</time><span><b class="tick-n">V</b>Will NFT to Sarah</span><span class="ev-sub"><span class="mono">dmw-demo-sarah-2667.testnet</span> can claim the 0.1 NEAR left in the vault. <a href="https://testnet.nearblocks.io/txns/4KtyRoV1yMQMkEBQFPWUVjaFaf3BiQHUken68jAFWLJ7">tx<span class="sr-only">: step V on nearblocks</span></a></span></li>
-        <li class="ev ev-end" data-t="1794512617000"><p class="settled-line">Settled. Left to Sarah.</p></li>
+        <li class="ev ev-tick" data-t="1794683884137"><time>19:18:03</time><span><b class="tick-n">I</b>Heirs paid on NEAR</span><span class="ev-sub">Sarah 60 %, Ben 40 %. <a href="https://testnet.nearblocks.io/txns/5zsdXzzkGMo1Uk4uGGrn9cMRy5JDJiXxACWNtw5e6SBN">tx<span class="sr-only">: step I on nearblocks</span></a></span></li>
+        <li class="ev ev-tick" data-t="1794683887143"><time>19:18:07</time><span><b class="tick-n">II</b>Pulse and agent keys deleted</span><span class="ev-sub">Including the phone&#8217;s. <a href="https://testnet.nearblocks.io/txns/2r8LFJZ6Lcjui5mGC25tpQHaoSUipkQrtdeEHXD1zGYn">tx<span class="sr-only">: step II on nearblocks</span></a></span></li>
+        <li class="ev ev-tick" data-t="1794683902423"><time>19:18:22</time><span><b class="tick-n">III</b>Base, Monad and Solana paid</span><span class="ev-sub">By NEAR&#8217;s MPC network, at 19:18:22, 19:18:33 and 19:18:46. The keeper relayed each one and all three landed: <a href="https://sepolia.basescan.org/tx/0x9eef8be2d052c2bcb8b0d369cc878bc3fae65b05bec500722f6365157e352ea0">Base<span class="sr-only"> payout on Basescan</span></a>, <a href="https://testnet.monadexplorer.com/tx/0x49485735526a6ea2e18991f1478ca86ad80c42c984024654b4cf4e44df2c9f94">Monad<span class="sr-only"> payout on the Monad explorer</span></a>, <a href="https://explorer.solana.com/tx/Qbkw2phdwUtmGBmyvEa2srcUGgfZHAB6gzw9wfwSieJbkjCmBXhKdBfQDRBT6pvYnuo87kKEXCwwiRtN99Mk1jH?cluster=devnet">Solana<span class="sr-only"> payout on the Solana explorer</span></a>. Signatures: <a href="https://testnet.nearblocks.io/txns/Bzj6tt6WMXLqixgeG8XRUyNbgoLuNrKE56p5qFaZCKia">Base<span class="sr-only"> payout signature on nearblocks</span></a>, <a href="https://testnet.nearblocks.io/txns/eZgHL8eizvMSy71NEuc4jnqjVEYU9FXare3FspMyu9f">Monad<span class="sr-only"> payout signature on nearblocks</span></a>, <a href="https://testnet.nearblocks.io/txns/2fTnjFas56ncoAvGhLYW99jqtmF6NCuTB5YNwnVu2ZPJ">Solana<span class="sr-only"> payout signature on nearblocks</span></a></span></li>
+        <li class="ev ev-tick" data-t="1794683932712"><time>19:18:52</time><span><b class="tick-n">IV</b>Estate DAO proposal</span><span class="ev-sub">Vault 4 named no DAO, so the step was skipped. <a href="https://testnet.nearblocks.io/txns/DiYmMdA9bREw3fkcq5fYrtmbmZiSwZaKRkKcW1yZpCKR">tx<span class="sr-only">: step IV on nearblocks</span></a></span></li>
+        <li class="ev ev-tick ev-final" data-t="1794683936220" data-state="still"><time>19:18:56</time><span><b class="tick-n">V</b>Will NFT to Sarah</span><span class="ev-sub"><span class="mono">dmw-demo-sarah-67d7.testnet</span> can claim the 0.1 NEAR left in the vault. <a href="https://testnet.nearblocks.io/txns/uGLuiJ7rNBzaDBqvfenHRXYWsZkHSfoQkAmzebPRMDP">tx<span class="sr-only">: step V on nearblocks</span></a></span></li>
+        <li class="ev ev-end" data-t="1794683937592"><p class="settled-line">Settled. Left to Sarah.</p></li>
       </ol>
     </div>
   </div>
@@ -343,7 +343,7 @@
   <div class="wrap">
     <header class="estate-head">
       <h2 id="live-h">One estate, read live.</h2>
-      <p>Vault 1 on <code>dmw-885364.testnet</code>, read from the chain while this page is open. Select any part to see what it holds. <span class="live-when" id="live-when">Reading the chain&#8230;</span></p>
+      <p>Vault 1 on <code>dmw-26a506.testnet</code>, read from the chain while this page is open. Select any part to see what it holds. <span class="live-when" id="live-when">Reading the chain&#8230;</span></p>
     </header>
 
     <div class="graph" id="graph" aria-busy="true">
@@ -352,7 +352,7 @@
       <p class="graph-label"><span class="live-dot" aria-hidden="true"></span>Live from NEAR testnet &#183; vault 1</p>
     </div>
     <div class="graph-detail" id="graph-detail" aria-live="polite"></div>
-    <p class="live-fail" id="live-fail" hidden>NEAR testnet did not answer just now, so nothing live is shown. The contract is <code>dmw-885364.testnet</code>; <a class="link" href="https://testnet.nearblocks.io/address/dmw-885364.testnet">read it on nearblocks</a> or reload to try again.</p>
+    <p class="live-fail" id="live-fail" hidden>NEAR testnet did not answer just now, so nothing live is shown. The contract is <code>dmw-26a506.testnet</code>; <a class="link" href="https://testnet.nearblocks.io/address/dmw-26a506.testnet">read it on nearblocks</a> or reload to try again.</p>
 
     <div class="live-grid" id="live-grid" aria-busy="true">
       <div class="live-cell">
@@ -373,7 +373,7 @@
         <h3 class="live-k">Vault 4, the run above, read now</h3>
         <p class="live-state" data-live="v17-state">&#160;</p>
         <ol class="live-steps" data-live="v17-steps"></ol>
-        <a class="link" href="https://testnet.nearblocks.io/address/dmw-885364.testnet">The contract on nearblocks</a>
+        <a class="link" href="https://testnet.nearblocks.io/address/dmw-26a506.testnet">The contract on nearblocks</a>
       </div>
     </div>
   </div>
@@ -396,7 +396,7 @@
           <svg viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="31" fill="none" stroke="currentColor" stroke-width="1"/><path d="M26 21.5v21l17-10.5z" fill="currentColor"/></svg>
         </button>
       </div>
-      <figcaption id="demo-cap">2 minutes 50 seconds, silent, captions burned in. Vault 4 on <span class="mono">dmw-885364.testnet</span>.</figcaption>
+      <figcaption id="demo-cap">2 minutes 48 seconds, silent, captions burned in. Vault 4 on <span class="mono">dmw-26a506.testnet</span>.</figcaption>
     </figure>
   </div>
 </section>
